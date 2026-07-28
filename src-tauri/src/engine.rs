@@ -194,7 +194,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         let mut downloaded: u64 = 0;
         let mut stream = res.bytes_stream();
         
-        let mut last_reported_pct = 0;
+        let mut last_reported_pct = 0i32;
         while let Some(chunk_res) = stream.next().await {
             let chunk_data = chunk_res.map_err(|e| format!("Stream error: {}", e))?;
             writer.write_all(&chunk_data).await.map_err(|e| format!("Disk error: {}", e))?;
@@ -203,16 +203,22 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             if total_size > 0 {
                 let pct = ((downloaded as f64 / total_size as f64) * 100.0) as i32;
                 if pct > last_reported_pct {
-                    let _ = app.emit("install-progress", InstallProgress { i: 0, text: format!("Downloading ({}%)", pct), total: 3, done: false });
+                    // i=pct, total=100 → progress bar fills from 0% to 100% during download
+                    let _ = app.emit("install-progress", InstallProgress { i: pct as usize, text: format!("Downloading ISO... {}%", pct), total: 100, done: false });
                     last_reported_pct = pct;
                 }
+            } else {
+                // Unknown size — show spinner text only
+                let _ = app.emit("install-progress", InstallProgress { i: 50, text: "Downloading ISO...".into(), total: 100, done: false });
             }
         }
         writer.flush().await.map_err(|e| format!("Disk flush error: {}", e))?;
+        // Download complete — reset to 3-step provisioning progress
+        let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Download Complete ✓ — Starting provisioning...".into(), total: 3, done: false });
         let _ = app.emit("command-output", Payload { message: "Download Complete.\n".to_string() });
     }
     
-    let _ = app.emit("install-progress", InstallProgress { i: 0, text: "".into(), total: 3, done: true });
+    let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Preparing environment...".into(), total: 3, done: false });
     
     if intent == "vbox_vm" {
         let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
