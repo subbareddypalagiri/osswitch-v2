@@ -153,8 +153,14 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         };
         
         let out = Command::new("wsl").arg("--install").arg("-d").arg(wsl_distro).output().await;
-        if out.is_err() {
-            return Err("Failed to execute WSL command.".into());
+        match out {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(format!("WSL installation failed: {}", stderr));
+                }
+            },
+            Err(e) => return Err(format!("Failed to execute WSL command: {}", e)),
         }
         
         let _ = app.emit("install-progress", InstallProgress { i: 0, text: "".into(), total: 1, done: true });
