@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useMemo } from "react";
+import { useState, useEffect, memo, useMemo } from "react";
 import { OS_LIST } from "./StepChooseOS";
 import { OS_CATALOG, BUNDLES } from "./constants";
 import { invoke } from "@tauri-apps/api/core";
@@ -43,7 +43,7 @@ export const InstallProgressBar = memo(function InstallProgressBar() {
 });
 
 export default function StepInstall({ 
-  onNext, 
+  onNext: _onNext, 
   onBack,
   selectedOS,
   selectedIntents,
