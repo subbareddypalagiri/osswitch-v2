@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import StepWelcome from "./StepWelcome";
 import StepScan from "./StepScan";
 import StepChooseOS from "./StepChooseOS";
 import StepConfigure from "./StepConfigure";
 import StepBundles from "./StepBundles";
 import StepInstall from "./StepInstall";
+import { OS_CATALOG } from "./constants";
 import "./App.css";
+
+// 🌐 Cloud Catalog URL — auto-updated weekly by GitHub Actions
+const CLOUD_CATALOG_URL = "https://raw.githubusercontent.com/subbareddypalagiri/osswitch-v2/master/catalog.json";
 
 const STEPS = [
   "Welcome",
@@ -22,6 +26,25 @@ function App() {
   const [selectedIntents, setSelectedIntents] = useState<Record<string, string>>({});
   const [selectedBundles, setSelectedBundles] = useState<string[]>([]);
   const [backupEnabled, setBackupEnabled] = useState(false);
+
+  // 🌐 Fetch fresh ISO URLs from GitHub cloud catalog on startup
+  useEffect(() => {
+    fetch(CLOUD_CATALOG_URL)
+      .then(res => res.json())
+      .then((cloudData: Record<string, { isoUrl?: string; officialSite?: string }>) => {
+        for (const entry of OS_CATALOG) {
+          const cloud = cloudData[entry.id];
+          if (cloud) {
+            if (cloud.isoUrl) entry.isoUrl = cloud.isoUrl;
+            if (cloud.officialSite) entry.officialSite = cloud.officialSite;
+          }
+        }
+        console.log("✅ [OSwitch] Cloud catalog loaded — ISO URLs are fresh!");
+      })
+      .catch(() => {
+        console.warn("⚠️ [OSwitch] Cloud catalog unavailable — using local fallback URLs.");
+      });
+  }, []);
 
   const goNext = () => {
     if (currentStep < STEPS.length - 1) {
