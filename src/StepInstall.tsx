@@ -51,6 +51,7 @@ export default function StepInstall({
   selectedOS,
   selectedIntents,
   selectedBundles,
+  selectedTools = [],
   backupEnabled,
   catalog,
   isInstalling,
@@ -61,6 +62,7 @@ export default function StepInstall({
   selectedOS: string[],
   selectedIntents: Record<string, string>,
   selectedBundles: string[],
+  selectedTools?: string[],
   backupEnabled: boolean,
   catalog: { id: string, name: string, isoUrl?: string, officialSite?: string }[],
   isInstalling: boolean,
@@ -70,6 +72,7 @@ export default function StepInstall({
   const [activeTab, setActiveTab] = useState(targets.length > 0 ? targets[0] : null);
   const [installStatus, setInstallStatus] = useState<Record<string, { status: "success" | "error" | "idle", message?: string }>>({});
   const [fallbackMode, setFallbackMode] = useState<{active: boolean, url: string, id: string}>({active: false, url: "", id: ""});
+  const [bundleProgress, setBundleProgress] = useState<Record<string, string>>({});
 
   // AI Integration States
   const [apiKey, setApiKey] = useState("");
@@ -80,6 +83,21 @@ export default function StepInstall({
   const [aiError, setAiError] = useState<string | null>(null);
   
   const consoleEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let isMounted = true;
+    listen("bundle-progress", (event: Event<{id: string, status: string}>) => {
+      if (isMounted) {
+        setBundleProgress(prev => ({ ...prev, [event.payload.id]: event.payload.status }));
+      }
+    }).then(un => { if (isMounted) unlisten = un; else un(); }).catch(console.error);
+
+    return () => {
+      isMounted = false;
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   const fetchAiModels = async () => {
     if (!apiKey.trim()) {
@@ -127,7 +145,16 @@ export default function StepInstall({
       const intent = selectedIntents[id] || "vbox_vm";
       const catalogEntry = catalog.find(o => o.id === id);
       const iso_url = localIsoPath || catalogEntry?.isoUrl || "";
+      
+      // Step 1: Install OS
       await invoke("install_os", { id: id, intent: intent, isoUrl: iso_url });
+      
+      // Step 2: Install Packages (Bundles + Tools)
+      const packagesToInstall = [...selectedBundles, ...(selectedTools || [])];
+      if (packagesToInstall.length > 0) {
+          setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "OS installed. Now installing packages..." } }));
+          await invoke("install_packages", { packages: packagesToInstall });
+      }
       
     } catch (e: unknown) {
       console.error(e);
@@ -344,6 +371,9 @@ export default function StepInstall({
             {selectedBundles.length > 0 && (
                <div className="text-yellow-400 mb-1">$ Bundles: {selectedBundles.length} selected for post-install</div>
             )}
+            {selectedTools.length > 0 && (
+               <div className="text-purple-400 mb-1">$ Tools: {selectedTools.length} specialized tools queued for install</div>
+            )}
             <div className="text-slate-500 mb-4"># Status: Ready for Dynamic Provisioning</div>
             
             {installStatus[activeTab || ""]?.status === "error" && (
@@ -352,6 +382,20 @@ export default function StepInstall({
               </div>
             )}
 
+            {Object.entries(bundleProgress).length > 0 && (
+              <div className="mb-4">
+                <div className="text-slate-500"># Package Installation Progress</div>
+                {Object.entries(bundleProgress).map(([pkgId, status]) => (
+                   <div key={pkgId} className="flex items-center gap-2">
+                     <span className={status === "installing" ? "text-blue-400" : status === "success" ? "text-green-400" : "text-red-400"}>
+                        [{status === "installing" ? "..." : status === "success" ? "OK" : "ERR"}]
+                     </span>
+                     <span className="text-slate-300">{pkgId}</span>
+                   </div>
+                ))}
+              </div>
+            )}
+            
             {installStatus[activeTab || ""]?.status === "success" && !installStatus[activeTab || ""]?.message && (
               <div className="mb-4 p-5 bg-gradient-to-r from-blue-900/40 to-purple-900/40 border border-blue-500/30 rounded-xl shadow-lg">
                 <h3 className="text-blue-300 font-bold text-lg mb-2 flex items-center gap-2">

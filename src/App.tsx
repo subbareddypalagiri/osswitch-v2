@@ -4,6 +4,7 @@ import StepScan from "./StepScan";
 import StepChooseOS from "./StepChooseOS";
 import StepConfigure from "./StepConfigure";
 import StepBundles from "./StepBundles";
+import StepTools from "./StepTools";
 import StepInstall from "./StepInstall";
 import StepBootSwitch from "./StepBootSwitch";
 import SplashScreen from "./SplashScreen";
@@ -18,10 +19,11 @@ const STEPS = [
   "Welcome",
   "System Scan",
   "Choose OS",
+  "Software Bundles",
+  "Infinite Store",
   "Permissions",
   "Boot Switcher",
-  "Run Console",
-  "Software Bundles"
+  "Run Console"
 ];
 
 function App() {
@@ -30,6 +32,7 @@ function App() {
   const [selectedOS, setSelectedOS] = useState<string[]>([]);
   const [selectedIntents, setSelectedIntents] = useState<Record<string, string>>({});
   const [selectedBundles, setSelectedBundles] = useState<string[]>([]);
+  const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [perms, setPerms] = useState<boolean[]>([false, false, false, false]);
   const [catalog, setCatalog] = useState(OS_CATALOG);
@@ -86,10 +89,11 @@ function App() {
     if (index === 0) return true; // Welcome
     if (index === 1) return true; // Scan
     if (index === 2) return selectedOS.length > 0; // Choose OS
-    if (index === 3) return true; // Permissions
-    if (index === 4) return true; // Boot Switcher
-    if (index === 5) return false; // Run Console
-    if (index === 6) return selectedBundles.length > 0; // Bundles
+    if (index === 3) return selectedBundles.length > 0; // Bundles
+    if (index === 4) return selectedTools.length > 0; // Infinite Store
+    if (index === 5) return true; // Permissions
+    if (index === 6) return true; // Boot Switcher
+    if (index === 7) return false; // Run Console
     return false;
   };
 
@@ -168,6 +172,22 @@ function App() {
               />
             )}
             {currentStep === 3 && (
+              <StepBundles 
+                onNext={goNext} 
+                onBack={goBack} 
+                selectedBundles={selectedBundles} 
+                setSelectedBundles={setSelectedBundles} 
+              />
+            )}
+            {currentStep === 4 && (
+              <StepTools 
+                onNext={goNext} 
+                onBack={goBack} 
+                selectedTools={selectedTools} 
+                setSelectedTools={setSelectedTools} 
+              />
+            )}
+            {currentStep === 5 && (
               <StepConfigure 
                 onNext={goNext} 
                 onBack={goBack} 
@@ -177,28 +197,21 @@ function App() {
                 setPerms={setPerms}
               />
             )}
-            {currentStep === 4 && (
+            {currentStep === 6 && (
               <StepBootSwitch onBack={goBack} />
             )}
-            {currentStep === 5 && (
+            {currentStep === 7 && (
               <StepInstall 
                 onNext={goNext} 
                 onBack={goBack}
                 selectedOS={selectedOS}
                 selectedIntents={selectedIntents}
                 selectedBundles={selectedBundles}
+                selectedTools={selectedTools}
                 backupEnabled={backupEnabled}
                 catalog={catalog}
                 isInstalling={isInstalling}
                 setIsInstalling={setIsInstalling}
-              />
-            )}
-            {currentStep === 6 && (
-              <StepBundles 
-                onNext={goNext} 
-                onBack={goBack} 
-                selectedBundles={selectedBundles} 
-                setSelectedBundles={setSelectedBundles} 
               />
             )}
           </div>
