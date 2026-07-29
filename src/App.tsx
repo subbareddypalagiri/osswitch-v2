@@ -21,8 +21,8 @@ const STEPS = [
   "Choose OS",
   "Software Bundles",
   "Infinite Store",
-  "Permissions",
   "Boot Switcher",
+  "Permissions",
   "Run Console"
 ];
 
@@ -33,7 +33,7 @@ function App() {
   const [selectedIntents, setSelectedIntents] = useState<Record<string, string>>({});
   const [selectedBundles, setSelectedBundles] = useState<string[]>([]);
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
-  const [backupEnabled, setBackupEnabled] = useState(false);
+  const [backupEnabled, setBackupEnabled] = useState(true);
   const [perms, setPerms] = useState<boolean[]>([false, false, false, false]);
   const [catalog, setCatalog] = useState(OS_CATALOG);
   const [isInstalling, setIsInstalling] = useState(false);
@@ -91,8 +91,8 @@ function App() {
     if (index === 2) return selectedOS.length > 0; // Choose OS
     if (index === 3) return selectedBundles.length > 0; // Bundles
     if (index === 4) return selectedTools.length > 0; // Infinite Store
-    if (index === 5) return true; // Permissions
-    if (index === 6) return true; // Boot Switcher
+    if (index === 5) return true; // Boot Switcher
+    if (index === 6) return true; // Permissions
     if (index === 7) return false; // Run Console
     return false;
   };
@@ -188,6 +188,9 @@ function App() {
               />
             )}
             {currentStep === 5 && (
+              <StepBootSwitch onBack={goBack} onNext={goNext} />
+            )}
+            {currentStep === 6 && (
               <StepConfigure 
                 onNext={goNext} 
                 onBack={goBack} 
@@ -196,9 +199,6 @@ function App() {
                 perms={perms}
                 setPerms={setPerms}
               />
-            )}
-            {currentStep === 6 && (
-              <StepBootSwitch onBack={goBack} />
             )}
             {currentStep === 7 && (
               <StepInstall 

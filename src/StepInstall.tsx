@@ -69,7 +69,7 @@ export default function StepInstall({
   setIsInstalling: (b: boolean) => void
 }) {
   const targets = selectedOS.filter(id => id !== 'windows');
-  const [activeTab, setActiveTab] = useState(targets.length > 0 ? targets[0] : null);
+  const [activeTab, setActiveTab] = useState(targets.length > 0 ? targets[0] : "tools_only");
   const [installStatus, setInstallStatus] = useState<Record<string, { status: "success" | "error" | "idle", message?: string }>>({});
   const [fallbackMode, setFallbackMode] = useState<{active: boolean, url: string, id: string}>({active: false, url: "", id: ""});
   const [bundleProgress, setBundleProgress] = useState<Record<string, string>>({});
@@ -146,8 +146,10 @@ export default function StepInstall({
       const catalogEntry = catalog.find(o => o.id === id);
       const iso_url = localIsoPath || catalogEntry?.isoUrl || "";
       
-      // Step 1: Install OS
-      await invoke("install_os", { id: id, intent: intent, isoUrl: iso_url });
+      // Step 1: Install OS (Skip if tools_only)
+      if (id !== "tools_only") {
+        await invoke("install_os", { id: id, intent: intent, isoUrl: iso_url });
+      }
       
       // Step 2: Install Packages (Bundles + Tools)
       const packagesToInstall = [...selectedBundles, ...(selectedTools || [])];
@@ -198,10 +200,10 @@ export default function StepInstall({
     }
   };
 
-  if (targets.length === 0) {
+  if (targets.length === 0 && selectedBundles.length === 0 && selectedTools?.length === 0) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center">
-        <div className="text-slate-400 text-lg">No OS selected. Go back and select an OS.</div>
+        <div className="text-slate-400 text-lg">No OS or Tools selected. Go back and make a selection.</div>
         <button 
           className="mt-4 bg-white/5 hover:bg-white/10 text-white font-semibold py-2 px-6 rounded-xl transition-colors border border-white/10"
           onClick={onBack}
@@ -297,6 +299,9 @@ export default function StepInstall({
         </h2>
         
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scrollbar">
+          {activeTab === "tools_only" && (
+            <button className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap bg-blue-600 text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]"><span>📦</span> App Store Execution</button>
+          )}
           {targets.map(id => {
             const os = getOSDetails(id);
             if (!os) return null;
@@ -361,13 +366,13 @@ export default function StepInstall({
               <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
               <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
             </div>
-            Terminal - {activeOSDetails?.name}
+            Terminal - {activeTab === "tools_only" ? "Package Manager" : activeOSDetails?.name}
           </div>
           
           <div className="p-4 font-mono text-sm overflow-y-auto flex-grow custom-scrollbar">
             <div className="text-slate-500 mb-1"># Universal Provisioning Engine</div>
-            <div className="text-green-400 mb-1">$ Target OS: {activeOSDetails?.name}</div>
-            <div className="text-green-400 mb-1">$ Intent: {selectedIntents[activeTab || ""] || "vbox_vm"}</div>
+            {activeTab !== "tools_only" && <div className="text-green-400 mb-1">$ Target OS: {activeOSDetails?.name}</div>}
+            {activeTab !== "tools_only" && <div className="text-green-400 mb-1">$ Intent: {selectedIntents[activeTab || ""] || "vbox_vm"}</div>}
             {selectedBundles.length > 0 && (
                <div className="text-yellow-400 mb-1">$ Bundles: {selectedBundles.length} selected for post-install</div>
             )}
@@ -436,7 +441,7 @@ export default function StepInstall({
                   Installing...
                 </>
               ) : (
-                <><span>▶</span> Install {activeOSDetails?.name} now</>
+                <><span>▶</span> {activeTab === "tools_only" ? "Execute Package Installation" : `Install ${activeOSDetails?.name} now`}</>
               )}
             </button>
             

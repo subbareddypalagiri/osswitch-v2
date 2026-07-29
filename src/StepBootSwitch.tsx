@@ -6,13 +6,11 @@ export interface BootEntry {
   name: string;
 }
 
-export default function StepBootSwitch({ onBack }: { onBack: () => void }) {
+export default function StepBootSwitch({ onBack, onNext }: { onBack: () => void, onNext?: () => void }) {
   const [entries, setEntries] = useState<BootEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const fetchEntries = async () => {
     try {
@@ -30,20 +28,6 @@ export default function StepBootSwitch({ onBack }: { onBack: () => void }) {
 
   useEffect(() => { fetchEntries(); }, []);
 
-  const handleSetDefault = async () => {
-    if (!selectedId) return;
-    try {
-      setSaving(true);
-      setSaved(false);
-      await invoke("set_default_boot", { identifier: selectedId });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (e: any) {
-      setError(e?.toString() || "Failed to set default boot entry");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <div className="w-full h-full flex flex-col items-center mt-10">
@@ -104,29 +88,23 @@ export default function StepBootSwitch({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {saved && (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-6 text-green-400 text-center animate-[fadeIn_0.3s_ease-out]">
-            ✅ Default boot entry updated! Changes take effect on next restart.
-          </div>
-        )}
+
 
         <div className="flex justify-between gap-4 mt-auto">
-          <button
-            className="bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
+                    <button 
+            className="bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl transition-colors border border-white/10"
             onClick={onBack}
           >
-            <span>←</span> Back
+            Back
           </button>
-          <button
-            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2
-              ${selectedId && !saving
-                ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.4)]'
-                : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
-            onClick={handleSetDefault}
-            disabled={!selectedId || saving}
-          >
-            {saving ? "Applying..." : "Set as Default Boot"} <span>⚡</span>
-          </button>
+          {onNext && (
+            <button 
+              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)]"
+              onClick={onNext}
+            >
+              Next ➔
+            </button>
+          )}
         </div>
       </div>
     </div>
