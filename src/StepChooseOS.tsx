@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 export const OS_LIST = [
   {id:"windows", name:"Windows 11", sub:"Currently installed Microsoft OS", glyph:"🪟", locked:true},
@@ -23,10 +23,10 @@ export const OS_LIST = [
   {id:"nixos", name:"NixOS", sub:"Declarative and reproducible Linux", glyph:"❄️"},
   {id:"openbsd", name:"OpenBSD", sub:"Proactive security UNIX", glyph:"🐡"},
   {id:"netbsd", name:"NetBSD", sub:"Highly portable UNIX", glyph:"🚩"},
-  {id:"macos", name:"macOS", sub:"Apple's Desktop Operating System", glyph:"🍎"},
+  {id:"macos", name:"macOS", sub:"Apple's Desktop Operating System", glyph:"🍎", locked:true},
   {id:"omnios", name:"OmniOS (Solaris)", sub:"Illumos-based Server UNIX", glyph:"🌞"},
   {id:"almalinux", name:"AlmaLinux", sub:"Enterprise-grade RHEL clone", glyph:"💠"},
-  {id:"rockylinux", name:"Rocky Linux", sub:"Community-driven Enterprise Linux", glyph:"🏔️"},
+  {id:"rocky", name:"Rocky Linux", sub:"Community-driven Enterprise Linux", glyph:"🏔️"},
   {id:"alpine", name:"Alpine Linux", sub:"Security-oriented, lightweight Linux", glyph:"🗻"},
   {id:"gentoo", name:"Gentoo", sub:"Highly customizable source Linux", glyph:"🐧"},
   {id:"slackware", name:"Slackware", sub:"The oldest maintained Linux", glyph:"📜"},
@@ -49,21 +49,38 @@ export default function StepChooseOS({
   selectedOS,
   setSelectedOS,
   selectedIntents,
-  setSelectedIntents
+  setSelectedIntents,
+  catalog
 }: { 
   onNext: () => void, 
   onBack: () => void,
   selectedOS: string[],
   setSelectedOS: (osList: string[]) => void,
   selectedIntents: Record<string, string>,
-  setSelectedIntents: (intents: Record<string, string>) => void
+  setSelectedIntents: (intents: Record<string, string>) => void,
+  catalog: { id: string, name: string, category: string, locked?: boolean }[]
 }) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredOS = OS_LIST.filter(os => 
-    os.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    os.sub.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOS = useMemo(() => {
+    // Merge catalog with static UI metadata
+    const mergedList = catalog.map(catEntry => {
+      const staticMeta = OS_LIST.find(o => o.id === catEntry.id);
+      return {
+        id: catEntry.id,
+        name: catEntry.name,
+        sub: staticMeta?.sub || catEntry.category,
+        glyph: staticMeta?.glyph || "📦",
+        locked: staticMeta?.locked || catEntry.locked || false
+      };
+    });
+
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return mergedList;
+    return mergedList.filter((os: any) => 
+      os.name.toLowerCase().includes(q) || os.sub.toLowerCase().includes(q)
+    );
+  }, [searchQuery, catalog]);
 
   const toggleOS = (id: string) => {
     if (selectedOS.includes(id)) {
@@ -80,73 +97,86 @@ export default function StepChooseOS({
     });
   };
 
-  const hasSelection = selectedOS.filter(id => id !== 'windows').length > 0;
+  const hasSelection = useMemo(() => selectedOS.some(id => id !== 'windows'), [selectedOS]);
+
+  const selectedOSSet = useMemo(() => new Set(selectedOS), [selectedOS]);
 
   return (
     <div className="w-full h-full flex flex-col items-center mt-10">
-      <div className="glass-card max-w-[1000px] p-10 w-full animate-[fadeIn_0.5s_ease-out] flex flex-col">
+      <div className="glass-card max-w-[1200px] p-10 w-full animate-[fadeIn_0.5s_ease-out] flex flex-col flex-grow">
         <div className="flex items-center gap-3 mb-2">
           <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
-          <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 3 of 6</span>
+          <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 3 of 7</span>
         </div>
-        
-        <h2 className="text-[32px] font-bold text-white tracking-tight mb-2">
-          Choose <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Operating Systems</span>
-        </h2>
         
         <div className="flex justify-between items-center mb-8">
           <p className="text-slate-400 text-lg">Search, pick your OS, and choose your preferred installation method.</p>
-          <input 
-            type="text" 
-            className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white w-[300px] focus:outline-none focus:border-blue-500 transition-colors" 
-            placeholder="Search OS..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+            <input 
+              type="text" 
+              placeholder="Search OS..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-6 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-[300px]"
+            />
+          </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 overflow-y-auto max-h-[500px] custom-scrollbar pr-2">
-          {filteredOS.map(os => {
-            const isSelected = selectedOS.includes(os.id);
-            const intent = selectedIntents[os.id] || 'vbox_vm';
-            
-            return (
-              <div 
-                key={os.id}
-                className={`bg-white/5 border rounded-2xl p-5 flex flex-col transition-all cursor-pointer relative
-                  ${os.locked ? 'opacity-60 cursor-not-allowed border-white/10' : 
-                    isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'border-white/10 hover:bg-white/10'}`}
-                onClick={() => !os.locked && toggleOS(os.id)}
-              >
-                {isSelected && !os.locked && (
-                  <div className="absolute top-4 right-4 w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
-                )}
-                <div className="flex items-center gap-4 mb-3">
-                  <span className="text-4xl drop-shadow-md">{os.glyph}</span>
-                  <div>
-                    <div className="text-white font-bold text-lg">{os.name}</div>
-                    <div className="text-slate-400 text-xs leading-tight">{os.sub}</div>
+        <div className="flex-grow custom-scrollbar overflow-y-auto pr-2 -mr-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
+            {filteredOS.map((os: any) => {
+              const isSelected = selectedOSSet.has(os.id);
+              const intent = selectedIntents[os.id] || 'vbox_vm';
+              
+              return (
+                <div 
+                  key={os.id}
+                  role="checkbox"
+                  aria-checked={isSelected}
+                  aria-disabled={os.locked}
+                  tabIndex={os.locked ? -1 : 0}
+                  onKeyDown={(e) => {
+                    if ((e.key === ' ' || e.key === 'Enter') && !os.locked) {
+                      e.preventDefault();
+                      toggleOS(os.id);
+                    }
+                  }}
+                  className={`bg-white/5 border rounded-2xl p-5 flex flex-col transition-all cursor-pointer relative
+                    ${os.locked ? 'opacity-60 cursor-not-allowed border-white/10' : 
+                      isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'border-white/10 hover:bg-white/10'}`}
+                  onClick={() => !os.locked && toggleOS(os.id)}
+                >
+                  {isSelected && !os.locked && (
+                    <div className="absolute top-4 right-4 w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] z-10"></div>
+                  )}
+                  <div className="flex items-center gap-4 mb-3 min-w-0 pr-6">
+                    <span className="text-4xl drop-shadow-md flex-shrink-0">{os.glyph}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white font-bold text-lg truncate">{os.name}</div>
+                      <div className="text-slate-400 text-xs leading-tight line-clamp-2">{os.sub}</div>
+                    </div>
                   </div>
+                  
+                  {isSelected && !os.locked && (
+                    <div className="mt-3 pt-3 border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+                      <label className="text-xs text-slate-400 block mb-1">Install Method:</label>
+                      <select 
+                        className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-white w-full text-sm focus:outline-none focus:border-blue-500"
+                        value={intent}
+                        onChange={(e) => handleIntentChange(os.id, e.target.value)}
+                      >
+                        <option value="baremetal_grub">Virtual USB (Direct Boot)</option>
+                        <option value="usb_flash">Physical USB</option>
+                        <option value="vbox_vm">VirtualBox VM</option>
+                        <option value="vmware_vm">VMware VM</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
-                
-                {isSelected && !os.locked && (
-                  <div className="mt-3 pt-3 border-t border-white/10" onClick={(e) => e.stopPropagation()}>
-                    <label className="text-xs text-slate-400 block mb-1">Install Method:</label>
-                    <select 
-                      className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-white w-full text-sm focus:outline-none focus:border-blue-500"
-                      value={intent}
-                      onChange={(e) => handleIntentChange(os.id, e.target.value)}
-                    >
-                      <option value="baremetal_grub">Virtual USB (Direct Boot)</option>
-                      <option value="usb_flash">Physical USB</option>
-                      <option value="vbox_vm">VirtualBox VM</option>
-                      <option value="vmware_vm">VMware VM</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
         
         <div className="flex justify-start gap-4 mt-auto">

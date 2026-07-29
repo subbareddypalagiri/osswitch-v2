@@ -1,4 +1,4 @@
-import { useState } from "react";
+
 
 export const PERMS = [
   {title:"Administrator access", desc:"OSwitch requires elevation (UAC) to run system-level commands."},
@@ -11,14 +11,18 @@ export default function StepConfigure({
   onNext, 
   onBack,
   backupEnabled,
-  setBackupEnabled
+  setBackupEnabled,
+  perms,
+  setPerms
 }: { 
   onNext: () => void, 
   onBack: () => void,
   backupEnabled: boolean,
-  setBackupEnabled: (val: boolean) => void
+  setBackupEnabled: (val: boolean) => void,
+  perms: boolean[],
+  setPerms: (perms: boolean[]) => void
 }) {
-  const [perms, setPerms] = useState<boolean[]>(PERMS.map(() => false));
+  
 
   const togglePerm = (index: number) => {
     const newPerms = [...perms];
@@ -26,14 +30,14 @@ export default function StepConfigure({
     setPerms(newPerms);
   };
 
-  const allChecked = perms.every(p => p);
+  const allChecked = PERMS.length > 0 && PERMS.every((_, i) => perms[i]);
 
   return (
     <div className="w-full h-full flex flex-col items-center mt-10">
       <div className="glass-card max-w-[800px] p-10 w-full animate-[fadeIn_0.5s_ease-out]">
         <div className="flex items-center gap-3 mb-2">
           <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
-          <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 5 of 6</span>
+          <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 4 of 7</span>
         </div>
         
         <h2 className="text-[32px] font-bold text-white tracking-tight mb-8">

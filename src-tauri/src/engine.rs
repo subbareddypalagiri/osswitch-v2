@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Emitter};
+﻿use tauri::{AppHandle, Emitter};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tokio::fs::File;
@@ -182,7 +182,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
     } else if !iso_url.contains("fake-url") {
         let _ = app.emit("command-output", Payload { message: format!("Connecting to server: {}\n", iso_url) });
         
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_default();
         let res = client.get(&iso_url).send().await.map_err(|e| format!("ISO_DOWNLOAD_FAILED:Network failure: {}", e))?;
         
         if !res.status().is_success() {
@@ -209,18 +209,18 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             if total_size > 0 {
                 let pct = ((downloaded as f64 / total_size as f64) * 100.0) as i32;
                 if pct > last_reported_pct {
-                    // i=pct, total=100 → progress bar fills from 0% to 100% during download
+                    // i=pct, total=100 â†’ progress bar fills from 0% to 100% during download
                     let _ = app.emit("install-progress", InstallProgress { i: pct as usize, text: format!("Downloading ISO... {}%", pct), total: 100, done: false });
                     last_reported_pct = pct;
                 }
             } else {
-                // Unknown size — show spinner text only
+                // Unknown size â€” show spinner text only
                 let _ = app.emit("install-progress", InstallProgress { i: 50, text: "Downloading ISO...".into(), total: 100, done: false });
             }
         }
         writer.flush().await.map_err(|e| format!("Disk flush error: {}", e))?;
-        // Download complete — reset to 3-step provisioning progress
-        let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Download Complete ✓ — Starting provisioning...".into(), total: 3, done: false });
+        // Download complete â€” reset to 3-step provisioning progress
+        let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Download Complete âœ“ â€” Starting provisioning...".into(), total: 3, done: false });
         let _ = app.emit("command-output", Payload { message: "Download Complete.\n".to_string() });
     }
     
@@ -230,7 +230,9 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
         if !Path::new(vbox_path).exists() {
             let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Installing VirtualBox via Winget...".into(), total: 3, done: false });
-            let output = Command::new("winget").args(&["install", "-e", "--id", "Oracle.VirtualBox", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+            let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+            let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+            let output = Command::new(&winget_path).args(&["install", "-e", "--id", "Oracle.VirtualBox", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
             let code = output.status.code().unwrap_or(-1);
             if code != 0 && code != 3010 {
                 return Err(format!("VirtualBox installation failed (exit code {}).", code));
@@ -255,7 +257,9 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         let vmware_exists = vmware_paths.iter().any(|p| p.exists());
         if !vmware_exists {
             let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Installing VMware via Winget...".into(), total: 3, done: false });
-            let output = Command::new("winget").args(&["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+            let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+            let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+            let output = Command::new(&winget_path).args(&["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
             let code = output.status.code().unwrap_or(-1);
             if code != 0 && code != 3010 {
                 return Err(format!("VMware installation failed (exit code {}).", code));
@@ -269,7 +273,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Launching Rufus USB Flasher...".into(), total: 2, done: false });
         let rufus_path = temp_dir.join("rufus.exe");
         if !rufus_path.exists() {
-            if let Ok(r) = reqwest::get("https://github.com/pbatard/rufus/releases/download/v4.4/rufus-4.4.exe").await {
+            if let Ok(r) = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().unwrap_or_default().get("https://github.com/pbatard/rufus/releases/download/v4.4/rufus-4.4.exe").send().await {
                 if let Ok(b) = r.bytes().await {
                     let _ = tokio::fs::write(&rufus_path, b).await;
                 }
@@ -291,7 +295,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             let letter = (c as u8 as char).to_string();
             let p = format!("{}:\\", letter);
             if !Path::new(&p).exists() {
-                free_letter = letter.chars().next().unwrap();
+                free_letter = letter.chars().next().unwrap_or('V');
                 found = true;
                 break;
             }
@@ -364,7 +368,9 @@ pub async fn install_bundle(winget_ids: String) -> Result<String, String> {
         args.push(id);
     }
     
-    let output = Command::new("winget")
+    let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+    let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+    let output = Command::new(&winget_path)
         .args(&args)
         .output().await.map_err(|e| e.to_string())?;
         
@@ -407,27 +413,6 @@ pub async fn uninstall_os(os_id: String) -> Result<String, String> {
     Ok(format!("Successfully uninstalled: {}", os_id))
 }
 
-#[tauri::command]
-pub async fn ai_fix(error_msg: String) -> Result<String, String> {
-    let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_default();
-    if api_key.is_empty() { return Ok("No API key configured.".into()); }
-    
-    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}", api_key);
-    let payload = serde_json::json!({
-        "contents": [{ "parts": [{ "text": format!("Fix this OS error: {}", error_msg) }] }]
-    });
-    
-    let client = reqwest::Client::new();
-    let res = client.post(&url).json(&payload).send().await.map_err(|e| e.to_string())?;
-    
-    if res.status().is_success() {
-        let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-        if let Some(text) = json["candidates"][0]["content"]["parts"][0]["text"].as_str() {
-            return Ok(text.to_string());
-        }
-    }
-    Ok("AI failed to generate a response.".into())
-}
 
 #[derive(Serialize)]
 pub struct SafetyReport {
@@ -490,4 +475,92 @@ pub async fn backup_system() -> Result<String, String> {
         .output().await;
         
     Ok("Backup completed successfully.".into())
+}
+
+#[derive(Clone, serde::Serialize)]
+struct BundleProgress {
+    id: String,
+    status: String,
+}
+
+#[tauri::command]
+pub async fn install_packages(app: tauri::AppHandle, packages: Vec<String>) -> Result<String, String> {
+    println!("[Engine] Installing {} packages with real-time telemetry...", packages.len());
+    
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let mut overall_success = true;
+        let mut error_msg = String::new();
+        
+        for id in packages {
+            let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "installing".to_string() });
+            
+            let args = vec!["install", "--silent", "--accept-package-agreements", "--accept-source-agreements", "--id", &id];
+            let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+            let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+            let status = std::process::Command::new(&winget_path).args(&args).status();
+            
+            match status {
+                Ok(s) if s.success() => {
+                    let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
+                },
+                Ok(_s) => {
+                    overall_success = false;
+                    error_msg.push_str(&format!("Failed to install {}. ", id));
+                    let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
+                },
+                Err(e) => {
+                    overall_success = false;
+                    error_msg.push_str(&format!("Failed winget for {}: {}. ", id, e));
+                    let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
+                }
+            }
+        }
+        
+        if overall_success { Ok("All packages installed successfully.".to_string()) } else { Err(error_msg) }
+    }).await.map_err(|e| format!("Task joined failed: {}", e))?;
+    
+    res
+}
+
+#[tauri::command]
+pub async fn ai_fix(error_msg: String, api_key: String, model: String) -> Result<String, String> {
+    if api_key.trim().is_empty() { return Ok("No API key configured.".into()); }
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/{}:generateContent?key={}", model, api_key);
+    let payload = serde_json::json!({
+        "contents": [{ "parts": [{ "text": format!("Fix this OS installation error. Be concise and helpful: {}", error_msg) }] }]
+    });
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_default();
+    let res = client.post(&url).json(&payload).send().await.map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+        if let Some(text) = json["candidates"][0]["content"]["parts"][0]["text"].as_str() { return Ok(text.to_string()); }
+    } else {
+        let err_text = res.text().await.unwrap_or_default();
+        return Err(format!("API Error: {}", err_text));
+    }
+    Ok("AI failed to generate a response.".into())
+}
+
+#[tauri::command]
+pub async fn get_gemini_models(api_key: String) -> Result<Vec<String>, String> {
+    if api_key.trim().is_empty() { return Err("No API key provided.".into()); }
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", api_key);
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_default();
+    let res = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+        let mut models = Vec::new();
+        if let Some(arr) = json["models"].as_array() {
+            for item in arr {
+                if let Some(name) = item["name"].as_str() {
+                    if name.contains("gemini") && name.contains("generateContent") { models.push(name.to_string()); }
+                    else if name.contains("gemini") { models.push(name.to_string()); }
+                }
+            }
+        }
+        return Ok(models);
+    } else {
+        let err_text = res.text().await.unwrap_or_default();
+        return Err(format!("API Error: {}", err_text));
+    }
 }

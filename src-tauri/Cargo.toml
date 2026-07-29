@@ -29,3 +29,4 @@ reqwest = { version = "0.13.4", features = ["json", "blocking", "stream"] }
 tokio = { version = "1.53.1", features = ["full"] }
 futures-util = "0.3.33"
 tauri-plugin-dialog = "2"
+sha2 = "0.10.8"

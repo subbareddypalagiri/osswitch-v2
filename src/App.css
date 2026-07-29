@@ -162,3 +162,14 @@
     box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
   }
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

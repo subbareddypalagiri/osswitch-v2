@@ -1,8 +1,8 @@
 export interface OSConfig {
   id: string;
   name: string;
-  category: "Linux" | "Windows" | "Security" | "Server";
-  isoUrl: string;
+  category: "Linux" | "Windows" | "Security" | "Server" | "macOS" | "BSD" | "Other";
+  isoUrl?: string;
   officialSite?: string;
   locked?: boolean;
 }
@@ -56,10 +56,9 @@ export const OS_CATALOG: OSConfig[] = [
   { id: "haiku", name: "Haiku OS", category: "Linux", isoUrl: "https://s3.wasabisys.com/haiku-nightly/x86_64/haiku-master-hrev57662-x86_64-anyboot.iso" },
   { id: "openbsd", name: "OpenBSD", category: "Server", isoUrl: "https://cdn.openbsd.org/pub/OpenBSD/7.5/amd64/install75.iso" },
   { id: "netbsd", name: "NetBSD", category: "Server", isoUrl: "https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.0/images/NetBSD-10.0-amd64.iso" },
-  { id: "macos", name: "macOS", category: "Windows", isoUrl: "https://example.com/macos-fake-url.iso", officialSite: "https://support.apple.com/en-us/102662", locked: true },
+  { id: "macos", name: "macOS", category: "macOS", isoUrl: "https://example.com/macos-fake-url.iso", officialSite: "https://support.apple.com/en-us/102662", locked: true },
   { id: "omnios", name: "OmniOS", category: "Server", isoUrl: "https://omnios.org/download/omnios-r151048.iso" },
-  { id: "rockylinux", name: "Rocky Linux 9", category: "Server", isoUrl: "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.3-x86_64-dvd.iso" },
-  { id: "gentoo", name: "Gentoo", category: "Linux", isoUrl: "https://distfiles.gentoo.org/releases/amd64/autobuilds/20240407T170428Z/install-amd64-minimal-20240407T170428Z.iso" },
+    { id: "gentoo", name: "Gentoo", category: "Linux", isoUrl: "https://distfiles.gentoo.org/releases/amd64/autobuilds/20240407T170428Z/install-amd64-minimal-20240407T170428Z.iso" },
   { id: "slackware", name: "Slackware", category: "Linux", isoUrl: "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/slackware64-15.0-install-dvd.iso" },
   { id: "kdeneon", name: "KDE Neon", category: "Linux", isoUrl: "https://files.kde.org/neon/images/user/20240411-0714/neon-user-20240411-0714.iso" },
   { id: "nobara", name: "Nobara Linux", category: "Linux", isoUrl: "https://nobaraproject.org/download/nobara-39-official.iso" },
@@ -69,14 +68,143 @@ export const OS_CATALOG: OSConfig[] = [
   { id: "kolibrios", name: "KolibriOS", category: "Linux", isoUrl: "http://kolibrios.org/releases/KolibriOS-0.7.7.0.iso" }
 ];
 
+export interface SoftwareItem {
+  id: string;
+  name: string;
+  defaultSelected: boolean;
+}
+
 export interface BundleConfig {
   id: string;
   name: string;
-  wingetId: string;
+  icon: string;
+  description: string;
+  items: SoftwareItem[];
 }
 
 export const BUNDLES: BundleConfig[] = [
-  { id: "dev", name: "Developer Tools", wingetId: "Git.Git Microsoft.VisualStudioCode Python.Python.3.11" },
-  { id: "gaming", name: "Gaming Essentials", wingetId: "Valve.Steam Discord.Discord" },
-  { id: "office", name: "Office Suite", wingetId: "Mozilla.Firefox VideoLAN.VLC" }
+  {
+    id: "dev", name: "End-to-End Developer", icon: "💻", description: "Everything you need to write, build, and run code.",
+    items: [
+      { id: "Microsoft.VisualStudioCode", name: "VS Code", defaultSelected: true },
+      { id: "Git.Git", name: "Git", defaultSelected: true },
+      { id: "Python.Python.3.12", name: "Python 3.11", defaultSelected: true },
+      { id: "OpenJS.NodeJS", name: "Node.js", defaultSelected: true },
+      { id: "Docker.DockerDesktop", name: "Docker Desktop", defaultSelected: false },
+      { id: "Postman.Postman", name: "Postman", defaultSelected: false },
+      { id: "Microsoft.WindowsTerminal", name: "Windows Terminal", defaultSelected: true },
+      { id: "Microsoft.VisualStudio.2022.Community", name: "Visual Studio Community", defaultSelected: false },
+      { id: "JetBrains.IntelliJIDEA.Community", name: "IntelliJ IDEA", defaultSelected: false },
+      { id: "GitHub.GitHubDesktop", name: "GitHub Desktop", defaultSelected: false }
+    ]
+  },
+  {
+    id: "creator", name: "End-to-End Creator", icon: "🎨", description: "World-class tools for 3D, Video, and Audio production.",
+    items: [
+      { id: "OBSProject.OBSStudio", name: "OBS Studio", defaultSelected: true },
+      { id: "BlenderFoundation.Blender", name: "Blender", defaultSelected: true },
+      { id: "GIMP.GIMP", name: "GIMP", defaultSelected: true },
+      { id: "Audacity.Audacity", name: "Audacity", defaultSelected: true },
+      { id: "Figma.Figma", name: "Figma", defaultSelected: false },
+      { id: "HandBrake.HandBrake", name: "HandBrake", defaultSelected: false },
+      { id: "KDE.Kdenlive", name: "Kdenlive Video Editor", defaultSelected: false },
+      { id: "KDE.Krita", name: "Krita", defaultSelected: false },
+      { id: "Inkscape.Inkscape", name: "Inkscape", defaultSelected: false }
+    ]
+  },
+  {
+    id: "gaming", name: "Ultimate Gaming", icon: "🎮", description: "All the launchers, comms, and drivers for gamers.",
+    items: [
+      { id: "Valve.Steam", name: "Steam", defaultSelected: true },
+      { id: "Discord.Discord", name: "Discord", defaultSelected: true },
+      { id: "EpicGames.EpicGamesLauncher", name: "Epic Games Launcher", defaultSelected: false },
+      { id: "GOG.Galaxy", name: "GOG Galaxy", defaultSelected: false },
+      { id: "Nvidia.GeForceNow", name: "GeForce NOW", defaultSelected: false },
+      { id: "ElectronicArts.EADesktop", name: "EA app", defaultSelected: false },
+      { id: "Ubisoft.Connect", name: "Ubisoft Connect", defaultSelected: false },
+      { id: "TeamSpeakSystems.TeamSpeakClient", name: "TeamSpeak 3", defaultSelected: false }
+    ]
+  },
+  {
+    id: "office", name: "Office & Productivity", icon: "💼", description: "Docs, spreadsheets, and seamless teamwork tools.",
+    items: [
+      { id: "TheDocumentFoundation.LibreOffice", name: "LibreOffice", defaultSelected: true },
+      { id: "SlackTechnologies.Slack", name: "Slack", defaultSelected: true },
+      { id: "Zoom.Zoom", name: "Zoom", defaultSelected: true },
+      { id: "Microsoft.Teams", name: "Microsoft Teams", defaultSelected: false },
+      { id: "Adobe.Acrobat.Reader.64-bit", name: "Acrobat Reader", defaultSelected: true },
+      { id: "Notion.Notion", name: "Notion", defaultSelected: false },
+      { id: "Evernote.Evernote", name: "Evernote", defaultSelected: false },
+      { id: "AnyDesk.AnyDesk", name: "AnyDesk", defaultSelected: false }
+    ]
+  },
+  {
+    id: "essentials", name: "PC Essentials", icon: "🛠️", description: "The must-haves for a clean and efficient PC experience.",
+    items: [
+      { id: "Google.Chrome", name: "Google Chrome", defaultSelected: true },
+      { id: "VideoLAN.VLC", name: "VLC Player", defaultSelected: true },
+      { id: "7zip.7zip", name: "7-Zip", defaultSelected: true },
+      { id: "9NKSQGP7F2NH", name: "WhatsApp", defaultSelected: true },
+      { id: "Spotify.Spotify", name: "Spotify", defaultSelected: false },
+      { id: "Microsoft.PowerToys", name: "PowerToys", defaultSelected: false },
+      { id: "Bitwarden.Bitwarden", name: "Bitwarden", defaultSelected: false },
+      { id: "voidtools.Everything", name: "Everything Search", defaultSelected: true }
+    ]
+  },
+  {
+    id: "security", name: "Cyber Security & Privacy", icon: "🔐", description: "VPNs, crypto tools, and network analysis.",
+    items: [
+      { id: "TorProject.TorBrowser", name: "Tor Browser", defaultSelected: true },
+      { id: "Proton.ProtonVPN", name: "ProtonVPN", defaultSelected: true },
+      { id: "Malwarebytes.Malwarebytes", name: "Malwarebytes", defaultSelected: true },
+      { id: "WiresharkFoundation.Wireshark", name: "Wireshark", defaultSelected: false },
+      { id: "IDRIX.VeraCrypt", name: "VeraCrypt", defaultSelected: false },
+      { id: "KeePassXCTeam.KeePassXC", name: "KeePassXC", defaultSelected: false },
+      { id: "Insecure.Nmap", name: "Nmap", defaultSelected: false }
+    ]
+  },
+  {
+    id: "system", name: "System Tweaking", icon: "⚙️", description: "Hardware diagnostics and OS-level utilities.",
+    items: [
+      { id: "CPUID.CPU-Z", name: "CPU-Z", defaultSelected: true },
+      { id: "Rufus.Rufus", name: "Rufus", defaultSelected: true },
+      { id: "CrystalDewWorld.CrystalDiskInfo", name: "CrystalDiskInfo", defaultSelected: true },
+      { id: "REALiX.HWiNFO", name: "HWiNFO", defaultSelected: false },
+      { id: "TechPowerUp.GPU-Z", name: "GPU-Z", defaultSelected: false },
+      { id: "Balena.Etcher", name: "BalenaEtcher", defaultSelected: false },
+      { id: "WinsiderSS.SystemInformer", name: "System Informer", defaultSelected: false }
+    ]
+  },
+  {
+    id: "webdev", name: "Web Dev & Design", icon: "🌐", description: "Servers, FTP, and specialized web browsers.",
+    items: [
+      { id: "Mozilla.Firefox.DeveloperEdition", name: "Firefox Developer", defaultSelected: true },
+      { id: "WinSCP.WinSCP", name: "WinSCP", defaultSelected: true },
+      { id: "Figma.Figma", name: "Figma", defaultSelected: true },
+      { id: "ApacheFriends.Xampp.8.2", name: "XAMPP", defaultSelected: false },
+      { id: "Insomnia.Insomnia", name: "Insomnia", defaultSelected: false }
+    ]
+  },
+  {
+    id: "data", name: "Data Science & AI", icon: "🤖", description: "Heavy lifters for analytics and machine learning.",
+    items: [
+      { id: "Anaconda.Anaconda3", name: "Anaconda3", defaultSelected: true },
+      { id: "RProject.R", name: "R Language", defaultSelected: true },
+      { id: "Posit.RStudio", name: "RStudio", defaultSelected: true },
+      { id: "DBBrowserForSQLite.DBBrowserForSQLite", name: "DB Browser for SQLite", defaultSelected: true },
+      { id: "Microsoft.PowerBI", name: "PowerBI Desktop", defaultSelected: false },
+      { id: "MongoDB.Compass.Community", name: "MongoDB Compass", defaultSelected: false }
+    ]
+  },
+  {
+    id: "comms", name: "Communication & Social", icon: "💬", description: "Stay connected across all major networks.",
+    items: [
+      { id: "Telegram.TelegramDesktop", name: "Telegram", defaultSelected: true },
+      { id: "OpenWhisperSystems.Signal", name: "Signal", defaultSelected: true },
+      { id: "WhatsApp.WhatsApp", name: "WhatsApp", defaultSelected: true },
+      { id: "Element.Element", name: "Element (Matrix)", defaultSelected: false },
+      { id: "Rakuten.Viber", name: "Viber", defaultSelected: false },
+      { id: "Discord.Discord", name: "Discord", defaultSelected: false }
+    ]
+  }
 ];
