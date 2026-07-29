@@ -15,6 +15,38 @@ import "./App.css";
 // 🌐 Cloud Catalog URL — auto-updated weekly by GitHub Actions
 const CLOUD_CATALOG_URL = "https://raw.githubusercontent.com/subbareddypalagiri/oswitch-v2/master/catalog.json";
 
+
+const NAV_SECTIONS = [
+  {
+    title: "GENERAL",
+    items: [
+      { index: 0, label: "Welcome", icon: "🏠" },
+      { index: 1, label: "System Scan", icon: "🔍" }
+    ]
+  },
+  {
+    title: "OS MANAGEMENT",
+    items: [
+      { index: 2, label: "Install OS", icon: "💿" },
+      { index: 5, label: "Boot Switcher", icon: "🔄" }
+    ]
+  },
+  {
+    title: "APP STORE",
+    items: [
+      { index: 3, label: "Software Bundles", icon: "📦" },
+      { index: 4, label: "Infinite Store", icon: "🌌" }
+    ]
+  },
+  {
+    title: "EXECUTION",
+    items: [
+      { index: 6, label: "Permissions", icon: "🛡️" },
+      { index: 7, label: "Run Console", icon: "🚀" }
+    ]
+  }
+];
+
 const STEPS = [
   "Welcome",
   "System Scan",
@@ -127,30 +159,36 @@ function App() {
             <span>OSwitch</span>
           </div>
 
-          <ul className="list-none flex-grow space-y-2">
-            {STEPS.map((step, index) => {
-              const isActive = currentStep === index;
-              const isCompleted = isStepCompleted(index);
-              
-              return (
-                <li 
-                  key={index}
-                  className={`px-4 py-3 rounded-xl flex items-center gap-3 font-medium transition-all
-                    ${isActive ? 'bg-blue-500/15 text-blue-500 border-l-4 border-blue-500' : 
-                      isInstalling ? 'text-slate-500 cursor-not-allowed opacity-50' : 'text-slate-300 hover:bg-white/5 cursor-pointer'}`}
-                  onClick={() => !isInstalling && setCurrentStep(index)}
-                >
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs 
-                    ${isActive ? 'bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 
-                      isCompleted ? 'bg-green-500 text-white' : 'bg-white/5'}`}
-                  >
-                    {isCompleted ? '✓' : index + 1}
-                  </div>
-                  {step}
-                </li>
-              );
-            })}
-          </ul>
+          <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-6">
+            {NAV_SECTIONS.map((section, sIdx) => (
+              <div key={sIdx}>
+                <div className="text-xs font-bold text-slate-500 mb-3 tracking-widest pl-4">
+                  {section.title}
+                </div>
+                <ul className="list-none space-y-1">
+                  {section.items.map((item) => {
+                    const isActive = currentStep === item.index;
+                    const isCompleted = isStepCompleted(item.index);
+                    
+                    return (
+                      <li 
+                        key={item.index}
+                        className={`px-4 py-2.5 rounded-xl flex items-center gap-3 font-medium transition-all
+                          ${isActive ? 'bg-blue-500/15 text-blue-500 border-l-4 border-blue-500 shadow-[inset_0_0_20px_rgba(59,130,246,0.05)]' : 
+                            isInstalling ? 'text-slate-500 cursor-not-allowed opacity-50' : 'text-slate-300 hover:bg-white/5 hover:text-white cursor-pointer'}`}
+                        onClick={() => !isInstalling && setCurrentStep(item.index)}
+                      >
+                        <div className={`text-lg transition-transform ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'opacity-70'}`}>
+                          {isCompleted && !isActive ? <span className="text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]">✓</span> : item.icon}
+                        </div>
+                        <span className="text-sm">{item.label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         </aside>
 
         {/* Main Content */}
