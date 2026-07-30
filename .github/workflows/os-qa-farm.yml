@@ -3,23 +3,45 @@ name: OS QA Farm (Matrix Test)
 on:
   workflow_dispatch:
     inputs:
-      os_list:
-        description: 'Comma separated list of OS IDs to test (e.g. ubuntu,kali,arch)'
+      os_group:
+        description: 'Which OS Group to test?'
         required: true
-        default: 'ubuntu,kali,arch,debian,fedora'
+        default: 'group1'
+        type: choice
+        options:
+          - group1
+          - group2
+          - group3
 
 jobs:
   prepare-matrix:
     runs-on: ubuntu-latest
     outputs:
-      os_matrix: ${{ steps.set-matrix.outputs.os_matrix }}
+      os_matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - id: set-matrix
+      - uses: actions/checkout@v4
+      - name: Generate Dynamic OS Matrix
+        id: set-matrix
         run: |
-          # Convert comma-separated string to JSON array
-          IFS=',' read -r -a array <<< "${{ github.event.inputs.os_list }}"
-          json_array=$(printf '"%s",' "${array[@]}" | sed 's/,$//')
-          echo "os_matrix=[$json_array]" >> $GITHUB_OUTPUT
+          node -e "
+            const fs = require('fs');
+            const keys = Object.keys(JSON.parse(fs.readFileSync('catalog.json')));
+            const chunkSize = Math.ceil(keys.length / 3);
+            const groups = [
+              keys.slice(0, chunkSize),
+              keys.slice(chunkSize, chunkSize * 2),
+              keys.slice(chunkSize * 2)
+            ];
+            
+            let groupIndex = 0;
+            const selection = '${{ github.event.inputs.os_group }}';
+            if (selection === 'group2') groupIndex = 1;
+            if (selection === 'group3') groupIndex = 2;
+            
+            const selectedOSes = groups[groupIndex];
+            console.log('Selected OSes:', selectedOSes);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'matrix=' + JSON.stringify(selectedOSes) + '\n');
+          "
 
   qa-test:
     needs: prepare-matrix
