@@ -1,0 +1,31 @@
+name: OS Catalog Auto-Healer
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run automatically every day at midnight
+  workflow_dispatch: # Allow manual triggers from the GitHub UI
+
+jobs:
+  heal-catalog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Auto-Healer Script
+        run: node scripts/os_catalog_healer.js
+
+      - name: Commit changes if any links were healed
+        run: |
+          git config --global user.name 'OSwitch Auto-Healer Bot'
+          git config --global user.email 'healer@oswitch.bot'
+          git add catalog.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore(catalog): auto-heal broken ISO links" && git push)
