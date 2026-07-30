@@ -34,10 +34,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install QEMU
+      - name: Install QEMU and OVMF
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 jq curl
+          sudo apt-get install -y qemu-system-x86 ovmf jq curl
 
       - name: Fetch ISO URL from Catalog
         id: fetch-iso
@@ -61,11 +61,12 @@ jobs:
           # Create a dummy hard drive
           qemu-img create -f qcow2 dummy_hd.qcow2 10G
           
-          # Boot in software emulation (tcg)
+          # Boot in software emulation (tcg) with UEFI firmware
           timeout 60s qemu-system-x86_64 \
             -machine pc,accel=tcg \
             -m 2048 \
             -smp 2 \
+            -bios /usr/share/ovmf/OVMF.fd \
             -drive file=dummy_hd.qcow2,format=qcow2 \
             -cdrom test.iso \
             -nographic \
