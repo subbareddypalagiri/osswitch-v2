@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { motion } from "framer-motion";
+import { TerminalSquare, MonitorPlay } from "lucide-react";
 
 export interface BootEntry {
   id: string;
@@ -64,26 +66,41 @@ export default function StepBootSwitch({ onBack, onNext }: { onBack: () => void,
         ) : (
           <div className="space-y-3 mb-8 overflow-y-auto custom-scrollbar flex-grow content-start pr-2">
             {entries.map((entry, i) => (
-              <div
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1, ease: "easeOut" }}
                 key={entry.id}
                 onClick={() => setSelectedId(entry.id)}
-                className={`bg-white/5 border rounded-2xl p-5 cursor-pointer transition-all flex items-center gap-4
+                className={`bg-white/5 border rounded-2xl p-5 cursor-pointer transition-all duration-300 flex items-center gap-4 group
                   ${selectedId === entry.id
-                    ? 'border-purple-500 bg-purple-500/10 shadow-[0_0_15px_rgba(147,51,234,0.2)]'
-                    : 'border-white/10 hover:bg-white/10'}`}
+                    ? 'border-purple-500 bg-purple-500/10 shadow-[0_0_20px_rgba(147,51,234,0.3)] transform scale-[1.02]'
+                    : 'border-white/10 hover:bg-white/10 hover:border-white/20'}`}
               >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shrink-0
-                  ${selectedId === entry.id ? 'border-purple-500 bg-purple-500' : 'border-slate-500'}`}>
-                  {selectedId === entry.id && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0
+                  ${selectedId === entry.id ? 'border-purple-500 bg-purple-500' : 'border-slate-500 group-hover:border-slate-400'}`}>
+                  {selectedId === entry.id && <div className="w-2.5 h-2.5 rounded-full bg-white shadow-sm"></div>}
                 </div>
+                
+                <div className={`p-2 rounded-xl flex items-center justify-center ${
+                  entry.name.toLowerCase().includes('windows') 
+                    ? 'bg-blue-500/20 text-blue-400' 
+                    : 'bg-orange-500/20 text-orange-400'
+                }`}>
+                  {entry.name.toLowerCase().includes('windows') ? <MonitorPlay size={20} /> : <TerminalSquare size={20} />}
+                </div>
+
                 <div className="flex-1 min-w-0">
-                  <div className="text-white font-bold text-lg truncate">{entry.name}</div>
-                  <div className="text-slate-400 text-xs font-mono mt-1 opacity-50">{entry.id}</div>
+                  <div className="text-white font-bold text-lg truncate group-hover:text-purple-300 transition-colors">{entry.name}</div>
+                  <div className="text-slate-400 text-xs font-mono mt-1 opacity-60 truncate">{entry.id}</div>
                 </div>
                 {i === 0 && (
-                  <span className="text-xs bg-green-500/20 text-green-400 px-3 py-1 rounded-full font-medium shrink-0">Current Default</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] uppercase tracking-wider text-green-500 font-bold mb-1">Active</span>
+                    <span className="text-xs bg-green-500/20 text-green-400 px-3 py-1 rounded-full font-medium shrink-0 border border-green-500/30">Default Boot</span>
+                  </div>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
