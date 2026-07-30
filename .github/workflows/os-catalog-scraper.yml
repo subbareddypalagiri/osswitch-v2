@@ -1,0 +1,33 @@
+name: Master Catalog Auto-Scraper
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Runs at 2:00 AM UTC every day
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  scrape-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to push changes
+      pages: write    # Needed to deploy to GitHub Pages
+      id-token: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Run Auto-Scraper
+        run: python .github/scripts/scraper.py
+
+      - name: Commit and Push Changes (If any)
+        run: |
+          git config --global user.name 'OSwitch Auto-Scraper'
+          git config --global user.email 'bot@oswitch.app'
+          git add catalog.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore(catalog): auto-update ISO links via cloud scraper" && git push)
