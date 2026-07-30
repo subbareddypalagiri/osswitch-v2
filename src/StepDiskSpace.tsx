@@ -1,32 +1,34 @@
-import { useState, useRef } from "react";
+import { useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 
 export default function StepDiskSpace({ 
   onNext, 
   onBack,
-  selectedOS
+  selectedOS,
+  osSpace,
+  setOsSpace
 }: { 
   onNext: () => void, 
   onBack: () => void,
-  selectedOS: string[]
+  selectedOS: string[],
+  osSpace: number,
+  setOsSpace: (val: number) => void
 }) {
   const osName = selectedOS.length > 0 ? selectedOS[0].replace(/_/g, " ").toUpperCase() : "NEW OS";
   
-  // Mock total disk size (e.g. from Rust backend in future)
+  // Mock total disk size
   const TOTAL_GB = 500;
   const MIN_WINDOWS_GB = 100;
   const MIN_OS_GB = 50;
 
-  // State for the slider value (GB for the new OS)
-  const [osSpace, setOsSpace] = useState(100); 
   const windowsSpace = TOTAL_GB - osSpace;
-
   const sliderRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
 
-  const handleDrag = (_e: any, info: any) => {
+  const handleDrag = (clientX: number) => {
     if (!sliderRef.current) return;
     const rect = sliderRef.current.getBoundingClientRect();
-    const percent = Math.max(0, Math.min(1, (info.point.x - rect.left) / rect.width));
+    const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     
     let newWindowsSpace = Math.round(percent * TOTAL_GB);
     
@@ -35,6 +37,42 @@ export default function StepDiskSpace({
     if (TOTAL_GB - newWindowsSpace < MIN_OS_GB) newWindowsSpace = TOTAL_GB - MIN_OS_GB;
     
     setOsSpace(TOTAL_GB - newWindowsSpace);
+  };
+
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => {
+      if (!isDragging.current) return;
+      handleDrag(e.clientX);
+    };
+    const onPointerUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+    };
+
+    return () => {
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+    };
+  }, []);
+
+  const startDrag = (e: React.PointerEvent) => {
+    isDragging.current = true;
+    handleDrag(e.clientX);
+    
+    // Using native DOM events on document for smoother global dragging
+    const onPointerMove = (ev: PointerEvent) => {
+      if (!isDragging.current) return;
+      handleDrag(ev.clientX);
+    };
+    
+    const onPointerUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("pointermove", onPointerMove);
+    };
+
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp, { once: true });
   };
 
   return (
@@ -68,6 +106,8 @@ export default function StepDiskSpace({
           <div 
             ref={sliderRef}
             className="relative w-full h-24 bg-[#141419] rounded-2xl border border-white/10 overflow-hidden flex shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)]"
+            onPointerDown={(e) => handleDrag(e.clientX)}
+            style={{ touchAction: "none" }}
           >
             {/* Windows Bar */}
             <motion.div 
@@ -89,17 +129,13 @@ export default function StepDiskSpace({
 
             {/* The Draggable Handle */}
             <motion.div 
-              drag="x"
-              dragConstraints={sliderRef}
-              dragElastic={0}
-              dragMomentum={false}
-              onDrag={handleDrag}
+              onPointerDown={(e) => { e.stopPropagation(); startDrag(e); }}
               className="absolute top-0 bottom-0 w-4 bg-white hover:bg-blue-100 cursor-ew-resize flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.5)] z-10"
-              style={{ x: "-50%" }}
+              style={{ transform: "translateX(-50%)" }}
               animate={{ left: `${(windowsSpace / TOTAL_GB) * 100}%` }}
               transition={{ type: "spring", bounce: 0, duration: 0.2 }}
             >
-              <div className="w-1 h-8 bg-slate-300 rounded-full"></div>
+              <div className="w-1 h-8 bg-slate-300 rounded-full pointer-events-none"></div>
             </motion.div>
           </div>
           
