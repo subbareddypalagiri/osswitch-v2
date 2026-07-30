@@ -1,4 +1,9 @@
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Home, Search, Disc, Package, Infinity as InfinityIcon, 
+  Power, ShieldCheck, TerminalSquare 
+} from "lucide-react";
 import StepWelcome from "./StepWelcome";
 import StepScan from "./StepScan";
 import StepChooseOS from "./StepChooseOS";
@@ -10,39 +15,39 @@ import StepBootSwitch from "./StepBootSwitch";
 import SplashScreen from "./SplashScreen";
 import Onboarding from "./Onboarding";
 import { OS_CATALOG } from "./constants";
+import Logo from "./Logo";
 import "./App.css";
 
-// 🌐 Cloud Catalog URL — auto-updated weekly by GitHub Actions
+// 🌐 Cloud Catalog URL
 const CLOUD_CATALOG_URL = "https://raw.githubusercontent.com/subbareddypalagiri/osswitch-v2/master/catalog.json";
-
 
 const NAV_SECTIONS = [
   {
     title: "GENERAL",
     items: [
-      { index: 0, label: "Welcome", icon: "🏠" },
-      { index: 1, label: "System Scan", icon: "🔍" }
+      { index: 0, label: "Welcome", icon: Home },
+      { index: 1, label: "System Scan", icon: Search }
     ]
   },
   {
     title: "OS MANAGEMENT",
     items: [
-      { index: 2, label: "Install OS", icon: "💿" },
-      { index: 5, label: "Boot Switcher", icon: "🔄" }
+      { index: 2, label: "Install OS", icon: Disc },
+      { index: 5, label: "Boot Switcher", icon: Power }
     ]
   },
   {
     title: "APP STORE",
     items: [
-      { index: 3, label: "Software Bundles", icon: "📦" },
-      { index: 4, label: "Infinite Store", icon: "🌌" }
+      { index: 3, label: "Software Bundles", icon: Package },
+      { index: 4, label: "Infinite Store", icon: InfinityIcon }
     ]
   },
   {
     title: "EXECUTION",
     items: [
-      { index: 6, label: "Permissions", icon: "🛡️" },
-      { index: 7, label: "Run Console", icon: "🚀" }
+      { index: 6, label: "Permissions", icon: ShieldCheck },
+      { index: 7, label: "Run Console", icon: TerminalSquare }
     ]
   }
 ];
@@ -70,7 +75,6 @@ function App() {
   const [catalog, setCatalog] = useState(OS_CATALOG);
   const [isInstalling, setIsInstalling] = useState(false);
 
-  // 🌐 Fetch fresh ISO URLs from GitHub cloud catalog on startup
   useEffect(() => {
     fetch(CLOUD_CATALOG_URL)
       .then(res => {
@@ -106,11 +110,9 @@ function App() {
           return entry;
             }), ...newEntries];
         });
-        console.log("✅ [OSwitch] Cloud catalog loaded — ISO URLs are fresh!");
+        console.log("✅ [OSwitch] Cloud catalog loaded.");
       })
-      .catch(() => {
-        console.warn("⚠️ [OSwitch] Cloud catalog unavailable — using local fallback URLs.");
-      });
+      .catch(() => console.warn("⚠️ [OSwitch] Cloud catalog unavailable."));
   }, []);
 
   const goNext = () => {
@@ -118,17 +120,14 @@ function App() {
   };
 
   const isStepCompleted = (index: number) => {
-    // In Dashboard mode, we only show green ticks for steps that have queued items
-    if (index === 2) return selectedOS.length > 0; // Choose OS
-    if (index === 3) return selectedBundles.length > 0; // Bundles
-    if (index === 4) return selectedTools.length > 0; // Infinite Store
-    return false; // Other tabs always show their icon
+    if (index === 2) return selectedOS.length > 0;
+    if (index === 3) return selectedBundles.length > 0;
+    if (index === 4) return selectedTools.length > 0;
+    return false; 
   };
 
   const goBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
+    if (currentStep > 0) setCurrentStep(currentStep - 1);
   };
 
   if (viewState === "splash") {
@@ -139,45 +138,82 @@ function App() {
     return <Onboarding onFinish={() => setViewState("app")} />;
   }
 
+  // Content for the active step
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0: return <StepWelcome onNext={goNext} />;
+      case 1: return <StepScan onNext={goNext} onBack={goBack} />;
+      case 2: return <StepChooseOS 
+                onNext={goNext} onBack={goBack} 
+                selectedOS={selectedOS} setSelectedOS={setSelectedOS}
+                selectedIntents={selectedIntents} setSelectedIntents={setSelectedIntents}
+                catalog={catalog} />;
+      case 3: return <StepBundles 
+                onNext={goNext} onBack={goBack} 
+                selectedBundles={selectedBundles} setSelectedBundles={setSelectedBundles} />;
+      case 4: return <StepTools 
+                onNext={goNext} onBack={goBack} 
+                selectedTools={selectedTools} setSelectedTools={setSelectedTools} />;
+      case 5: return <StepBootSwitch onBack={goBack} onNext={goNext} />;
+      case 6: return <StepConfigure 
+                onNext={goNext} onBack={goBack} 
+                backupEnabled={backupEnabled} setBackupEnabled={setBackupEnabled}
+                perms={perms} setPerms={setPerms} />;
+      case 7: return <StepInstall 
+                onNext={goNext} onBack={goBack}
+                selectedOS={selectedOS} selectedIntents={selectedIntents}
+                selectedBundles={selectedBundles} selectedTools={selectedTools}
+                backupEnabled={backupEnabled} catalog={catalog}
+                isInstalling={isInstalling} setIsInstalling={setIsInstalling} />;
+      default: return null;
+    }
+  };
+
   return (
     <>
-      <div className="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden bg-[#05050A]">
-        <div className="blob blob-1"></div>
-        <div className="blob blob-2"></div>
-        <div className="blob blob-3"></div>
+      <div className="mesh-bg">
+        <div className="mesh-blob mesh-blob-1"></div>
+        <div className="mesh-blob mesh-blob-2"></div>
+        <div className="mesh-blob mesh-blob-3"></div>
       </div>
 
-      <div className="flex w-full h-full">
-        {/* Sidebar */}
-        <aside className="w-[280px] shrink-0 h-full flex flex-col border-r border-white/10 glass-panel bg-gradient-to-b from-[#0F142333] to-[#05050ACC] py-8 px-5">
-          <div className="font-['Poppins'] text-[26px] font-extrabold flex items-center gap-2.5 mb-10 tracking-tight">
-            <span className="text-blue-500 drop-shadow-[0_0_20px_rgba(59,130,246,1)]">⚡</span>
-            <span>OSwitch</span>
+      <div className="flex w-full h-full text-[#f5f5f7]">
+        {/* Apple-Tier Sidebar */}
+        <aside className="w-[260px] shrink-0 h-full flex flex-col border-r border-white/5 bg-[#141419]/50 backdrop-blur-3xl pt-10 pb-6 px-4">
+          <div className="flex items-center gap-3 mb-10 px-2 cursor-pointer transition-opacity hover:opacity-80">
+            <Logo className="w-8 h-8" />
+            <span className="font-semibold text-xl tracking-tight">OSwitch</span>
           </div>
 
-          <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-6">
+          <div className="flex-grow overflow-y-auto custom-scrollbar pr-1 space-y-6">
             {NAV_SECTIONS.map((section, sIdx) => (
               <div key={sIdx}>
-                <div className="text-xs font-bold text-slate-500 mb-3 tracking-widest pl-4">
+                <div className="text-[10px] font-bold text-[#86868b] mb-2 tracking-wider pl-3 uppercase">
                   {section.title}
                 </div>
                 <ul className="list-none space-y-1">
                   {section.items.map((item) => {
                     const isActive = currentStep === item.index;
                     const isCompleted = isStepCompleted(item.index);
+                    const Icon = item.icon;
                     
                     return (
                       <li 
                         key={item.index}
-                        className={`px-4 py-2.5 rounded-xl flex items-center gap-3 font-medium transition-all
-                          ${isActive ? 'bg-blue-500/15 text-blue-500 border-l-4 border-blue-500 shadow-[inset_0_0_20px_rgba(59,130,246,0.05)]' : 
-                            isInstalling ? 'text-slate-500 cursor-not-allowed opacity-50' : 'text-slate-300 hover:bg-white/5 hover:text-white cursor-pointer'}`}
                         onClick={() => !isInstalling && setCurrentStep(item.index)}
+                        className={`
+                          px-3 py-2 rounded-lg flex items-center gap-3 text-[13px] font-medium transition-all duration-200 cursor-pointer
+                          ${isActive 
+                            ? 'bg-[#007aff]/15 text-[#007aff] shadow-[inset_0_0_0_1px_rgba(0,122,255,0.2)]' 
+                            : isInstalling 
+                              ? 'text-[#86868b] cursor-not-allowed opacity-50' 
+                              : 'text-[#a1a1a6] hover:bg-white/5 hover:text-white'}
+                        `}
                       >
-                        <div className={`text-lg transition-transform ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'opacity-70'}`}>
-                          {isCompleted && !isActive ? <span className="text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]">✓</span> : item.icon}
+                        <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : ''}`}>
+                          <Icon size={16} strokeWidth={isActive ? 2.5 : 2} className={isCompleted && !isActive ? "text-[#34c759]" : ""} />
                         </div>
-                        <span className="text-sm">{item.label}</span>
+                        <span>{item.label}</span>
                       </li>
                     );
                   })}
@@ -187,67 +223,21 @@ function App() {
           </div>
         </aside>
 
-        {/* Main Content */}
+        {/* Main Content Area with Framer Motion Transitions */}
         <main className="flex-grow flex flex-col h-full min-h-0 relative">
-          <div className="pt-6 pb-6 px-14 flex-grow min-h-0 custom-scrollbar overflow-y-auto">
-            {currentStep === 0 && <StepWelcome onNext={goNext} />}
-            {currentStep === 1 && (
-              <StepScan onNext={goNext} onBack={goBack} />
-            )}
-            {currentStep === 2 && (
-              <StepChooseOS 
-                onNext={goNext} 
-                onBack={goBack} 
-                selectedOS={selectedOS} 
-                setSelectedOS={setSelectedOS}
-                selectedIntents={selectedIntents}
-                setSelectedIntents={setSelectedIntents}
-                catalog={catalog}
-              />
-            )}
-            {currentStep === 3 && (
-              <StepBundles 
-                onNext={goNext} 
-                onBack={goBack} 
-                selectedBundles={selectedBundles} 
-                setSelectedBundles={setSelectedBundles} 
-              />
-            )}
-            {currentStep === 4 && (
-              <StepTools 
-                onNext={goNext} 
-                onBack={goBack} 
-                selectedTools={selectedTools} 
-                setSelectedTools={setSelectedTools} 
-              />
-            )}
-            {currentStep === 5 && (
-              <StepBootSwitch onBack={goBack} onNext={goNext} />
-            )}
-            {currentStep === 6 && (
-              <StepConfigure 
-                onNext={goNext} 
-                onBack={goBack} 
-                backupEnabled={backupEnabled}
-                setBackupEnabled={setBackupEnabled}
-                perms={perms}
-                setPerms={setPerms}
-              />
-            )}
-            {currentStep === 7 && (
-              <StepInstall 
-                onNext={goNext} 
-                onBack={goBack}
-                selectedOS={selectedOS}
-                selectedIntents={selectedIntents}
-                selectedBundles={selectedBundles}
-                selectedTools={selectedTools}
-                backupEnabled={backupEnabled}
-                catalog={catalog}
-                isInstalling={isInstalling}
-                setIsInstalling={setIsInstalling}
-              />
-            )}
+          <div className="pt-8 pb-8 px-16 flex-grow min-h-0 custom-scrollbar overflow-y-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                className="h-full"
+              >
+                {renderStepContent()}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </main>
       </div>
