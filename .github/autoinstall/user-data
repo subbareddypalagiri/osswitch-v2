@@ -1,0 +1,14 @@
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: oswitch-os
+    password: "$6$ex/pD79H$R/p/Xb53q0qO6zX/zX5.n.0q" # Hash for password 'oswitch'
+    username: oswitch
+  keyboard:
+    layout: us
+  locale: en_US.UTF-8
+  storage:
+    layout:
+      name: direct
+  shutdown: poweroff

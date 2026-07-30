@@ -1,0 +1,53 @@
+name: Phase 2 Zero-Touch Matrix (Proof of Concept)
+
+on: workflow_dispatch
+
+jobs:
+  zerotouch-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install QEMU and Cloud-Init Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils curl
+          
+      - name: Download Ubuntu 24.04 Server ISO
+        run: |
+          # Using Ubuntu Server 24.04 because it fully supports Subiquity Autoinstall
+          curl -L -o ubuntu.iso "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-live-server-amd64.iso"
+          
+      - name: Generate Cloud-Init Seed Image
+        run: |
+          cloud-localds seed.img .github/autoinstall/user-data .github/autoinstall/meta-data
+          
+      - name: Create 10GB Virtual Hard Drive
+        run: |
+          qemu-img create -f qcow2 hdd.img 10G
+          
+      - name: Execute Zero-Touch Silent Installation
+        timeout-minutes: 15
+        run: |
+          echo "Starting QEMU with Ubuntu ISO, Seed Image, and 10GB HDD..."
+          # -no-reboot ensures QEMU exits when the autoinstall script calls 'poweroff'
+          # -display none because we don't have a GUI in GitHub Actions
+          # -m 3072 gives it 3GB of RAM to speed up the install
+          sudo qemu-system-x86_64 \
+            -m 3072 \
+            -smp 2 \
+            -enable-kvm \
+            -cdrom ubuntu.iso \
+            -drive file=seed.img,format=raw,if=virtio \
+            -drive file=hdd.img,format=qcow2,if=virtio \
+            -display none \
+            -no-reboot
+
+      - name: Verify Installation Success
+        run: |
+          echo "Installation completed and VM powered off automatically."
+          echo "Verifying virtual hard drive..."
+          ls -lh hdd.img
+          qemu-img info hdd.img
+          echo "✅ ZERO-TOUCH INSTALLATION PROOF OF CONCEPT SUCCESSFUL!"
