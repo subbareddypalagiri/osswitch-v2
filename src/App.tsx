@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Home, Search, Disc, Package, Infinity as InfinityIcon, 
+  Home, Search, Disc, HardDrive, Package, Infinity as InfinityIcon, 
   Power, ShieldCheck, TerminalSquare 
 } from "lucide-react";
 import StepWelcome from "./StepWelcome";
 import StepScan from "./StepScan";
 import StepChooseOS from "./StepChooseOS";
+import StepDiskSpace from "./StepDiskSpace";
 import StepConfigure from "./StepConfigure";
 import StepBundles from "./StepBundles";
 import StepTools from "./StepTools";
@@ -33,21 +34,22 @@ const NAV_SECTIONS = [
     title: "OS MANAGEMENT",
     items: [
       { index: 2, label: "Install OS", icon: Disc },
-      { index: 5, label: "Boot Switcher", icon: Power }
+      { index: 3, label: "Disk Partition", icon: HardDrive },
+      { index: 6, label: "Boot Switcher", icon: Power }
     ]
   },
   {
     title: "APP STORE",
     items: [
-      { index: 3, label: "Software Bundles", icon: Package },
-      { index: 4, label: "Infinite Store", icon: InfinityIcon }
+      { index: 4, label: "Software Bundles", icon: Package },
+      { index: 5, label: "Infinite Store", icon: InfinityIcon }
     ]
   },
   {
     title: "EXECUTION",
     items: [
-      { index: 6, label: "Permissions", icon: ShieldCheck },
-      { index: 7, label: "Run Console", icon: TerminalSquare }
+      { index: 7, label: "Permissions", icon: ShieldCheck },
+      { index: 8, label: "Run Console", icon: TerminalSquare }
     ]
   }
 ];
@@ -56,6 +58,7 @@ const STEPS = [
   "Welcome",
   "System Scan",
   "Choose OS",
+  "Disk Partition",
   "Software Bundles",
   "Infinite Store",
   "Boot Switcher",
@@ -121,8 +124,9 @@ function App() {
 
   const isStepCompleted = (index: number) => {
     if (index === 2) return selectedOS.length > 0;
-    if (index === 3) return selectedBundles.length > 0;
-    if (index === 4) return selectedTools.length > 0;
+    if (index === 3) return selectedOS.length > 0; // Disk Partition completed if OS selected
+    if (index === 4) return selectedBundles.length > 0;
+    if (index === 5) return selectedTools.length > 0;
     return false; 
   };
 
@@ -148,18 +152,21 @@ function App() {
                 selectedOS={selectedOS} setSelectedOS={setSelectedOS}
                 selectedIntents={selectedIntents} setSelectedIntents={setSelectedIntents}
                 catalog={catalog} />;
-      case 3: return <StepBundles 
+      case 3: return <StepDiskSpace
+                onNext={goNext} onBack={goBack}
+                selectedOS={selectedOS} />;
+      case 4: return <StepBundles 
                 onNext={goNext} onBack={goBack} 
                 selectedBundles={selectedBundles} setSelectedBundles={setSelectedBundles} />;
-      case 4: return <StepTools 
+      case 5: return <StepTools 
                 onNext={goNext} onBack={goBack} 
                 selectedTools={selectedTools} setSelectedTools={setSelectedTools} />;
-      case 5: return <StepBootSwitch onBack={goBack} onNext={goNext} />;
-      case 6: return <StepConfigure 
+      case 6: return <StepBootSwitch onBack={goBack} onNext={goNext} />;
+      case 7: return <StepConfigure 
                 onNext={goNext} onBack={goBack} 
                 backupEnabled={backupEnabled} setBackupEnabled={setBackupEnabled}
                 perms={perms} setPerms={setPerms} />;
-      case 7: return <StepInstall 
+      case 8: return <StepInstall 
                 onNext={goNext} onBack={goBack}
                 selectedOS={selectedOS} selectedIntents={selectedIntents}
                 selectedBundles={selectedBundles} selectedTools={selectedTools}
