@@ -15,9 +15,9 @@
     "isoUrl": "https://software.download.prss.microsoft.com/db/Win11_English_x64v2.iso"
   },
   "fedora": {
-    "name": "Fedora Workstation 40",
+    "name": "Fedora Workstation 41",
     "category": "Linux",
-    "isoUrl": "https://download.fedoraproject.org/pub/fedora/linux/releases/40/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-40-1.14.iso"
+    "isoUrl": "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-41-1.4.iso"
   },
   "pop": {
     "name": "Pop!_OS 22.04",
