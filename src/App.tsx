@@ -13,7 +13,7 @@ import { OS_CATALOG } from "./constants";
 import "./App.css";
 
 // 🌐 Cloud Catalog URL — auto-updated weekly by GitHub Actions
-const CLOUD_CATALOG_URL = "https://raw.githubusercontent.com/subbareddypalagiri/oswitch-v2/master/catalog.json";
+const CLOUD_CATALOG_URL = "https://raw.githubusercontent.com/subbareddypalagiri/osswitch-v2/master/catalog.json";
 
 
 const NAV_SECTIONS = [
