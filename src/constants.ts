@@ -65,7 +65,19 @@ export const OS_CATALOG: OSConfig[] = [
   { id: "vanillaos", name: "Vanilla OS", category: "Linux", isoUrl: "https://github.com/Vanilla-OS/os/releases/download/v2.0.0/VanillaOS-2.0.0.iso" },
   { id: "blissos", name: "Bliss OS", category: "Linux", isoUrl: "https://sourceforge.net/projects/blissos-dev/files/BlissOS/BlissOS-16/BlissOS-16.iso" },
   { id: "templeos", name: "TempleOS", category: "Server", isoUrl: "https://templeos.org/Downloads/TempleOS.ISO" },
-  { id: "kolibrios", name: "KolibriOS", category: "Linux", isoUrl: "http://kolibrios.org/releases/KolibriOS-0.7.7.0.iso" }
+  { id: "kolibrios", name: "KolibriOS", category: "Linux", isoUrl: "http://kolibrios.org/releases/KolibriOS-0.7.7.0.iso" },
+  { id: "rhel", name: "Red Hat Enterprise Linux", category: "Server", isoUrl: "https://example.com/rhel-locked.iso", locked: true },
+  { id: "tens", name: "TENS (NSA/DoD)", category: "Security", isoUrl: "https://www.tens.af.mil/iso/tens-3.1.2-public.iso" },
+  { id: "kodachi", name: "Linux Kodachi", category: "Security", isoUrl: "https://sourceforge.net/projects/linuxkodachi/files/latest/download" },
+  { id: "hardenedbsd", name: "HardenedBSD", category: "Security", isoUrl: "https://installer.hardenedbsd.org/pub/HardenedBSD/releases/amd64/amd64/ISO-IMAGES/13-STABLE/HardenedBSD-13-STABLE-v1300063-amd64-disc1.iso" },
+  { id: "integrity", name: "Green Hills INTEGRITY", category: "Server", isoUrl: "https://example.com/integrity-locked.iso", locked: true },
+  { id: "subgraph", name: "Subgraph OS", category: "Security", isoUrl: "https://subgraph.com/sgos/download/subgraph-os-alpha-latest.iso" },
+  { id: "pureos", name: "PureOS", category: "Linux", isoUrl: "https://downloads.puri.sm/pureos/gnome/gnome-live-latest-amd64.iso" },
+  { id: "sel4", name: "seL4 Microkernel", category: "Security", isoUrl: "https://example.com/sel4-locked.iso", locked: true },
+  { id: "clearlinux", name: "Clear Linux", category: "Linux", isoUrl: "https://cdn.download.clearlinux.org/releases/latest/clear/clear-linux-live-desktop.iso" },
+  { id: "septor", name: "Septor Linux", category: "Security", isoUrl: "https://sourceforge.net/projects/septor/files/latest/download" },
+  { id: "alpine-extended", name: "Alpine Extended", category: "Server", isoUrl: "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-extended-3.19.1-x86_64.iso" },
+  { id: "grapheneos", name: "GrapheneOS", category: "Security", isoUrl: "https://example.com/graphene-locked.iso", locked: true }
 ];
 
 export interface SoftwareItem {

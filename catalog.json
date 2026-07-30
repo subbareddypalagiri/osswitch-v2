@@ -288,5 +288,77 @@
     "name": "KolibriOS",
     "category": "Linux",
     "isoUrl": "http://kolibrios.org/releases/KolibriOS-0.7.7.0.iso"
+  },
+  "rhel": {
+    "name": "Red Hat Enterprise Linux",
+    "category": "Server",
+    "isoUrl": "https://example.com/rhel-locked.iso",
+    "locked": true
+  },
+  "tens": {
+    "name": "TENS (NSA/DoD)",
+    "category": "Security",
+    "isoUrl": "https://www.tens.af.mil/iso/tens-3.1.2-public.iso",
+    "locked": false
+  },
+  "kodachi": {
+    "name": "Linux Kodachi",
+    "category": "Security",
+    "isoUrl": "https://sourceforge.net/projects/linuxkodachi/files/latest/download",
+    "locked": false
+  },
+  "hardenedbsd": {
+    "name": "HardenedBSD",
+    "category": "Security",
+    "isoUrl": "https://installer.hardenedbsd.org/pub/HardenedBSD/releases/amd64/amd64/ISO-IMAGES/13-STABLE/HardenedBSD-13-STABLE-v1300063-amd64-disc1.iso",
+    "locked": false
+  },
+  "integrity": {
+    "name": "Green Hills INTEGRITY",
+    "category": "Server",
+    "isoUrl": "https://example.com/integrity-locked.iso",
+    "locked": true
+  },
+  "subgraph": {
+    "name": "Subgraph OS",
+    "category": "Security",
+    "isoUrl": "https://subgraph.com/sgos/download/subgraph-os-alpha-latest.iso",
+    "locked": false
+  },
+  "pureos": {
+    "name": "PureOS",
+    "category": "Linux",
+    "isoUrl": "https://downloads.puri.sm/pureos/gnome/gnome-live-latest-amd64.iso",
+    "locked": false
+  },
+  "sel4": {
+    "name": "seL4 Microkernel",
+    "category": "Security",
+    "isoUrl": "https://example.com/sel4-locked.iso",
+    "locked": true
+  },
+  "clearlinux": {
+    "name": "Clear Linux",
+    "category": "Linux",
+    "isoUrl": "https://cdn.download.clearlinux.org/releases/latest/clear/clear-linux-live-desktop.iso",
+    "locked": false
+  },
+  "septor": {
+    "name": "Septor Linux",
+    "category": "Security",
+    "isoUrl": "https://sourceforge.net/projects/septor/files/latest/download",
+    "locked": false
+  },
+  "alpine-extended": {
+    "name": "Alpine Extended",
+    "category": "Server",
+    "isoUrl": "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-extended-3.19.1-x86_64.iso",
+    "locked": false
+  },
+  "grapheneos": {
+    "name": "GrapheneOS",
+    "category": "Security",
+    "isoUrl": "https://example.com/graphene-locked.iso",
+    "locked": true
   }
 }
