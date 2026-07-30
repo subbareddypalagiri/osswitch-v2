@@ -75,17 +75,47 @@ function App() {
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [backupEnabled, setBackupEnabled] = useState(true);
   const [perms, setPerms] = useState<boolean[]>([false, false, false, false]);
-  const [catalog, setCatalog] = useState(OS_CATALOG);
+  const [osSpace, setOsSpace] = useState(100);
+  
+  // 0ms Latency Local Caching Engine
+  const [catalog, setCatalog] = useState(() => {
+    try {
+      const cached = localStorage.getItem("oswitch_catalog_cache");
+      if (cached) {
+        const cloudData = JSON.parse(cached);
+        const merged = OS_CATALOG.map(entry => {
+          const normalizedId = entry.id.replace("-", "_");
+          const cloud = cloudData[normalizedId] || cloudData[entry.id];
+          if (cloud && typeof cloud === "object") {
+            return {
+              ...entry,
+              isoUrl: (typeof cloud.isoUrl === "string" && cloud.isoUrl.trim() !== "") ? cloud.isoUrl : entry.isoUrl,
+              officialSite: typeof cloud.officialSite === "string" ? cloud.officialSite : entry.officialSite
+            };
+          }
+          return entry;
+        });
+        return merged;
+      }
+    } catch (e) {}
+    return OS_CATALOG;
+  });
+  
   const [isInstalling, setIsInstalling] = useState(false);
 
   useEffect(() => {
-    fetch(CLOUD_CATALOG_URL)
+    // Silently check edge CDN in the background
+    fetch(CLOUD_CATALOG_URL, { cache: "no-store" })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP error ${res.status}`);
         return res.json();
       })
       .then((cloudData) => {
         if (!cloudData || typeof cloudData !== "object" || Array.isArray(cloudData)) return;
+        
+        // Save to local physical cache for instant loading next time
+        localStorage.setItem("oswitch_catalog_cache", JSON.stringify(cloudData));
+        
         setCatalog(prev => {
             const currentIds = new Set(prev.map(e => e.id));
             const newEntries: any[] = [];
@@ -113,9 +143,9 @@ function App() {
           return entry;
             }), ...newEntries];
         });
-        console.log("✅ [OSwitch] Cloud catalog loaded.");
+        console.log("✅ [OSwitch] Cloud Edge CDN catalog synced to Local Cache.");
       })
-      .catch(() => console.warn("⚠️ [OSwitch] Cloud catalog unavailable."));
+      .catch(() => console.warn("⚠️ [OSwitch] Edge CDN unavailable, relying on Local Cache."));
   }, []);
 
   const goNext = () => {
@@ -154,7 +184,8 @@ function App() {
                 catalog={catalog} />;
       case 3: return <StepDiskSpace
                 onNext={goNext} onBack={goBack}
-                selectedOS={selectedOS} />;
+                selectedOS={selectedOS} 
+                osSpace={osSpace} setOsSpace={setOsSpace} />;
       case 4: return <StepBundles 
                 onNext={goNext} onBack={goBack} 
                 selectedBundles={selectedBundles} setSelectedBundles={setSelectedBundles} />;
