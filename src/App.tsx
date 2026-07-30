@@ -118,15 +118,11 @@ function App() {
   };
 
   const isStepCompleted = (index: number) => {
-    if (index === 0) return true; // Welcome
-    if (index === 1) return true; // Scan
+    // In Dashboard mode, we only show green ticks for steps that have queued items
     if (index === 2) return selectedOS.length > 0; // Choose OS
     if (index === 3) return selectedBundles.length > 0; // Bundles
     if (index === 4) return selectedTools.length > 0; // Infinite Store
-    if (index === 5) return true; // Boot Switcher
-    if (index === 6) return true; // Permissions
-    if (index === 7) return false; // Run Console
-    return false;
+    return false; // Other tabs always show their icon
   };
 
   const goBack = () => {
