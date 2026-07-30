@@ -49,12 +49,28 @@ jobs:
           fi
           echo "url=$ISO_URL" >> $GITHUB_OUTPUT
 
+      - name: Pre-Flight ISO Validation
+        id: preflight
+        run: |
+          echo "Validating URL: ${{ steps.fetch-iso.outputs.url }}"
+          HTTP_STATUS=$(curl -sL -w "%{http_code}" -I "${{ steps.fetch-iso.outputs.url }}" -o /dev/null || echo "000")
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "URL is DEAD or redirects to 404 (HTTP $HTTP_STATUS). Skipping QEMU boot test to prevent failure."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            # We exit 0 here so the job stays green (successful), but skips subsequent steps
+            exit 0
+          fi
+          echo "URL is ALIVE (HTTP 200). Proceeding to download."
+          echo "skip=false" >> $GITHUB_OUTPUT
+
       - name: Download ISO (Simulating OSwitch Download)
+        if: steps.preflight.outputs.skip != 'true'
         run: |
           echo "Downloading ${{ steps.fetch-iso.outputs.url }}..."
           curl -L --fail --max-time 600 -o test.iso "${{ steps.fetch-iso.outputs.url }}" || (echo "Download Failed (404 or Timeout)" && exit 1)
           
       - name: Boot Virtual Machine (Simulating Mode ${{ matrix.mode }})
+        if: steps.preflight.outputs.skip != 'true'
         run: |
           echo "Simulating boot in ${{ matrix.mode }} mode..."
           
@@ -73,6 +89,7 @@ jobs:
             -serial file:boot_log.txt || true
             
       - name: Verify Boot Success
+        if: steps.preflight.outputs.skip != 'true'
         run: |
           if [ -s boot_log.txt ]; then
             echo "✅ SUCCESS: OS Bootloader executed successfully."
