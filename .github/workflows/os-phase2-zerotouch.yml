@@ -28,7 +28,7 @@ jobs:
           qemu-img create -f qcow2 hdd.img 10G
           
       - name: Execute Zero-Touch Silent Installation
-        timeout-minutes: 15
+        timeout-minutes: 45
         run: |
           echo "Starting QEMU with Ubuntu ISO, Seed Image, and 10GB HDD..."
           # -no-reboot ensures QEMU exits when the autoinstall script calls 'poweroff'
@@ -37,7 +37,6 @@ jobs:
           sudo qemu-system-x86_64 \
             -m 3072 \
             -smp 2 \
-            -enable-kvm \
             -cdrom ubuntu.iso \
             -drive file=seed.img,format=raw,if=virtio \
             -drive file=hdd.img,format=qcow2,if=virtio \
