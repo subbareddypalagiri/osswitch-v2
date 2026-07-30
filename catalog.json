@@ -2,12 +2,12 @@
   "ubuntu": {
     "name": "Ubuntu 24.04 LTS",
     "category": "Linux",
-    "isoUrl": "https://releases.ubuntu.com/24.04/ubuntu-24.04.4-desktop-amd64.iso"
+    "isoUrl": "https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso"
   },
   "kali": {
-    "name": "Kali Linux 2026.2",
+    "name": "Kali Linux 2024.2",
     "category": "Security",
-    "isoUrl": "https://cdimage.kali.org/kali-images/current/kali-linux-2026.2-installer-amd64.iso"
+    "isoUrl": "https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso"
   },
   "win11": {
     "name": "Windows 11 Pro",
@@ -22,7 +22,7 @@
   "pop": {
     "name": "Pop!_OS 22.04",
     "category": "Linux",
-    "isoUrl": "https://iso.pop-os.org/22.04/amd64/intel/pop-os_22.04_amd64_intel_34.iso"
+    "isoUrl": "https://iso.pop-os.org/22.04/amd64/intel/36/pop-os_22.04_amd64_intel_36.iso"
   },
   "debian": {
     "name": "Debian 13",
@@ -35,14 +35,14 @@
     "isoUrl": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso"
   },
   "mint": {
-    "name": "Linux Mint 21.3",
+    "name": "Linux Mint 22",
     "category": "Linux",
-    "isoUrl": "https://mirrors.kernel.org/linuxmint/stable/21.3/linuxmint-21.3-cinnamon-64bit.iso"
+    "isoUrl": "https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-cinnamon-64bit.iso"
   },
   "manjaro": {
     "name": "Manjaro KDE",
     "category": "Linux",
-    "isoUrl": "https://download.manjaro.org/kde/23.1.4/manjaro-kde-23.1.4-240406-linux66.iso"
+    "isoUrl": "https://download.manjaro.org/kde/24.0.2/manjaro-kde-24.0.2-240618-linux69.iso"
   },
   "centos": {
     "name": "CentOS Stream 9",
