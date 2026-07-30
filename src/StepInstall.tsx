@@ -162,7 +162,7 @@ export default function StepInstall({
       console.error(e);
       let errMsg = typeof e === "string" ? e : (e as Error)?.message || JSON.stringify(e);
       
-      if (errMsg.includes("ISO_DOWNLOAD_FAILED") || errMsg.includes("MACOS_RESTRICTION") || errMsg.includes("does not exist") || !catalog.find(o => o.id === id)?.isoUrl) {
+      if (id !== "tools_only" && (errMsg.includes("ISO_DOWNLOAD_FAILED") || errMsg.includes("MACOS_RESTRICTION") || errMsg.includes("does not exist") || !catalog.find(o => o.id === id)?.isoUrl)) {
         const catalogEntry = catalog.find(o => o.id === id);
         const officialUrl = catalogEntry?.officialSite || "https://google.com/search?q=" + encodeURIComponent((catalogEntry?.name || id) + " download");
         setFallbackMode({active: true, url: officialUrl, id});
