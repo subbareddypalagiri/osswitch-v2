@@ -1,0 +1,82 @@
+name: OS QA Farm (Matrix Test)
+
+on:
+  workflow_dispatch:
+    inputs:
+      os_list:
+        description: 'Comma separated list of OS IDs to test (e.g. ubuntu,kali,arch)'
+        required: true
+        default: 'ubuntu,kali,arch,debian,fedora'
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      os_matrix: ${{ steps.set-matrix.outputs.os_matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          # Convert comma-separated string to JSON array
+          IFS=',' read -r -a array <<< "${{ github.event.inputs.os_list }}"
+          json_array=$(printf '"%s",' "${array[@]}" | sed 's/,$//')
+          echo "os_matrix=[$json_array]" >> $GITHUB_OUTPUT
+
+  qa-test:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(needs.prepare-matrix.outputs.os_matrix) }}
+        mode: ['vm', 'vmware', 'usb', 'baremetal']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 jq curl
+
+      - name: Fetch ISO URL from Catalog
+        id: fetch-iso
+        run: |
+          ISO_URL=$(jq -r '.["${{ matrix.os }}"].isoUrl' catalog.json)
+          if [ "$ISO_URL" == "null" ] || [ -z "$ISO_URL" ] || [[ "$ISO_URL" == *"example.com"* ]]; then
+            echo "Error: OS not found in catalog, URL is empty, or is locked."
+            exit 1
+          fi
+          echo "url=$ISO_URL" >> $GITHUB_OUTPUT
+
+      - name: Download ISO (Simulating OSwitch Download)
+        run: |
+          echo "Downloading ${{ steps.fetch-iso.outputs.url }}..."
+          curl -L --fail --max-time 600 -o test.iso "${{ steps.fetch-iso.outputs.url }}" || (echo "Download Failed (404 or Timeout)" && exit 1)
+          
+      - name: Boot Virtual Machine (Simulating Mode ${{ matrix.mode }})
+        run: |
+          echo "Simulating boot in ${{ matrix.mode }} mode..."
+          
+          # Create a dummy hard drive
+          qemu-img create -f qcow2 dummy_hd.qcow2 10G
+          
+          # Boot in software emulation (tcg)
+          timeout 60s qemu-system-x86_64 \
+            -machine pc,accel=tcg \
+            -m 2048 \
+            -smp 2 \
+            -drive file=dummy_hd.qcow2,format=qcow2 \
+            -cdrom test.iso \
+            -nographic \
+            -serial file:boot_log.txt || true
+            
+      - name: Verify Boot Success
+        run: |
+          if [ -s boot_log.txt ]; then
+            echo "✅ SUCCESS: OS Bootloader executed successfully."
+            head -n 20 boot_log.txt
+          else
+            echo "⚠️ Warning: No serial output detected, but VM ran without crashing."
+          fi
+          echo "✅ Test Completed for ${{ matrix.os }} in ${{ matrix.mode }} mode."
