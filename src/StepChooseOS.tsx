@@ -118,7 +118,7 @@ export default function StepChooseOS({
               placeholder="Search OS..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-6 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-[300px]"
+              className="bg-white/5 border border-black/10 dark:border-white/10 rounded-xl py-3 pl-12 pr-6 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-[300px]"
             />
           </div>
         </div>
@@ -143,8 +143,8 @@ export default function StepChooseOS({
                     }
                   }}
                   className={`bg-white/5 border rounded-2xl p-5 flex flex-col transition-all cursor-pointer relative
-                    ${os.locked ? 'opacity-60 cursor-not-allowed border-white/10' : 
-                      isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'border-white/10 hover:bg-white/10'}`}
+                    ${os.locked ? 'opacity-60 cursor-not-allowed border-black/10 dark:border-white/10' : 
+                      isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'border-black/10 dark:border-white/10 hover:bg-white/10'}`}
                   onClick={() => !os.locked && toggleOS(os.id)}
                 >
                   {isSelected && !os.locked && (
@@ -153,16 +153,16 @@ export default function StepChooseOS({
                   <div className="flex items-center gap-4 mb-3 min-w-0 pr-6">
                     <span className="text-4xl drop-shadow-md flex-shrink-0">{os.glyph}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="text-white font-bold text-lg truncate">{os.name}</div>
+                      <div className="text-slate-900 dark:text-white font-bold text-lg truncate">{os.name}</div>
                       <div className="text-slate-400 text-xs leading-tight line-clamp-2">{os.sub}</div>
                     </div>
                   </div>
                   
                   {isSelected && !os.locked && (
-                    <div className="mt-3 pt-3 border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+                    <div className="mt-3 pt-3 border-t border-black/10 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
                       <label className="text-xs text-slate-400 block mb-1">Install Method:</label>
                       <select 
-                        className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-white w-full text-sm focus:outline-none focus:border-blue-500"
+                        className="bg-black/60 border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white w-full text-sm focus:outline-none focus:border-blue-500"
                         value={intent}
                         onChange={(e) => handleIntentChange(os.id, e.target.value)}
                       >
@@ -181,14 +181,14 @@ export default function StepChooseOS({
         
         <div className="flex justify-start gap-4 mt-auto">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
+            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           <button 
             className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2
-              ${hasSelection ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
+              ${hasSelection ? 'bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
             onClick={onNext}
             disabled={!hasSelection}
           >

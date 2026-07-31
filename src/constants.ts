@@ -5,17 +5,20 @@ export interface OSConfig {
   isoUrl?: string;
   officialSite?: string;
   locked?: boolean;
+  frugalKernel?: string;
+  frugalInitrd?: string;
+  frugalAppend?: string;
 }
 
 export const OS_CATALOG: OSConfig[] = [
-  { id: "ubuntu", name: "Ubuntu 24.04 LTS", category: "Linux", isoUrl: "https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso", officialSite: "https://ubuntu.com/download/desktop" },
-  { id: "kali", name: "Kali Linux 2024.2", category: "Security", isoUrl: "https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso", officialSite: "https://www.kali.org/get-kali/#kali-installer-images" },
+  { id: "ubuntu", name: "Ubuntu 24.04 LTS", category: "Linux", isoUrl: "https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso", officialSite: "https://ubuntu.com/download/desktop", frugalKernel: "/casper/vmlinuz", frugalInitrd: "/casper/initrd", frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject" },
+  { id: "kali", name: "Kali Linux 2024.2", category: "Security", isoUrl: "https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso", officialSite: "https://www.kali.org/get-kali/#kali-installer-images", frugalKernel: "/install.amd/vmlinuz", frugalInitrd: "/install.amd/initrd.gz", frugalAppend: "iso-scan/filename=__ISO_PATH__" },
   { id: "win11", name: "Windows 11 Pro", category: "Windows", isoUrl: "https://software.download.prss.microsoft.com/db/Win11_English_x64v2.iso", officialSite: "https://www.microsoft.com/software-download/windows11", locked: true },
-  { id: "fedora", name: "Fedora Workstation 41", category: "Linux", isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-41-1.4.iso", officialSite: "https://fedoraproject.org/workstation/download" },
-  { id: "pop", name: "Pop!_OS 22.04", category: "Linux", isoUrl: "https://iso.pop-os.org/22.04/amd64/intel/36/pop-os_22.04_amd64_intel_36.iso", officialSite: "https://pop.system76.com/" },
-  { id: "debian", name: "Debian 12", category: "Linux", isoUrl: "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso", officialSite: "https://www.debian.org/distrib/" },
-  { id: "arch", name: "Arch Linux", category: "Linux", isoUrl: "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso", officialSite: "https://archlinux.org/download/" },
-  { id: "mint", name: "Linux Mint 22", category: "Linux", isoUrl: "https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-cinnamon-64bit.iso", officialSite: "https://linuxmint.com/download.php" },
+  { id: "fedora", name: "Fedora Workstation 41", category: "Linux", isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-41-1.4.iso", officialSite: "https://fedoraproject.org/workstation/download", frugalKernel: "/images/pxeboot/vmlinuz", frugalInitrd: "/images/pxeboot/initrd.img", frugalAppend: "root=live:CDLABEL=Fedora iso-scan/filename=__ISO_PATH__" },
+  { id: "pop", name: "Pop!_OS 22.04", category: "Linux", isoUrl: "https://iso.pop-os.org/22.04/amd64/intel/36/pop-os_22.04_amd64_intel_36.iso", officialSite: "https://pop.system76.com/", frugalKernel: "/casper/vmlinuz.efi", frugalInitrd: "/casper/initrd.gz", frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject" },
+  { id: "debian", name: "Debian 12", category: "Linux", isoUrl: "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso", officialSite: "https://www.debian.org/distrib/", frugalKernel: "/install.amd/vmlinuz", frugalInitrd: "/install.amd/initrd.gz", frugalAppend: "iso-scan/filename=__ISO_PATH__" },
+  { id: "arch", name: "Arch Linux", category: "Linux", isoUrl: "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso", officialSite: "https://archlinux.org/download/", frugalKernel: "/arch/boot/x86_64/vmlinuz-linux", frugalInitrd: "/arch/boot/x86_64/initramfs-linux.img", frugalAppend: "archisobasedir=arch img_loop=__ISO_PATH__" },
+  { id: "mint", name: "Linux Mint 22", category: "Linux", isoUrl: "https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-cinnamon-64bit.iso", officialSite: "https://linuxmint.com/download.php", frugalKernel: "/casper/vmlinuz", frugalInitrd: "/casper/initrd.lz", frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject" },
   { id: "manjaro", name: "Manjaro KDE", category: "Linux", isoUrl: "https://download.manjaro.org/kde/24.0.2/manjaro-kde-24.0.2-240618-linux69.iso", officialSite: "https://manjaro.org/download/" },
   { id: "centos", name: "CentOS Stream 9", category: "Server", isoUrl: "https://mirrors.centos.org/mirrorlist?path=9-stream/BaseOS/x86_64/iso/CentOS-Stream-9-latest-x86_64-dvd1.iso", officialSite: "https://www.centos.org/download/" },
   { id: "rocky", name: "Rocky Linux 9", category: "Server", isoUrl: "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.3-x86_64-dvd.iso", officialSite: "https://rockylinux.org/download" },
@@ -100,14 +103,40 @@ export const BUNDLES: BundleConfig[] = [
     items: [
       { id: "Microsoft.VisualStudioCode", name: "VS Code", defaultSelected: true },
       { id: "Git.Git", name: "Git", defaultSelected: true },
-      { id: "Python.Python.3.12", name: "Python 3.11", defaultSelected: true },
+      { id: "Python.Python.3.12", name: "Python 3.12", defaultSelected: true },
       { id: "OpenJS.NodeJS", name: "Node.js", defaultSelected: true },
       { id: "Docker.DockerDesktop", name: "Docker Desktop", defaultSelected: false },
       { id: "Postman.Postman", name: "Postman", defaultSelected: false },
       { id: "Microsoft.WindowsTerminal", name: "Windows Terminal", defaultSelected: true },
       { id: "Microsoft.VisualStudio.2022.Community", name: "Visual Studio Community", defaultSelected: false },
       { id: "JetBrains.IntelliJIDEA.Community", name: "IntelliJ IDEA", defaultSelected: false },
+      { id: "JetBrains.PyCharm.Community", name: "PyCharm", defaultSelected: false },
+      { id: "JetBrains.WebStorm", name: "WebStorm", defaultSelected: false },
+      { id: "Neovim.Neovim", name: "Neovim", defaultSelected: false },
+      { id: "GoLang.Go", name: "Go Language", defaultSelected: false },
+      { id: "Rustlang.Rustup", name: "Rust (Rustup)", defaultSelected: false },
       { id: "GitHub.GitHubDesktop", name: "GitHub Desktop", defaultSelected: false }
+    ]
+  },
+  {
+    id: "devops", name: "Cloud & DevOps", icon: "☁️", description: "Infrastructure as code, containers, and cloud CLI tools.",
+    items: [
+      { id: "Amazon.AWSCLI", name: "AWS CLI", defaultSelected: true },
+      { id: "Microsoft.AzureCLI", name: "Azure CLI", defaultSelected: false },
+      { id: "Google.CloudSDK", name: "Google Cloud SDK", defaultSelected: false },
+      { id: "Hashicorp.Terraform", name: "Terraform", defaultSelected: true },
+      { id: "Kubernetes.kubectl", name: "Kubernetes CLI", defaultSelected: true },
+      { id: "Helm.Helm", name: "Helm", defaultSelected: false },
+      { id: "RedHat.Ansible", name: "Ansible", defaultSelected: false }
+    ]
+  },
+  {
+    id: "mobile_dev", name: "Mobile Development", icon: "📱", description: "Android, iOS, and cross-platform app development.",
+    items: [
+      { id: "Google.AndroidStudio", name: "Android Studio", defaultSelected: true },
+      { id: "Google.Flutter", name: "Flutter SDK", defaultSelected: false },
+      { id: "Appium.Appium", name: "Appium Server", defaultSelected: false },
+      { id: "Genymobile.Genymotion", name: "Genymotion Emulator", defaultSelected: false }
     ]
   },
   {
@@ -115,6 +144,8 @@ export const BUNDLES: BundleConfig[] = [
     items: [
       { id: "OBSProject.OBSStudio", name: "OBS Studio", defaultSelected: true },
       { id: "BlenderFoundation.Blender", name: "Blender", defaultSelected: true },
+      { id: "EpicGames.UnrealEngine", name: "Unreal Engine", defaultSelected: false },
+      { id: "Unity.UnityHub", name: "Unity Hub", defaultSelected: false },
       { id: "GIMP.GIMP", name: "GIMP", defaultSelected: true },
       { id: "Audacity.Audacity", name: "Audacity", defaultSelected: true },
       { id: "Figma.Figma", name: "Figma", defaultSelected: false },
@@ -130,22 +161,30 @@ export const BUNDLES: BundleConfig[] = [
       { id: "Valve.Steam", name: "Steam", defaultSelected: true },
       { id: "Discord.Discord", name: "Discord", defaultSelected: true },
       { id: "EpicGames.EpicGamesLauncher", name: "Epic Games Launcher", defaultSelected: false },
+      { id: "Blizzard.BattleNet", name: "Battle.net", defaultSelected: false },
+      { id: "RiotGames.RiotClient", name: "Riot Client", defaultSelected: false },
+      { id: "Microsoft.XboxApp", name: "Xbox App", defaultSelected: false },
       { id: "GOG.Galaxy", name: "GOG Galaxy", defaultSelected: false },
       { id: "Nvidia.GeForceNow", name: "GeForce NOW", defaultSelected: false },
       { id: "ElectronicArts.EADesktop", name: "EA app", defaultSelected: false },
       { id: "Ubisoft.Connect", name: "Ubisoft Connect", defaultSelected: false },
+      { id: "Razer.Synapse", name: "Razer Synapse", defaultSelected: false },
+      { id: "Logitech.GHUB", name: "Logitech G HUB", defaultSelected: false },
       { id: "TeamSpeakSystems.TeamSpeakClient", name: "TeamSpeak 3", defaultSelected: false }
     ]
   },
   {
     id: "office", name: "Office & Productivity", icon: "💼", description: "Docs, spreadsheets, and seamless teamwork tools.",
     items: [
+      { id: "Microsoft.Office", name: "Microsoft Office 365", defaultSelected: false },
       { id: "TheDocumentFoundation.LibreOffice", name: "LibreOffice", defaultSelected: true },
       { id: "SlackTechnologies.Slack", name: "Slack", defaultSelected: true },
       { id: "Zoom.Zoom", name: "Zoom", defaultSelected: true },
       { id: "Microsoft.Teams", name: "Microsoft Teams", defaultSelected: false },
       { id: "Adobe.Acrobat.Reader.64-bit", name: "Acrobat Reader", defaultSelected: true },
+      { id: "Obsidian.Obsidian", name: "Obsidian", defaultSelected: false },
       { id: "Notion.Notion", name: "Notion", defaultSelected: false },
+      { id: "Atlassian.Trello", name: "Trello", defaultSelected: false },
       { id: "Evernote.Evernote", name: "Evernote", defaultSelected: false },
       { id: "AnyDesk.AnyDesk", name: "AnyDesk", defaultSelected: false }
     ]
@@ -156,10 +195,14 @@ export const BUNDLES: BundleConfig[] = [
       { id: "Google.Chrome", name: "Google Chrome", defaultSelected: true },
       { id: "VideoLAN.VLC", name: "VLC Player", defaultSelected: true },
       { id: "7zip.7zip", name: "7-Zip", defaultSelected: true },
+      { id: "RARLab.WinRAR", name: "WinRAR", defaultSelected: false },
       { id: "9NKSQGP7F2NH", name: "WhatsApp", defaultSelected: true },
       { id: "Spotify.Spotify", name: "Spotify", defaultSelected: false },
+      { id: "AgileBits.1Password", name: "1Password", defaultSelected: false },
       { id: "Microsoft.PowerToys", name: "PowerToys", defaultSelected: false },
       { id: "Bitwarden.Bitwarden", name: "Bitwarden", defaultSelected: false },
+      { id: "ShareX.ShareX", name: "ShareX", defaultSelected: true },
+      { id: "qBittorrent.qBittorrent", name: "qBittorrent", defaultSelected: false },
       { id: "voidtools.Everything", name: "Everything Search", defaultSelected: true }
     ]
   },
@@ -168,8 +211,12 @@ export const BUNDLES: BundleConfig[] = [
     items: [
       { id: "TorProject.TorBrowser", name: "Tor Browser", defaultSelected: true },
       { id: "Proton.ProtonVPN", name: "ProtonVPN", defaultSelected: true },
+      { id: "OpenVPN.OpenVPN", name: "OpenVPN Connect", defaultSelected: false },
       { id: "Malwarebytes.Malwarebytes", name: "Malwarebytes", defaultSelected: true },
       { id: "WiresharkFoundation.Wireshark", name: "Wireshark", defaultSelected: false },
+      { id: "Npcap.Npcap", name: "Npcap", defaultSelected: false },
+      { id: "PortSwigger.BurpSuite.Community", name: "Burp Suite Community", defaultSelected: false },
+      { id: "Hashcat.Hashcat", name: "Hashcat", defaultSelected: false },
       { id: "IDRIX.VeraCrypt", name: "VeraCrypt", defaultSelected: false },
       { id: "KeePassXCTeam.KeePassXC", name: "KeePassXC", defaultSelected: false },
       { id: "Insecure.Nmap", name: "Nmap", defaultSelected: false }
@@ -192,20 +239,35 @@ export const BUNDLES: BundleConfig[] = [
     items: [
       { id: "Mozilla.Firefox.DeveloperEdition", name: "Firefox Developer", defaultSelected: true },
       { id: "WinSCP.WinSCP", name: "WinSCP", defaultSelected: true },
+      { id: "TimKosse.FileZillaClient", name: "FileZilla", defaultSelected: false },
+      { id: "Cyberduck.Cyberduck", name: "Cyberduck", defaultSelected: false },
       { id: "Figma.Figma", name: "Figma", defaultSelected: true },
       { id: "ApacheFriends.Xampp.8.2", name: "XAMPP", defaultSelected: false },
       { id: "Insomnia.Insomnia", name: "Insomnia", defaultSelected: false }
     ]
   },
   {
-    id: "data", name: "Data Science & AI", icon: "🤖", description: "Heavy lifters for analytics and machine learning.",
+    id: "data", name: "Data Science & Local AI", icon: "🧠", description: "Heavy lifters for analytics and local LLMs.",
     items: [
       { id: "Anaconda.Anaconda3", name: "Anaconda3", defaultSelected: true },
+      { id: "Ollama.Ollama", name: "Ollama (Local AI)", defaultSelected: true },
+      { id: "LMStudio.LMStudio", name: "LM Studio", defaultSelected: false },
       { id: "RProject.R", name: "R Language", defaultSelected: true },
       { id: "Posit.RStudio", name: "RStudio", defaultSelected: true },
-      { id: "DBBrowserForSQLite.DBBrowserForSQLite", name: "DB Browser for SQLite", defaultSelected: true },
+      { id: "dbeaver.dbeaver", name: "DBeaver Community", defaultSelected: true },
+      { id: "Oracle.MySQLWorkbench", name: "MySQL Workbench", defaultSelected: false },
+      { id: "DBBrowserForSQLite.DBBrowserForSQLite", name: "DB Browser for SQLite", defaultSelected: false },
       { id: "Microsoft.PowerBI", name: "PowerBI Desktop", defaultSelected: false },
       { id: "MongoDB.Compass.Community", name: "MongoDB Compass", defaultSelected: false }
+    ]
+  },
+  {
+    id: "media", name: "Media & Entertainment", icon: "🎬", description: "Media servers, players, and streaming.",
+    items: [
+      { id: "Plex.Plex", name: "Plex Media Player", defaultSelected: true },
+      { id: "Jellyfin.Jellyfin", name: "Jellyfin Media Player", defaultSelected: false },
+      { id: "Kodi.Kodi", name: "Kodi", defaultSelected: false },
+      { id: "Apple.iTunes", name: "Apple iTunes", defaultSelected: false }
     ]
   },
   {

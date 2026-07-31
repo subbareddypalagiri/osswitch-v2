@@ -83,7 +83,7 @@ export default function StepDiskSpace({
           <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 3 of 8</span>
         </div>
         
-        <h2 className="text-[32px] font-bold text-white tracking-tight mb-2">
+        <h2 className="text-[32px] font-bold text-slate-900 dark:text-white tracking-tight mb-2">
           Intelligent <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Partitioning</span>
         </h2>
         <p className="text-slate-400 mb-10 text-lg">
@@ -92,7 +92,7 @@ export default function StepDiskSpace({
 
         {/* The Apple-Tier Slider Visualization */}
         <div className="mb-16">
-          <div className="flex justify-between text-white font-bold text-2xl mb-4 px-2">
+          <div className="flex justify-between text-slate-900 dark:text-white font-bold text-2xl mb-4 px-2">
             <div className="flex flex-col">
               <span className="text-slate-400 text-sm font-normal uppercase tracking-wider mb-1">Windows C:</span>
               <span>{windowsSpace} GB</span>
@@ -105,7 +105,7 @@ export default function StepDiskSpace({
 
           <div 
             ref={sliderRef}
-            className="relative w-full h-24 bg-[#141419] rounded-2xl border border-white/10 overflow-hidden flex shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)]"
+            className="relative w-full h-24 bg-[#141419] rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden flex shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)]"
             onPointerDown={(e) => handleDrag(e.clientX)}
             style={{ touchAction: "none" }}
           >
@@ -148,13 +148,13 @@ export default function StepDiskSpace({
         
         <div className="flex justify-start gap-4">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
+            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           <button 
-            className="bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2"
             onClick={onNext}
           >
             Confirm Partition <span className="text-lg">🔪</span>

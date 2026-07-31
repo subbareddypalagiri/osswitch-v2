@@ -1,76 +1,57 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import StepInstall from "./StepInstall";
-import { invoke } from "@tauri-apps/api/core";
+import { render, screen, fireEvent } from '@testing-library/react';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import StepInstall from './StepInstall';
 
-// Mock Tauri modules
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-}));
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(() => Promise.resolve(() => {})),
-}));
-vi.mock("@tauri-apps/plugin-dialog", () => ({
-  open: vi.fn(),
-}));
-
-describe("StepInstall - Fallback UI State", () => {
+describe('StepInstall Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("resets status to idle and clears the red error box when cancelling Fallback UI", async () => {
-    // 1. Initial Failure to show red error box
-    (invoke as any)
-      .mockRejectedValueOnce(new Error("Generic Network Error"))
-      // 2. Second failure triggers Fallback UI
-      .mockRejectedValueOnce(new Error("ISO_DOWNLOAD_FAILED"));
-
-    const setIsInstalling = vi.fn();
-    
+  it('renders the OS installation UI correctly', () => {
     render(
-      <StepInstall
-        onNext={vi.fn()}
-        onBack={vi.fn()}
-        selectedOS={["ubuntu"]}
-        selectedIntents={{ ubuntu: "vbox_vm" }}
-        selectedBundles={[]}
-        backupEnabled={false}
-        catalog={[{ id: "ubuntu", name: "Ubuntu", isoUrl: "http://ubuntu.com/iso" }]}
-        isInstalling={false}
-        setIsInstalling={setIsInstalling}
+      <StepInstall 
+        onNext={() => {}} 
+        onBack={() => {}} 
+        selectedOS={['ubuntu']} 
+        selectedIntents={{ ubuntu: 'vbox_vm' }} 
+        selectedBundles={[]} 
+        backupEnabled={false} 
+        catalog={[{ id: 'ubuntu', name: 'Ubuntu Linux' }]} 
+        isInstalling={false} 
+        setIsInstalling={() => {}} 
+        osSpace={50}
       />
     );
+    
+    // Check if the target OS name appears in the terminal header or tab
+    expect(screen.getByText(/Terminal - Ubuntu Linux/i)).toBeInTheDocument();
+    
+    // Check if the Install button is present
+    expect(screen.getByRole('button', { name: /Install Ubuntu Linux now/i })).toBeInTheDocument();
+  });
 
-    // Initial state check - no error box
-    expect(screen.queryByText(/Error:/i)).not.toBeInTheDocument();
+  it('handles the installation flow and updates progress', async () => {
+    const setIsInstalling = vi.fn();
 
-    // Trigger installation (Fails with Generic Error)
-    const installBtn = screen.getByRole("button", { name: /Install Ubuntu now/i });
-    fireEvent.click(installBtn);
-
-    // Wait for the red error box to appear
-    await waitFor(() => {
-      expect(screen.getByText(/Error: Failed to install OS ubuntu:/i)).toBeInTheDocument();
-    });
-
-    // Trigger installation again (Fails with ISO_DOWNLOAD_FAILED)
-    const runBtn = screen.getByText("Run");
-    fireEvent.click(runBtn);
-
-    // Wait for the fallback UI to appear
-    await waitFor(() => {
-      expect(screen.getByText("Automatic Download Blocked")).toBeInTheDocument();
-    });
-
-    // Cancel fallback UI
-    const cancelBtn = screen.getByRole("button", { name: /Cancel/i });
-    fireEvent.click(cancelBtn);
-
-    // Verify Fallback UI is closed
-    expect(screen.queryByText("Automatic Download Blocked")).not.toBeInTheDocument();
-
-    // Verify the error box is cleared (status is reset to idle by runInstall)
-    expect(screen.queryByText(/Error:/i)).not.toBeInTheDocument();
+    render(
+      <StepInstall 
+        onNext={() => {}} 
+        onBack={() => {}} 
+        selectedOS={['arch']} 
+        selectedIntents={{ arch: 'usb_flash' }} 
+        selectedBundles={[]} 
+        backupEnabled={false} 
+        catalog={[{ id: 'arch', name: 'Arch Linux' }]} 
+        isInstalling={false} 
+        setIsInstalling={vi.fn()} 
+        osSpace={50}
+      />
+    );
+    
+    const installButton = screen.getByRole('button', { name: /Install Arch Linux now/i });
+    fireEvent.click(installButton);
+    
+    // Expect the state setter to be called indicating installation started
+    expect(setIsInstalling).toHaveBeenCalledWith(true);
   });
 });

@@ -17,6 +17,7 @@ import SplashScreen from "./SplashScreen";
 import Onboarding from "./Onboarding";
 import { OS_CATALOG } from "./constants";
 import Logo from "./Logo";
+import ThemeToggle from "./ThemeToggle";
 import "./App.css";
 
 // 🌐 Cloud Catalog URL
@@ -201,6 +202,7 @@ function App() {
                 onNext={goNext} onBack={goBack}
                 selectedOS={selectedOS} selectedIntents={selectedIntents}
                 selectedBundles={selectedBundles} selectedTools={selectedTools}
+                osSpace={osSpace}
                 backupEnabled={backupEnabled} catalog={catalog}
                 isInstalling={isInstalling} setIsInstalling={setIsInstalling} />;
       default: return null;
@@ -209,15 +211,16 @@ function App() {
 
   return (
     <>
+      <ThemeToggle />
       <div className="mesh-bg">
         <div className="mesh-blob mesh-blob-1"></div>
         <div className="mesh-blob mesh-blob-2"></div>
         <div className="mesh-blob mesh-blob-3"></div>
       </div>
 
-      <div className="flex w-full h-full text-[#f5f5f7]">
+      <div className="flex w-full h-full text-slate-900 dark:text-[#f5f5f7]">
         {/* Apple-Tier Sidebar */}
-        <aside className="w-[260px] shrink-0 h-full flex flex-col border-r border-white/5 bg-[#141419]/50 backdrop-blur-3xl pt-10 pb-6 px-4">
+        <aside className="w-[260px] shrink-0 h-full flex flex-col border-r border-black/5 dark:border-white/5 bg-white/50 dark:bg-[#141419]/50 backdrop-blur-3xl pt-10 pb-6 px-4">
           <div className="flex items-center gap-3 mb-10 px-2 cursor-pointer transition-opacity hover:opacity-80">
             <Logo className="w-8 h-8" />
             <span className="font-semibold text-xl tracking-tight">OSwitch</span>
@@ -226,7 +229,7 @@ function App() {
           <div className="flex-grow overflow-y-auto custom-scrollbar pr-1 space-y-6">
             {NAV_SECTIONS.map((section, sIdx) => (
               <div key={sIdx}>
-                <div className="text-[10px] font-bold text-[#86868b] mb-2 tracking-wider pl-3 uppercase">
+                <div className="text-[10px] font-bold text-slate-500 dark:text-[#86868b] mb-2 tracking-wider pl-3 uppercase">
                   {section.title}
                 </div>
                 <ul className="list-none space-y-1">
@@ -244,8 +247,8 @@ function App() {
                           ${isActive 
                             ? 'bg-[#007aff]/15 text-[#007aff] shadow-[inset_0_0_0_1px_rgba(0,122,255,0.2)]' 
                             : isInstalling 
-                              ? 'text-[#86868b] cursor-not-allowed opacity-50' 
-                              : 'text-[#a1a1a6] hover:bg-white/5 hover:text-white'}
+                              ? 'text-slate-500 dark:text-[#86868b] cursor-not-allowed opacity-50' 
+                              : 'text-[#a1a1a6] hover:bg-white/5 hover:text-slate-900 dark:text-white'}
                         `}
                       >
                         <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : ''}`}>

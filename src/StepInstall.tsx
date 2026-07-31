@@ -35,7 +35,7 @@ export const InstallProgressBar = memo(function InstallProgressBar() {
   return (
     <div className="flex flex-col items-center w-full">
       <p className="text-blue-400 mb-8 font-mono break-all text-center max-w-xl px-4 text-sm">{progress.text || "Running provisioning sequence..."}</p>
-      <div className="w-full max-w-md bg-white/5 rounded-full h-3 mb-6 overflow-hidden border border-white/10 relative">
+      <div className="w-full max-w-md bg-white/5 rounded-full h-3 mb-6 overflow-hidden border border-black/10 dark:border-white/10 relative">
         <div 
           className="bg-gradient-to-r from-blue-600 to-purple-500 h-full origin-left transition-transform duration-150 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
           style={{ transform: `scaleX(${percentage / 100})` }}
@@ -55,7 +55,8 @@ export default function StepInstall({
   backupEnabled,
   catalog,
   isInstalling,
-  setIsInstalling
+  setIsInstalling,
+  osSpace
 }: { 
   onNext: () => void, 
   onBack: () => void,
@@ -64,15 +65,19 @@ export default function StepInstall({
   selectedBundles: string[],
   selectedTools?: string[],
   backupEnabled: boolean,
-  catalog: { id: string, name: string, isoUrl?: string, officialSite?: string }[],
+  catalog: { id: string, name: string, isoUrl?: string, officialSite?: string, frugalKernel?: string, frugalInitrd?: string, frugalAppend?: string }[],
   isInstalling: boolean,
-  setIsInstalling: (b: boolean) => void
+  setIsInstalling: (b: boolean) => void,
+  osSpace: number
 }) {
   const targets = selectedOS.filter(id => id !== 'windows');
   const [activeTab, setActiveTab] = useState(targets.length > 0 ? targets[0] : "tools_only");
   const [installStatus, setInstallStatus] = useState<Record<string, { status: "success" | "error" | "idle", message?: string }>>({});
+  const [safetyPromptState, setSafetyPromptState] = useState<{show: boolean, id: string, path?: string, accepted: boolean}>({show: false, id: "", accepted: false});
+  const [usbPromptState, setUsbPromptState] = useState<{show: boolean, id: string, path?: string, detected: boolean}>({show: false, id: "", detected: false});
   const [fallbackMode, setFallbackMode] = useState<{active: boolean, url: string, id: string}>({active: false, url: "", id: ""});
   const [bundleProgress, setBundleProgress] = useState<Record<string, string>>({});
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // AI Integration States
   const [apiKey, setApiKey] = useState("");
@@ -133,6 +138,19 @@ export default function StepInstall({
 
   
   const runInstall = async (id: string, localIsoPath?: string) => {
+    const intent = selectedIntents[id] || "vbox_vm";
+    if (intent === "baremetal_grub") {
+      setSafetyPromptState({show: true, id, path: localIsoPath, accepted: false});
+      return;
+    }
+    if (intent === "usb_flash") {
+      setUsbPromptState({show: true, id, path: localIsoPath, detected: false});
+      return;
+    }
+    await executeInstall(id, localIsoPath);
+  };
+
+  const executeInstall = async (id: string, localIsoPath?: string) => {
     try {
       setIsInstalling(true);
       setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "" } })); // clear previous
@@ -148,14 +166,22 @@ export default function StepInstall({
       
       // Step 1: Install OS (Skip if tools_only)
       if (id !== "tools_only") {
-        await invoke("install_os", { id: id, intent: intent, isoUrl: iso_url });
+        await invoke("install_os", { 
+          id: id, 
+          intent: intent, 
+          isoUrl: iso_url, 
+          osSpace: osSpace,
+          frugalKernel: catalogEntry?.frugalKernel,
+          frugalInitrd: catalogEntry?.frugalInitrd,
+          frugalAppend: catalogEntry?.frugalAppend
+        });
       }
       
       // Step 2: Install Packages (Bundles + Tools)
       const packagesToInstall = [...selectedBundles, ...(selectedTools || [])];
       if (packagesToInstall.length > 0) {
           setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "OS installed. Now installing packages..." } }));
-          await invoke("install_packages", { packages: packagesToInstall });
+          await invoke("install_packages", { packages: packagesToInstall, targetOs: id, intent: intent, apiKey: apiKey, aiModel: selectedModel ? selectedModel.replace("models/", "") : "gemini-2.5-flash" });
       }
       
     } catch (e: unknown) {
@@ -205,7 +231,7 @@ export default function StepInstall({
       <div className="w-full h-full flex flex-col items-center justify-center">
         <div className="text-slate-400 text-lg">No OS or Tools selected. Go back and make a selection.</div>
         <button 
-          className="mt-4 bg-white/5 hover:bg-white/10 text-white font-semibold py-2 px-6 rounded-xl transition-colors border border-white/10"
+          className="mt-4 bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-2 px-6 rounded-xl transition-colors border border-black/10 dark:border-white/10"
           onClick={onBack}
         >
           Back
@@ -238,14 +264,14 @@ export default function StepInstall({
                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
              </svg>
            </div>
-           <h2 className="text-xl font-bold text-white mb-2">Automatic Download Blocked</h2>
+           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Automatic Download Blocked</h2>
            <p className="text-slate-300 text-sm mb-6">
               The official server for this OS restricts automated downloads (or the link expired). 
               Please download the ISO manually from their official website, then select it below.
            </p>
            <div className="flex flex-col gap-3 w-full">
              <button 
-               className="bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-6 rounded-xl transition-colors border border-white/10 flex items-center justify-center gap-2"
+               className="bg-white/10 hover:bg-white/20 text-slate-900 dark:text-white font-medium py-3 px-6 rounded-xl transition-colors border border-black/10 dark:border-white/10 flex items-center justify-center gap-2"
                onClick={async () => {
                 try { await openUrl(fallbackMode.url); }
                 catch (e) { console.error("Failed to open URL", e); alert("Failed to open browser. Please copy this link manually: " + fallbackMode.url); }
@@ -254,13 +280,13 @@ export default function StepInstall({
                1. Open Official Website <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
              </button>
              <button 
-               className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-transform hover:-translate-y-0.5 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+               className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white font-bold py-3 px-6 rounded-xl transition-transform hover:-translate-y-0.5 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
                onClick={handleSelectLocalIso}
              >
                2. Select Downloaded ISO
              </button>
              <button 
-               className="mt-4 text-slate-400 hover:text-white text-sm px-4 py-2"
+               className="mt-4 text-slate-400 hover:text-slate-900 dark:text-white text-sm px-4 py-2"
                onClick={() => setFallbackMode({active:false, url:"", id:""})}
              >
                Cancel
@@ -279,7 +305,7 @@ export default function StepInstall({
             <div className="w-24 h-24 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
             <div className="absolute inset-0 flex items-center justify-center text-2xl">⚡</div>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Installing Operating System</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">Installing Operating System</h2>
           <InstallProgressBar />
         </div>
       </div>
@@ -294,13 +320,13 @@ export default function StepInstall({
           <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 6 of 7</span>
         </div>
         
-        <h2 className="text-[32px] font-bold text-white tracking-tight mb-6">
+        <h2 className="text-[32px] font-bold text-slate-900 dark:text-white tracking-tight mb-6">
           Run <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Console</span>
         </h2>
         
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scrollbar">
           {activeTab === "tools_only" && (
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap bg-blue-600 text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]"><span>📦</span> App Store Execution</button>
+            <button className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap bg-blue-600 text-slate-900 dark:text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]"><span>📦</span> App Store Execution</button>
           )}
           {targets.map(id => {
             const os = getOSDetails(id);
@@ -310,7 +336,7 @@ export default function StepInstall({
                 key={id}
                 disabled={isInstalling}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap
-                  ${activeTab === id ? 'bg-blue-600 text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'}
+                  ${activeTab === id ? 'bg-blue-600 text-slate-900 dark:text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-900 dark:text-white'}
                   ${isInstalling ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => setActiveTab(id)}
               >
@@ -325,7 +351,7 @@ export default function StepInstall({
         <div className="w-full bg-white/5 border border-purple-500/30 rounded-xl p-4 mb-6 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-purple-400">✨</span>
-            <span className="text-white font-bold text-sm tracking-wide">GEMINI AI AUTO-FIX</span>
+            <span className="text-slate-900 dark:text-white font-bold text-sm tracking-wide">GEMINI AI AUTO-FIX</span>
           </div>
           <div className="flex gap-3">
             <input 
@@ -334,12 +360,12 @@ export default function StepInstall({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               disabled={isInstalling}
-              className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors placeholder:text-slate-500"
+              className="flex-1 bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors placeholder:text-slate-500"
             />
             <button 
               onClick={fetchAiModels}
               disabled={isInstalling || fetchingModels || !apiKey.trim()}
-              className="bg-purple-600/80 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-purple-600/80 hover:bg-purple-500 text-slate-900 dark:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {fetchingModels ? "Fetching..." : "Connect"}
             </button>
@@ -348,7 +374,7 @@ export default function StepInstall({
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
                 disabled={isInstalling}
-                className="bg-black/40 border border-purple-500/50 rounded-lg px-3 py-2 text-sm text-purple-300 focus:outline-none focus:border-purple-500 max-w-[200px]"
+                className="bg-slate-100 dark:bg-black/40 border border-purple-500/50 rounded-lg px-3 py-2 text-sm text-purple-300 focus:outline-none focus:border-purple-500 max-w-[200px]"
               >
                 {modelsList.map(m => (
                   <option key={m} value={m}>{m.replace('models/', '')}</option>
@@ -359,8 +385,8 @@ export default function StepInstall({
           {aiError && <div className="text-xs text-red-400 mt-2">{aiError}</div>}
         </div>
 
-        <div className="bg-black/40 border border-white/10 rounded-2xl flex flex-col flex-grow overflow-hidden mb-6">
-          <div className="bg-white/5 px-4 py-2 border-b border-white/10 flex items-center gap-2 text-xs font-mono text-slate-400">
+        <div className="bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-2xl flex flex-col flex-grow overflow-hidden mb-6">
+          <div className="bg-white/5 px-4 py-2 border-b border-black/10 dark:border-white/10 flex items-center gap-2 text-xs font-mono text-slate-400">
             <div className="flex gap-1.5 mr-4">
               <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
@@ -431,7 +457,7 @@ export default function StepInstall({
             
             <button 
               className={`w-full py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-colors mb-6
-                ${isInstalling ? 'bg-white/10 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]'}`}
+                ${isInstalling ? 'bg-white/10 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]'}`}
               disabled={isInstalling}
               onClick={() => activeTab && runInstall(activeTab)}
             >
@@ -454,7 +480,7 @@ export default function StepInstall({
                 <span className="text-xl">🤖</span>
                 <div>
                   <h4 className="text-purple-300 font-bold text-sm mb-1 uppercase tracking-wider">AI Suggestion</h4>
-                  <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{aiSuggestion}</p>
+                  <p className="text-slate-900 dark:text-white text-sm leading-relaxed whitespace-pre-wrap">{aiSuggestion}</p>
                 </div>
               </div>
             </div>
@@ -466,7 +492,7 @@ export default function StepInstall({
 
         <div className="flex justify-between mt-auto">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
+            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
             onClick={onBack}
             disabled={isInstalling}
           >
@@ -474,14 +500,184 @@ export default function StepInstall({
           </button>
           
           <button 
-            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 ${isInstalling ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_20px_rgba(34,197,94,0.4)]'}`}
-            onClick={() => window.location.reload()}
+            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 ${isInstalling ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(34,197,94,0.4)]'}`}
+            onClick={() => setShowSuccessModal(true)}
             disabled={isInstalling}
           >
             Finish <span>✓</span>
           </button>
         </div>
       </div>
+
+
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 z-50 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full p-8 shadow-2xl space-y-6 text-white">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl font-bold">
+                ✓
+              </div>
+              <div>
+                <h3 className="text-xl font-bold tracking-tight">Provisioning Complete!</h3>
+                <p className="text-sm text-slate-400">Your OS installation media is ready.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-800/60 rounded-xl p-5 border border-slate-700/50 space-y-4 text-sm">
+              <h4 className="font-semibold text-indigo-400 uppercase tracking-wider text-xs">🚀 How to Boot Your Test Laptop:</h4>
+              <ol className="list-decimal list-inside space-y-2 text-slate-300">
+                <li><strong className="text-white">Unplug USB</strong> safely & insert it into your test laptop.</li>
+                <li>Press the <strong className="text-white">POWER ON</strong> button on your laptop.</li>
+                <li><strong className="text-emerald-400">Immediately & continuously tap F12 or F2</strong> as soon as the screen turns on!</li>
+                <li>Select your <strong className="text-white">USB Drive</strong> from the Boot Menu and press Enter.</li>
+              </ol>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center text-xs bg-black/40 p-3 rounded-lg border border-white/5 text-slate-400">
+              <div><strong>Dell / Lenovo:</strong> F12</div>
+              <div><strong>HP / Asus:</strong> F9 / F2</div>
+              <div><strong>Acer / MSI:</strong> F12 / Del</div>
+            </div>
+
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-900/40"
+            >
+              Done & Return to Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {usbPromptState.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-white/20 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 pointer-events-none" />
+            
+            <div className="mb-6 relative z-10">
+              <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center ${usbPromptState.detected ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400 animate-pulse'}`}>
+                <span className="text-4xl">💾</span>
+              </div>
+            </div>
+            
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 relative z-10">
+              {usbPromptState.detected ? "USB Detected! ✅" : "Insert USB Drive"}
+            </h2>
+            
+            <p className="text-slate-400 mb-8 relative z-10">
+              {usbPromptState.detected 
+                ? "Rufus will now launch. Please select your USB drive in Rufus and click START."
+                : "Please plug your empty USB Flash Drive into the computer now."}
+            </p>
+            
+            <div className="flex gap-4 relative z-10">
+              <button 
+                onClick={() => setUsbPromptState({show: false, id: "", detected: false})}
+                className="flex-1 py-3 px-4 rounded-xl font-medium border border-black/10 dark:border-white/10 hover:bg-white/5 text-slate-900 dark:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              
+              {!usbPromptState.detected ? (
+                <button 
+                  onClick={() => setUsbPromptState(prev => ({...prev, detected: true}))}
+                  className="flex-1 py-3 px-4 rounded-xl font-medium bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white transition-colors"
+                >
+                  I've Inserted It
+                </button>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setUsbPromptState(prev => ({...prev, show: false}));
+                    executeInstall(usbPromptState.id, usbPromptState.path);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl font-medium bg-green-600 hover:bg-green-500 text-slate-900 dark:text-white shadow-lg shadow-green-500/20 transition-colors"
+                >
+                  Launch Rufus
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {safetyPromptState.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-indigo-500/30 p-8 rounded-2xl max-w-lg w-full shadow-2xl relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-amber-500/10 pointer-events-none" />
+            
+            <div className="mb-6 relative z-10 text-center">
+              <div className="w-20 h-20 mx-auto rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 border border-indigo-500/30">
+                <span className="text-3xl">🛡️</span>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">System Preparation</h2>
+              <p className="text-slate-300 text-sm">
+                OSwitch is ready to install your new Operating System natively. To ensure zero data loss, please review our automated safety measures.
+              </p>
+            </div>
+            
+            <div className="bg-slate-100 dark:bg-black/40 rounded-xl p-4 mb-6 border border-black/5 dark:border-white/5 relative z-10 text-left space-y-3">
+              <div className="flex items-start gap-3">
+                <span className="text-amber-400 mt-0.5">⚡</span>
+                <div>
+                  <h4 className="text-slate-900 dark:text-white font-medium text-sm">Automated Bootloader Backup</h4>
+                  <p className="text-slate-400 text-xs">Your Windows boot configuration will be safely backed up before any changes are made.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-400 mt-0.5">🔒</span>
+                <div>
+                  <h4 className="text-slate-900 dark:text-white font-medium text-sm">Safe Partition Carving</h4>
+                  <p className="text-slate-400 text-xs">We will only use free, unallocated space. Your existing personal files and Windows data will remain untouched.</p>
+                </div>
+              </div>
+            </div>
+
+            <label className="flex items-start gap-3 mb-8 cursor-pointer relative z-10 group">
+              <div className="mt-1 relative flex items-center justify-center">
+                <input 
+                  type="checkbox" 
+                  className="w-5 h-5 appearance-none border border-slate-500 rounded bg-black/30 checked:bg-indigo-500 checked:border-indigo-500 transition-all cursor-pointer"
+                  checked={safetyPromptState.accepted}
+                  onChange={(e) => setSafetyPromptState(prev => ({...prev, accepted: e.target.checked}))}
+                />
+                {safetyPromptState.accepted && (
+                  <svg className="absolute w-3 h-3 text-slate-900 dark:text-white pointer-events-none" viewBox="0 0 14 14" fill="none">
+                    <path d="M3 8L6 11L11 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+              <span className="text-sm text-slate-300 group-hover:text-slate-900 dark:text-white transition-colors">
+                I understand that OS installation alters hardware partitions. I have saved my open work and am ready to proceed.
+              </span>
+            </label>
+            
+            <div className="flex gap-4 relative z-10">
+              <button 
+                onClick={() => setSafetyPromptState({show: false, id: "", accepted: false})}
+                className="flex-1 py-3 px-4 rounded-xl font-medium border border-black/10 dark:border-white/10 hover:bg-white/5 text-slate-900 dark:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              
+              <button 
+                onClick={() => {
+                  if (safetyPromptState.accepted) {
+                    setSafetyPromptState(prev => ({...prev, show: false}));
+                    executeInstall(safetyPromptState.id, safetyPromptState.path);
+                  }
+                }}
+                disabled={!safetyPromptState.accepted}
+                className={"flex-[2] py-3 px-4 rounded-xl font-medium transition-all " + (safetyPromptState.accepted ? "bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white shadow-lg shadow-indigo-500/20" : "bg-slate-800 text-slate-500 cursor-not-allowed")}
+              >
+                Proceed Securely
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -40,7 +40,7 @@ export default function Onboarding({ onFinish }: { onFinish: () => void }) {
         <img src={logo} alt="OSwitch" className="w-16 h-16 rounded-2xl mb-8 shadow-lg z-10" />
 
         <div className="text-6xl mb-6 z-10">{slides[step].icon}</div>
-        <h2 className="text-4xl font-bold text-white mb-4 z-10 transition-all duration-300">
+        <h2 className="text-4xl font-bold text-slate-900 dark:text-white mb-4 z-10 transition-all duration-300">
           {slides[step].title}
         </h2>
         <p className="text-lg text-slate-400 max-w-[600px] leading-relaxed mb-12 z-10 transition-all duration-300 min-h-[80px]">
@@ -68,7 +68,7 @@ export default function Onboarding({ onFinish }: { onFinish: () => void }) {
           
           <button 
             onClick={handleNext}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-10 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] transition-all flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white font-semibold py-3 px-10 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] transition-all flex items-center gap-2"
           >
             {step === slides.length - 1 ? "Get Started" : "Continue"} <span>→</span>
           </button>

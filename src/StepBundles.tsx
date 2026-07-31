@@ -26,7 +26,7 @@ export default function StepBundles({
   return (
     <div className="flex flex-col h-full w-full max-w-[1200px] mx-auto">
       <div className="text-center mb-10 shrink-0">
-        <h2 className="text-4xl font-bold text-white tracking-tight mb-3">Install App Bundles</h2>
+        <h2 className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight mb-3">Install App Bundles</h2>
         <p className="text-lg text-slate-400">Select essential software you want to install automatically.</p>
       </div>
 
@@ -55,7 +55,7 @@ export default function StepBundles({
                         isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-500'
                       }`}>
                         {isSelected && (
-                          <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <svg className="w-3.5 h-3.5 text-slate-900 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
                         )}
@@ -73,13 +73,13 @@ export default function StepBundles({
       <div className="pt-6 mt-4 border-t border-slate-800 shrink-0">
         <div className="flex justify-between items-center bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
           <button 
-            className="text-slate-400 hover:text-white font-medium px-6 py-3 rounded-xl hover:bg-slate-800 transition-all flex items-center gap-2"
+            className="text-slate-400 hover:text-slate-900 dark:text-white font-medium px-6 py-3 rounded-xl hover:bg-slate-800 transition-all flex items-center gap-2"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           <button 
-            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.4)] flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.4)] flex items-center gap-2"
             onClick={handleNext}
           >
             {selectedBundles.length > 0 ? `Queue ${selectedBundles.length} Bundles` : 'Skip Bundles'} <span>→</span>

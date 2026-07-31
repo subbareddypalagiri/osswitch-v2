@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import App from "./App";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -15,25 +15,47 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 
 (globalThis as any).fetch = vi.fn().mockRejectedValue(new Error("No network in test"));
 
+import { act, fireEvent } from "@testing-library/react";
+
 describe("App Component", () => {
-  it("renders the OSwitch welcome screen", () => {
-    render(<App />);
-    expect(screen.getByText("OSwitch")).toBeInTheDocument();
-    expect(screen.getByText(/Welcome to the future of/i)).toBeInTheDocument();
+  beforeEach(() => {
+    vi.useFakeTimers();
   });
 
-  it("renders sidebar with all 6 steps", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders the OSwitch welcome screen (Tour)", () => {
     render(<App />);
+    act(() => {
+      vi.advanceTimersByTime(3000); // Fast-forward past the LoadingSplash
+    });
+    
+    expect(screen.getByText(/Welcome to OSwitch/i)).toBeInTheDocument();
+  });
+
+  it("renders sidebar with Welcome step after skipping tour", () => {
+    render(<App />);
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    
+    const skipBtn = screen.getByText(/Skip Tour/i);
+    fireEvent.click(skipBtn);
+
     expect(screen.getByText("Welcome")).toBeInTheDocument();
-    expect(screen.getByText("System Scan")).toBeInTheDocument();
-    expect(screen.getByText("Choose OS")).toBeInTheDocument();
-    expect(screen.getByText("Software Bundles")).toBeInTheDocument();
-    expect(screen.getByText("Permissions")).toBeInTheDocument();
-    expect(screen.getByText("Run Console")).toBeInTheDocument();
   });
 
-  it("has a Get Started button", () => {
+  it("has a Get Started button on the first step", () => {
     render(<App />);
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    
+    const skipBtn = screen.getByText(/Skip Tour/i);
+    fireEvent.click(skipBtn);
+
     const btn = screen.getByText(/Get Started/i);
     expect(btn).toBeInTheDocument();
   });

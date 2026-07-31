@@ -39,7 +39,7 @@ export default function StepBootSwitch({ onBack, onNext }: { onBack: () => void,
           <span className="text-purple-500 text-sm font-bold uppercase tracking-widest">Boot Manager</span>
         </div>
 
-        <h2 className="text-[32px] font-bold text-white tracking-tight mb-2">
+        <h2 className="text-[32px] font-bold text-slate-900 dark:text-white tracking-tight mb-2">
           Boot <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">Switcher</span>
         </h2>
         <p className="text-slate-400 mb-8">
@@ -49,7 +49,7 @@ export default function StepBootSwitch({ onBack, onNext }: { onBack: () => void,
         {error && (
           <div role="alert" className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 text-red-400">
             <strong>Error:</strong> {error}
-            <button className="ml-4 underline text-red-300 hover:text-white" onClick={fetchEntries}>Retry</button>
+            <button className="ml-4 underline text-red-300 hover:text-slate-900 dark:text-white" onClick={fetchEntries}>Retry</button>
           </div>
         )}
 
@@ -59,7 +59,7 @@ export default function StepBootSwitch({ onBack, onNext }: { onBack: () => void,
             <span className="text-slate-400">Reading boot entries from BCD...</span>
           </div>
         ) : entries.length === 0 ? (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+          <div className="bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-8 text-center">
             <span className="text-4xl mb-4 block">📭</span>
             <p className="text-slate-400">No boot entries found. Install an OS first to see entries here.</p>
           </div>
@@ -75,7 +75,7 @@ export default function StepBootSwitch({ onBack, onNext }: { onBack: () => void,
                 className={`bg-white/5 border rounded-2xl p-5 cursor-pointer transition-all duration-300 flex items-center gap-4 group
                   ${selectedId === entry.id
                     ? 'border-purple-500 bg-purple-500/10 shadow-[0_0_20px_rgba(147,51,234,0.3)] transform scale-[1.02]'
-                    : 'border-white/10 hover:bg-white/10 hover:border-white/20'}`}
+                    : 'border-black/10 dark:border-white/10 hover:bg-white/10 hover:border-white/20'}`}
               >
                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0
                   ${selectedId === entry.id ? 'border-purple-500 bg-purple-500' : 'border-slate-500 group-hover:border-slate-400'}`}>
@@ -91,7 +91,7 @@ export default function StepBootSwitch({ onBack, onNext }: { onBack: () => void,
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="text-white font-bold text-lg truncate group-hover:text-purple-300 transition-colors">{entry.name}</div>
+                  <div className="text-slate-900 dark:text-white font-bold text-lg truncate group-hover:text-purple-300 transition-colors">{entry.name}</div>
                   <div className="text-slate-400 text-xs font-mono mt-1 opacity-60 truncate">{entry.id}</div>
                 </div>
                 {i === 0 && (
@@ -109,14 +109,14 @@ export default function StepBootSwitch({ onBack, onNext }: { onBack: () => void,
 
         <div className="flex justify-between gap-4 mt-auto">
                     <button 
-            className="bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl transition-colors border border-white/10"
+            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors border border-black/10 dark:border-white/10"
             onClick={onBack}
           >
             Back
           </button>
           {onNext && (
             <button 
-              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)]"
+              className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)]"
               onClick={onNext}
             >
               Next ➔

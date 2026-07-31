@@ -25,7 +25,7 @@ pub fn run() {
             engine::get_drives,
             engine::install_os,
             engine::boot_os,
-            boot_switcher::get_boot_menu,
+                                    boot_switcher::get_boot_menu,
             boot_switcher::set_default_boot
         ])
         .run(tauri::generate_context!())

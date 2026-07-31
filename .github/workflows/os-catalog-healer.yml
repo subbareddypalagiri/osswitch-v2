@@ -21,7 +21,7 @@ jobs:
           node-version: '20'
 
       - name: Run Auto-Healer Script
-        run: node scripts/os_catalog_healer.js
+        run: node scripts/os_catalog_healer.cjs
 
       - name: Commit changes if any links were healed
         run: |

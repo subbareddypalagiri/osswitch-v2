@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "oswitch-v2",
+  "productName": "OSwitch",
   "version": "1.0.0",
   "identifier": "com.subba.oswitch-v2",
   "build": {

@@ -21,7 +21,7 @@ export default function SplashScreen({ onFinish }: { onFinish: () => void }) {
           className="w-32 h-32 rounded-3xl shadow-[0_0_50px_rgba(59,130,246,0.3)] animate-[pulse_2s_infinite] mb-6 object-cover"
         />
         
-        <h1 className="text-5xl font-bold text-white tracking-tight mb-2">
+        <h1 className="text-5xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
           OSwitch
         </h1>
         <p className="text-blue-400 tracking-[0.2em] font-medium uppercase text-sm mb-12">

@@ -42,7 +42,7 @@ export default function StepScan({
           <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 2 of 6</span>
         </div>
         
-        <h2 className="text-[32px] font-bold mb-8 text-white tracking-tight hero-title">System Scan</h2>
+        <h2 className="text-[32px] font-bold mb-8 text-slate-900 dark:text-white tracking-tight hero-title">System Scan</h2>
         
         <div className="flex-grow">
           {error ? (
@@ -51,7 +51,7 @@ export default function StepScan({
                 <strong>Scan Failed:</strong> {error}
               </div>
               <button 
-                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white font-semibold py-2 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
                 onClick={fetchSysInfo}
               >
                 Retry Scan
@@ -59,22 +59,22 @@ export default function StepScan({
             </div>
           ) : sysInfo ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
+              <div className="bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
                 <span className="text-slate-400 text-sm uppercase tracking-[1.5px] mb-2 font-medium">CPU</span>
-                <span className="text-xl text-white font-semibold">{sysInfo.cpu}</span>
+                <span className="text-xl text-slate-900 dark:text-white font-semibold">{sysInfo.cpu}</span>
               </div>
               
-              <div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
+              <div className="bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
                 <span className="text-slate-400 text-sm uppercase tracking-[1.5px] mb-2 font-medium">RAM</span>
-                <span className="text-xl text-white font-semibold">{formatBytes(sysInfo.ram_gb * 1024 * 1024 * 1024)}</span>
+                <span className="text-xl text-slate-900 dark:text-white font-semibold">{formatBytes(sysInfo.ram_gb * 1024 * 1024 * 1024)}</span>
               </div>
 
-              <div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
+              <div className="bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
                 <span className="text-slate-400 text-sm uppercase tracking-[1.5px] mb-2 font-medium">Disk Space</span>
-                <span className="text-xl text-white font-semibold">{formatBytes(sysInfo.disk_free_gb * 1024 * 1024 * 1024)} free</span>
+                <span className="text-xl text-slate-900 dark:text-white font-semibold">{formatBytes(sysInfo.disk_free_gb * 1024 * 1024 * 1024)} free</span>
               </div>
 
-              <div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
+              <div className="bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
                 <span className="text-slate-400 text-sm uppercase tracking-[1.5px] mb-2 font-medium">Virtualization</span>
                 <span className="text-xl font-semibold">
                   {sysInfo.virtualization ? (
@@ -99,14 +99,14 @@ export default function StepScan({
 
         <div className="flex justify-start gap-4 mt-10">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
+            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           <button 
             className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2
-              ${sysInfo ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
+              ${sysInfo ? 'bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
             onClick={onNext}
             disabled={!sysInfo}
           >

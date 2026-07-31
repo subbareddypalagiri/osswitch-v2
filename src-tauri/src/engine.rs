@@ -1,4 +1,4 @@
-﻿use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tokio::fs::File;
@@ -116,7 +116,7 @@ pub async fn get_drives() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: String) -> Result<String, String> {
+pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: String, os_space: Option<u32>, frugal_kernel: Option<String>, frugal_initrd: Option<String>, frugal_append: Option<String>) -> Result<String, String> {
     // Global Validations for Edge Cases
     if id.to_lowercase().contains("macos") && iso_url.starts_with("http") {
         return Err("ISO_DOWNLOAD_FAILED: Automated download of macOS is disabled due to Apple's EULA. Please provide a local ISO file.".into());
@@ -182,7 +182,10 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
     } else if !iso_url.contains("fake-url") {
         let _ = app.emit("command-output", Payload { message: format!("Connecting to server: {}\n", iso_url) });
         
-        let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_default();
+        let client = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(30))
+            .read_timeout(std::time::Duration::from_secs(60))
+            .build().unwrap_or_default();
         let res = client.get(&iso_url).send().await.map_err(|e| format!("ISO_DOWNLOAD_FAILED:Network failure: {}", e))?;
         
         if !res.status().is_success() {
@@ -280,10 +283,27 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             }
         }
         if rufus_path.exists() {
-             let _ = Command::new("powershell").args(&["-Command", &format!("Start-Process '{}' -ArgumentList '-i {}'", rufus_path.display(), iso_path.display())]).output().await;
+             let _ = Command::new("powershell").args(&["-Command", &format!("Start-Process '{}' -ArgumentList '-i {}' -Wait", rufus_path.display(), iso_path.display())]).output().await;
         } else {
              return Err("Failed to download Rufus.".into());
         }
+        
+        if id.to_lowercase().contains("arch") {
+            let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Scanning for flashed USB drive...".into(), total: 2, done: false });
+            let mut target_usb = None;
+            for c in 68..=90 { // D to Z
+                let letter = (c as u8 as char).to_string();
+                let efi_path = format!("{}:\\EFI\\BOOT\\BOOTx64.EFI", letter);
+                if std::path::Path::new(&efi_path).exists() {
+                    target_usb = Some(format!("{}:\\", letter));
+                    break;
+                }
+            }
+            if let Some(usb) = target_usb {
+                let _ = inject_arch_unattended(&usb, &app).await;
+            }
+        }
+        
         let _ = app.emit("install-progress", InstallProgress { i: 1, text: "".into(), total: 2, done: true });
 
     } else if intent == "baremetal_grub" {
@@ -350,6 +370,11 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         let master_out = Command::new("powershell").args(&["-Command", &format!("Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"' -Verb RunAs -Wait -PassThru", master_ps1.display())]).output().await;
         if master_out.is_err() {
             return Err("Failed to execute Master Admin script.".into());
+        }
+        
+        if id.to_lowercase().contains("arch") {
+            let usb = format!("{}:\\", free_letter);
+            let _ = inject_arch_unattended(&usb, &app).await;
         }
         
         let _ = app.emit("command-output", Payload { message: "Master Installation Complete.\n".into() });
@@ -484,7 +509,13 @@ struct BundleProgress {
 }
 
 #[tauri::command]
-pub async fn install_packages(app: tauri::AppHandle, packages: Vec<String>) -> Result<String, String> {
+pub async fn install_packages(app: tauri::AppHandle, packages: Vec<String>, target_os: Option<String>, intent: Option<String>, api_key: Option<String>, ai_model: Option<String>) -> Result<String, String> {
+    if let (Some(os), Some(intnt)) = (&target_os, &intent) {
+        if intnt == "baremetal_grub" || intnt == "usb_flash" {
+            return generate_and_inject_ai_script(app, os.clone(), packages, api_key, ai_model).await;
+        }
+    }
+
     println!("[Engine] Installing {} packages with real-time telemetry...", packages.len());
     
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -562,5 +593,116 @@ pub async fn get_gemini_models(api_key: String) -> Result<Vec<String>, String> {
     } else {
         let err_text = res.text().await.unwrap_or_default();
         return Err(format!("API Error: {}", err_text));
+    }
+}
+
+
+
+
+async fn inject_arch_unattended(usb_root: &str, app: &tauri::AppHandle) -> Result<(), String> {
+    let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Injecting Auto-Installer Scripts...".into(), total: 2, done: false });
+    
+    let usb_path = std::path::Path::new(usb_root);
+    
+    // JSON Configs
+    let config_json = r#"{
+        "keyboard-layout": "us",
+        "mirror-region": {"US": {"http://mirrors.kernel.org/archlinux/$repo/os/$arch": true}},
+        "sys-language": "en_US.UTF-8",
+        "sys-encoding": "UTF-8",
+        "desktop-environment": "kde",
+        "profile": {"type": "desktop", "custom_settings": {"desktop-environment": "kde"}},
+        "audio": "pipewire",
+        "network-management": "NetworkManager",
+        "timezone": "UTC"
+    }"#;
+    let creds_json = r#"{
+        "root-password": "root",
+        "users": [{"username": "user", "password": "password", "sudo": true}]
+    }"#;
+    
+    // Write configs
+    let _ = tokio::fs::write(usb_path.join("oswitch_config.json"), config_json).await;
+    let _ = tokio::fs::write(usb_path.join("oswitch_creds.json"), creds_json).await;
+    
+    // Ghost Script
+    let ghost_script = r#"#!/bin/bash
+cat << 'INNEREOF' > /new_root/root/.zlogin
+echo -e "e[1;36m[OS Switch] Waiting for WiFi connection...e[0m"
+while ! ping -c 1 archlinux.org &> /dev/null; do
+    sleep 2
+done
+echo -e "e[1;32m[OS Switch] WiFi Detected! Starting Automated Installation...e[0m"
+archinstall --config /run/archiso/bootmnt/oswitch_config.json --creds /run/archiso/bootmnt/oswitch_creds.json
+INNEREOF
+chmod +x /new_root/root/.zlogin
+"#;
+    let _ = tokio::fs::write(usb_path.join("oswitch_auto.sh"), ghost_script).await;
+    
+    // Patch Bootloaders (GRUB & Syslinux & Systemd-boot)
+    // We search for archisolabel= and append script=/oswitch_auto.sh
+    let paths_to_patch = vec![
+        usb_path.join("EFI").join("BOOT").join("grub.cfg"),
+        usb_path.join("arch").join("boot").join("syslinux").join("archiso_sys-linux.cfg"),
+        usb_path.join("loader").join("entries").join("archiso-x86_64-linux.conf"),
+    ];
+    
+    for p in paths_to_patch {
+        if p.exists() {
+            if let Ok(content) = tokio::fs::read_to_string(&p).await {
+                if !content.contains("script=/oswitch_auto.sh") {
+                    let patched = content.replace("archisolabel=", "script=/oswitch_auto.sh archisolabel=");
+                    let _ = tokio::fs::write(&p, patched).await;
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+async fn generate_and_inject_ai_script(app: tauri::AppHandle, target_os: String, packages: Vec<String>, api_key: Option<String>, ai_model: Option<String>) -> Result<String, String> {
+    let key = api_key.unwrap_or_default();
+    if key.is_empty() {
+        return Err("Gemini API Key is required for Auto-Bundler.".into());
+    }
+
+    let _ = app.emit("install-progress", InstallProgress { i: 0, text: "AI generating custom Bash installer script...".into(), total: 1, done: false });
+
+    let prompt = format!("You are a master Linux sysadmin. Write a single, clean, robust Bash script to automatically install the following packages on '{}': {}. Use the correct package manager (apt, pacman, dnf, zypper, etc.). Include a #!/bin/bash header. Output ONLY the raw bash script without markdown formatting or code blocks.", target_os, packages.join(", "));
+
+    let client = reqwest::Client::new();
+    let res = client.post(format!("https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}", ai_model.unwrap_or("gemini-2.5-flash".to_string()), key))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }))
+        .send().await.map_err(|e| format!("Network error connecting to Gemini: {}", e))?;
+
+    if !res.status().is_success() {
+        return Err(format!("Gemini API Error: {}", res.status()));
+    }
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    let raw_script = json["candidates"][0]["content"]["parts"][0]["text"].as_str().unwrap_or("#!/bin/bash\necho 'Failed to generate script'");
+    let clean_script = raw_script.replace("```bash", "").replace("```", "").trim().to_string();
+
+    let _ = app.emit("install-progress", InstallProgress { i: 0, text: "Injecting AI Script into Motherboard EFI...".into(), total: 1, done: false });
+
+    // Mount EFI
+    let _ = std::process::Command::new("cmd").args(&["/c", "mountvol", "S:", "/S"]).output();
+    let _ = std::fs::create_dir_all("S:\\EFI\\oswitch");
+    
+    let write_res = std::fs::write("S:\\EFI\\oswitch\\auto-install.sh", clean_script);
+    
+    // Unmount EFI
+    let _ = std::process::Command::new("cmd").args(&["/c", "mountvol", "S:", "/D"]).output();
+
+    match write_res {
+        Ok(_) => Ok("Successfully injected Auto-Bundler script into EFI.".into()),
+        Err(e) => Err(format!("Failed to write AI script: {}", e)),
     }
 }
