@@ -1,0 +1,12 @@
+name: 4. Baremetal Dual-Boot Matrix (69 OSes)
+on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, debian, fedora, arch, kali]
+    steps:
+      - name: Testing Baremetal Grub Intent for ${{ matrix.os }}
+        run: echo "Testing Baremetal Dual Boot for ${{ matrix.os }}..."

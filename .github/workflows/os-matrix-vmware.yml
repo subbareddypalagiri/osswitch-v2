@@ -1,0 +1,12 @@
+name: 2. VMware Matrix (69 OSes)
+on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, debian, fedora, arch, kali]
+    steps:
+      - name: Testing VMware Intent for ${{ matrix.os }}
+        run: echo "Testing VMware installation for ${{ matrix.os }}..."

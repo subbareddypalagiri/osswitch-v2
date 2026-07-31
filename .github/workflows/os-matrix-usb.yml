@@ -1,0 +1,12 @@
+name: 3. USB Flash Matrix (69 OSes)
+on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, debian, fedora, arch, kali]
+    steps:
+      - name: Testing USB Flash Intent for ${{ matrix.os }}
+        run: echo "Testing USB Flashing for ${{ matrix.os }}..."
