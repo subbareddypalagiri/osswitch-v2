@@ -229,49 +229,142 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
     
     let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Preparing environment...".into(), total: 3, done: false });
     
-    if intent == "vbox_vm" {
-        let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
-        if !Path::new(vbox_path).exists() {
-            let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Installing VirtualBox via Winget...".into(), total: 3, done: false });
-            let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
-            let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-            let output = Command::new(&winget_path).args(&["install", "-e", "--id", "Oracle.VirtualBox", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
-            let code = output.status.code().unwrap_or(-1);
-            if code != 0 && code != 3010 {
-                return Err(format!("VirtualBox installation failed (exit code {}).", code));
-            }
-        }
+    if intent == "vbox_vm" || intent == "vmware_vm" {
+        let is_arch = id.to_lowercase().contains("arch");
+        let mut installer_vhd = "".to_string();
+        let mut target_vhd = "".to_string();
         
-        let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Provisioning VirtualBox VM...".into(), total: 3, done: false });
-        let vm_name = format!("OSwitch-{}-VM", id);
-        let script = format!(
-            "$ErrorActionPreference = 'Stop'; $vbox = '{}'; & $vbox createvm --name '{}' --ostype 'Linux26_64' --register; & $vbox modifyvm '{}' --memory 2048; & $vbox storagectl '{}' --name 'IDE' --add ide; & $vbox storageattach '{}' --storagectl 'IDE' --port 0 --device 0 --type dvddrive --medium '{}'; & $vbox startvm '{}';",
-            vbox_path, vm_name, vm_name, vm_name, vm_name, iso_path.display(), vm_name
-        );
-        let _ = Command::new("powershell").args(&["-Command", &script]).output().await;
-        let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
-        
-    } else if intent == "vmware_vm" {
-        let vmware_paths = [
-            Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmplayer.exe"),
-            Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmware.exe"),
-            Path::new("C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmplayer.exe"),
-        ];
-        let vmware_exists = vmware_paths.iter().any(|p| p.exists());
-        if !vmware_exists {
-            let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Installing VMware via Winget...".into(), total: 3, done: false });
-            let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
-            let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-            let output = Command::new(&winget_path).args(&["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
-            let code = output.status.code().unwrap_or(-1);
-            if code != 0 && code != 3010 {
-                return Err(format!("VMware installation failed (exit code {}).", code));
+        if is_arch {
+            let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Generating Installer & Target VHDs...".into(), total: 3, done: false });
+            installer_vhd = temp_dir.join(format!("{}_installer.vhd", id)).to_string_lossy().to_string();
+            target_vhd = temp_dir.join(format!("{}_target.vhd", id)).to_string_lossy().to_string();
+            
+            let _ = std::fs::remove_file(&installer_vhd);
+            let _ = std::fs::remove_file(&target_vhd);
+            
+            let mut free_letter = 'V';
+            for c in (68..=90).rev() {
+                let letter = (c as u8 as char).to_string();
+                if !std::path::Path::new(&format!("{}:\\", letter)).exists() {
+                    free_letter = letter.chars().next().unwrap_or('V');
+                    break;
+                }
             }
+            
+            let dp_script = temp_dir.join("osw_vm_diskpart.txt");
+            let script_content = format!(
+                "create vdisk file=\"{}\" maximum=5000 type=expandable\n\
+                select vdisk file=\"{}\"\n\
+                attach vdisk\n\
+                create partition primary\n\
+                format fs=fat32 quick label=\"OSW_BOOT\"\n\
+                assign letter={}\n\
+                create vdisk file=\"{}\" maximum=20000 type=expandable\n",
+                installer_vhd, installer_vhd, free_letter, target_vhd
+            );
+            let _ = tokio::fs::write(&dp_script, script_content).await;
+            
+            let master_ps1 = temp_dir.join("osw_vm_master.ps1");
+            let ps1_content = format!(
+                "$ErrorActionPreference = 'Stop'\n\
+                diskpart /s \"{}\"\n\
+                $isoDrive = (Mount-DiskImage -ImagePath \"{}\" -PassThru | Get-Volume).DriveLetter\n\
+                if (!$isoDrive) {{ $isoDrive = 'E' }}\n\
+                robocopy ${{isoDrive}}:\\ {}:\\ /E\n\
+                Dismount-DiskImage -ImagePath \"{}\"\n",
+                dp_script.display(), iso_path.display(), free_letter, iso_path.display()
+            );
+            let _ = tokio::fs::write(&master_ps1, ps1_content).await;
+            
+            let master_out = Command::new("powershell").args(&["-Command", &format!("Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"' -Verb RunAs -Wait -PassThru", master_ps1.display())]).output().await;
+            if master_out.is_err() {
+                return Err("Failed to execute VM VHD generation script.".into());
+            }
+            
+            let usb = format!("{}:\\", free_letter);
+            let _ = inject_arch_unattended(&usb, &app).await;
+            
+            let detach_script = temp_dir.join("osw_vm_detach.txt");
+            let _ = tokio::fs::write(&detach_script, format!("select vdisk file=\"{}\"\ndetach vdisk\n", installer_vhd)).await;
+            let _ = Command::new("powershell").args(&["-Command", &format!("Start-Process diskpart -ArgumentList '/s \"{}\"' -Verb RunAs -Wait", detach_script.display())]).output().await;
         }
-        let _ = app.emit("install-progress", InstallProgress { i: 2, text: "VMware provisioning ready...".into(), total: 3, done: false });
-        let _ = app.emit("command-output", Payload { message: "Please open VMware Player to mount the ISO.\n".into() });
-        let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
 
+        if intent == "vbox_vm" {
+            let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
+            if !std::path::Path::new(vbox_path).exists() {
+                let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VirtualBox via Winget...".into(), total: 3, done: false });
+                let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+                let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+                let output = Command::new(&winget_path).args(&["install", "-e", "--id", "Oracle.VirtualBox", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+                let code = output.status.code().unwrap_or(-1);
+                if code != 0 && code != 3010 {
+                    return Err(format!("VirtualBox installation failed (exit code {}).", code));
+                }
+            }
+            
+            let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Provisioning VirtualBox VM...".into(), total: 3, done: false });
+            let vm_name = format!("OSwitch-{}-VM", id);
+            
+            let script = if is_arch {
+                format!(
+                    "$ErrorActionPreference = 'Stop'; $vbox = '{}'; & $vbox createvm --name '{}' --ostype 'Linux26_64' --register; & $vbox modifyvm '{}' --memory 2048 --firmware efi; & $vbox storagectl '{}' --name 'SATA' --add sata --controller IntelAhci; & $vbox storageattach '{}' --storagectl 'SATA' --port 0 --device 0 --type hdd --medium '{}'; & $vbox storageattach '{}' --storagectl 'SATA' --port 1 --device 0 --type hdd --medium '{}'; & $vbox startvm '{}';",
+                    vbox_path, vm_name, vm_name, vm_name, vm_name, installer_vhd, vm_name, target_vhd, vm_name
+                )
+            } else {
+                format!(
+                    "$ErrorActionPreference = 'Stop'; $vbox = '{}'; & $vbox createvm --name '{}' --ostype 'Linux26_64' --register; & $vbox modifyvm '{}' --memory 2048; & $vbox storagectl '{}' --name 'IDE' --add ide; & $vbox storageattach '{}' --storagectl 'IDE' --port 0 --device 0 --type dvddrive --medium '{}'; & $vbox startvm '{}';",
+                    vbox_path, vm_name, vm_name, vm_name, vm_name, iso_path.display(), vm_name
+                )
+            };
+            let _ = Command::new("powershell").args(&["-Command", &script]).output().await;
+            let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
+        } else if intent == "vmware_vm" {
+            let vmware_paths = [
+                std::path::Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmplayer.exe"),
+                std::path::Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmware.exe"),
+                std::path::Path::new("C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmplayer.exe"),
+            ];
+            let vmware_exists = vmware_paths.iter().any(|p| p.exists());
+            if !vmware_exists {
+                let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VMware via Winget...".into(), total: 3, done: false });
+                let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+                let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+                let output = Command::new(&winget_path).args(&["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+                let code = output.status.code().unwrap_or(-1);
+                if code != 0 && code != 3010 {
+                    return Err(format!("VMware installation failed (exit code {}).", code));
+                }
+            }
+            
+            let _ = app.emit("install-progress", InstallProgress { i: 2, text: "VMware provisioning ready...".into(), total: 3, done: false });
+            if is_arch {
+                let vmx_path = temp_dir.join(format!("OSwitch_{}.vmx", id));
+                let vmx_content = format!(
+                    ".encoding = \"windows-1252\"\n\
+                    config.version = \"8\"\n\
+                    virtualHW.version = \"18\"\n\
+                    displayName = \"OSwitch VM\"\n\
+                    guestOS = \"archlinux-64\"\n\
+                    memsize = \"2048\"\n\
+                    firmware = \"efi\"\n\
+                    sata0.present = \"TRUE\"\n\
+                    sata0:0.present = \"TRUE\"\n\
+                    sata0:0.fileName = \"{}\"\n\
+                    sata0:1.present = \"TRUE\"\n\
+                    sata0:1.fileName = \"{}\"\n",
+                    installer_vhd.replace("\\", "\\\\"), target_vhd.replace("\\", "\\\\")
+                );
+                let _ = tokio::fs::write(&vmx_path, vmx_content).await;
+                
+                let player_path = vmware_paths.iter().find(|p| p.exists()).unwrap();
+                let _ = Command::new(player_path).arg(&vmx_path).spawn();
+                
+                let _ = app.emit("command-output", Payload { message: "VMware Player launched automatically with the Dual-VHD setup!\n".into() });
+            } else {
+                let _ = app.emit("command-output", Payload { message: "Please open VMware Player to mount the ISO.\n".into() });
+            }
+            let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
+        }
     } else if intent == "usb_flash" {
         let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Launching Rufus USB Flasher...".into(), total: 2, done: false });
         let rufus_path = temp_dir.join("rufus.exe");
