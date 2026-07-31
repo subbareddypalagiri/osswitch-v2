@@ -43,7 +43,7 @@ jobs:
 
       - name: Validate user-data Schema
         run: |
-          cloud-init schema --system --config-file .github/autoinstall/user-data
+          cloud-init schema --config-file .github/autoinstall/user-data
           echo "✅ Schema Validation Passed! The user-data automation logic is flawless."
 
   test-hardware-macos:
