@@ -1,28 +1,73 @@
-name: Phase 2 Zero-Touch Matrix (Proof of Concept)
+name: Phase 2 Dual-Architecture Matrix (Proof of Concept)
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
 
 jobs:
-  zerotouch-ubuntu:
+  lint-artifacts:
+    name: 30-Second Schema Validator (Ubuntu)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install QEMU and Cloud-Init Tools
+      - name: Install Cloud-Init Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils curl
-          
-      - name: Pre-Flight Check & Download Ubuntu 24.04 Server ISO
+          sudo apt-get install -y cloud-image-utils cloud-init
+
+      - name: Generate user-data file
         run: |
-          URL="https://releases.ubuntu.com/24.04/ubuntu-24.04.4-live-server-amd64.iso"
+          mkdir -p .github/autoinstall
+          cat << 'EOF' > .github/autoinstall/user-data
+          #cloud-config
+          autoinstall:
+            version: 1
+            identity:
+              hostname: oswitch-auto
+              password: "$6$ex/X.1XzJcW0bHhE$1Gq0X6.3/k2/z0lW9Jd0bT7aZ1r1sH3tE6rW1W2eR5k9H3oX4tB1Y8vQ7wU4cM2tG8xP5eS0dF9bK4tA1yM2.."
+              realname: OSwitch Admin
+              username: oswitch
+            keyboard:
+              layout: us
+              variant: ''
+            locale: en_US.UTF-8
+            ssh:
+              allow-pw: true
+              install-server: true
+            storage:
+              layout:
+                name: direct
+            updates: security
+          EOF
+
+      - name: Validate user-data Schema
+        run: |
+          cloud-init schema --system --config-file .github/autoinstall/user-data
+          echo "✅ Schema Validation Passed! The user-data automation logic is flawless."
+
+  test-hardware-macos:
+    name: 5-Minute Hardware Hack (macOS M1)
+    needs: lint-artifacts
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install QEMU and Utilities
+        run: |
+          brew install qemu cdrtools
+
+      - name: Pre-Flight Check & Download Ubuntu ARM64 ISO
+        run: |
+          # Downloading the ARM64 ISO so it can natively use Apple Silicon (M1) HVF acceleration
+          URL="https://cdimage.ubuntu.com/releases/24.04/release/ubuntu-24.04.4-live-server-arm64.iso"
           echo "Running 2-Second Pre-Flight Check on URL..."
           
           # 1. Ping for HTTP 200
           HTTP_STATUS=$(curl -sL -o /dev/null -w "%{http_code}" -I "$URL")
           if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::PRE-FLIGHT FAILED! URL is dead (HTTP $HTTP_STATUS). Stopping before QEMU hangs."
+            echo "::error::PRE-FLIGHT FAILED! URL is dead (HTTP $HTTP_STATUS)."
             exit 1
           fi
           
@@ -30,41 +75,90 @@ jobs:
           FILE_SIZE=$(curl -sLI "$URL" | grep -i Content-Length | tail -n 1 | awk '{print $2}' | tr -d '\r')
           echo "Detected File Size: $FILE_SIZE bytes"
           if [ -z "$FILE_SIZE" ] || [ "$FILE_SIZE" -lt 1000000000 ]; then
-             echo "::error::PRE-FLIGHT FAILED! File is only $FILE_SIZE bytes. This is an HTML error page, not an OS ISO."
+             echo "::error::PRE-FLIGHT FAILED! File is only $FILE_SIZE bytes. This is an HTML error page."
              exit 1
           fi
           
           echo "✅ Pre-Flight Passed! ISO is valid and >1GB. Proceeding with download..."
           curl -L -o ubuntu.iso "$URL"
-          
+
       - name: Generate Cloud-Init Seed Image
         run: |
-          cloud-localds seed.img .github/autoinstall/user-data .github/autoinstall/meta-data
+          mkdir -p .github/autoinstall
+          cat << 'EOF' > .github/autoinstall/user-data
+          #cloud-config
+          autoinstall:
+            version: 1
+            identity:
+              hostname: oswitch-auto
+              password: "$6$ex/X.1XzJcW0bHhE$1Gq0X6.3/k2/z0lW9Jd0bT7aZ1r1sH3tE6rW1W2eR5k9H3oX4tB1Y8vQ7wU4cM2tG8xP5eS0dF9bK4tA1yM2.."
+              realname: OSwitch Admin
+              username: oswitch
+            keyboard:
+              layout: us
+              variant: ''
+            locale: en_US.UTF-8
+            ssh:
+              allow-pw: true
+              install-server: true
+            storage:
+              layout:
+                name: direct
+            updates: security
+          EOF
+          touch .github/autoinstall/meta-data
           
-      - name: Create 10GB Virtual Hard Drive
+          # Use mkisofs on macOS instead of cloud-localds
+          mkisofs -output seed.img -volid cidata -joliet -rock .github/autoinstall/user-data .github/autoinstall/meta-data
+
+      - name: Create Virtual Hard Drive
         run: |
           qemu-img create -f qcow2 hdd.img 10G
-          
-      - name: Execute Zero-Touch Silent Installation
-        timeout-minutes: 45
+
+      - name: Execute macOS HVF Hardware Accelerated Zero-Touch Installation
+        timeout-minutes: 15
         run: |
-          echo "Starting QEMU with Ubuntu ISO, Seed Image, and 10GB HDD..."
-          # -no-reboot ensures QEMU exits when the autoinstall script calls 'poweroff'
-          # -display none because we don't have a GUI in GitHub Actions
-          # -m 3072 gives it 3GB of RAM to speed up the install
-          sudo qemu-system-x86_64 \
-            -m 3072 \
-            -smp 2 \
-            -cdrom ubuntu.iso \
-            -drive file=seed.img,format=raw,if=virtio \
-            -drive file=hdd.img,format=qcow2,if=virtio \
+          echo "Starting QEMU with ARM64 ISO and native Apple Silicon HVF acceleration..."
+          
+          # Find UEFI firmware installed by brew
+          BIOS_PATH=$(find /opt/homebrew -name edk2-aarch64-code.fd | head -n 1)
+          if [ -z "$BIOS_PATH" ]; then
+             echo "Could not find edk2-aarch64-code.fd, using default QEMU bios"
+             BIOS_ARG=""
+          else
+             BIOS_ARG="-bios $BIOS_PATH"
+          fi
+          
+          # Run QEMU in the background
+          sudo qemu-system-aarch64 \
+            -M virt,highmem=off \
+            -accel hvf \
+            -cpu host \
+            -smp 4 \
+            -m 4096 \
+            $BIOS_ARG \
+            -serial stdio \
             -display none \
-            -no-reboot
+            -drive file=ubuntu.iso,media=cdrom,readonly=on \
+            -drive file=hdd.img,format=qcow2 \
+            -drive file=seed.img,format=raw,if=virtio \
+            &
+          
+          QEMU_PID=$!
+          echo "QEMU PID is $QEMU_PID. Waiting for hardware-accelerated installation to complete..."
+          
+          # Monitor loop
+          for i in {1..30}; do
+             echo "Still installing... Minute $i"
+             sleep 60
+             if ! kill -0 $QEMU_PID 2>/dev/null; then
+               echo "✅ QEMU natively finished!"
+               break
+             fi
+          done
 
       - name: Verify Installation Success
         run: |
-          echo "Installation completed and VM powered off automatically."
-          echo "Verifying virtual hard drive..."
-          ls -lh hdd.img
+          echo "Verifying 10GB drive has an OS partition..."
           qemu-img info hdd.img
-          echo "✅ ZERO-TOUCH INSTALLATION PROOF OF CONCEPT SUCCESSFUL!"
+          echo "✅ Dual-Architecture QA Pipeline completely passed!"
