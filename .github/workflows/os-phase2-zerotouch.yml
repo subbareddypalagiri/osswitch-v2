@@ -14,10 +14,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils curl
           
-      - name: Download Ubuntu 24.04 Server ISO
+      - name: Pre-Flight Check & Download Ubuntu 24.04 Server ISO
         run: |
-          # Using Ubuntu Server 24.04 because it fully supports Subiquity Autoinstall
-          curl -L -o ubuntu.iso "https://releases.ubuntu.com/24.04/ubuntu-24.04.4-live-server-amd64.iso"
+          URL="https://releases.ubuntu.com/24.04/ubuntu-24.04.4-live-server-amd64.iso"
+          echo "Running 2-Second Pre-Flight Check on URL..."
+          
+          # 1. Ping for HTTP 200
+          HTTP_STATUS=$(curl -sL -o /dev/null -w "%{http_code}" -I "$URL")
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::PRE-FLIGHT FAILED! URL is dead (HTTP $HTTP_STATUS). Stopping before QEMU hangs."
+            exit 1
+          fi
+          
+          # 2. Ping for File Size (Must be > 1GB)
+          FILE_SIZE=$(curl -sLI "$URL" | grep -i Content-Length | tail -n 1 | awk '{print $2}' | tr -d '\r')
+          echo "Detected File Size: $FILE_SIZE bytes"
+          if [ -z "$FILE_SIZE" ] || [ "$FILE_SIZE" -lt 1000000000 ]; then
+             echo "::error::PRE-FLIGHT FAILED! File is only $FILE_SIZE bytes. This is an HTML error page, not an OS ISO."
+             exit 1
+          fi
+          
+          echo "✅ Pre-Flight Passed! ISO is valid and >1GB. Proceeding with download..."
+          curl -L -o ubuntu.iso "$URL"
           
       - name: Generate Cloud-Init Seed Image
         run: |
