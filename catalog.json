@@ -52,12 +52,12 @@
   "rocky": {
     "name": "Rocky Linux 9",
     "category": "Server",
-    "isoUrl": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.3-x86_64-dvd.iso"
+    "isoUrl": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-dvd.iso"
   },
   "almalinux": {
     "name": "AlmaLinux 9",
     "category": "Server",
-    "isoUrl": "https://repo.almalinux.org/almalinux/9/isos/x86_64/AlmaLinux-9.3-x86_64-dvd.iso"
+    "isoUrl": "https://repo.almalinux.org/almalinux/9/isos/x86_64/AlmaLinux-9.8-x86_64-dvd.iso"
   },
   "opensuse": {
     "name": "openSUSE Tumbleweed",
