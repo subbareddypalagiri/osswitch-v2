@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Home, Search, Disc, HardDrive, Package, Infinity as InfinityIcon, 
-  Power, ShieldCheck, TerminalSquare 
+  Power, ShieldCheck, TerminalSquare, Cpu 
 } from "lucide-react";
 import StepWelcome from "./StepWelcome";
 import StepScan from "./StepScan";
 import StepChooseOS from "./StepChooseOS";
+import StepManageOS from "./StepManageOS";
 import StepDiskSpace from "./StepDiskSpace";
 import StepConfigure from "./StepConfigure";
 import StepBundles from "./StepBundles";
@@ -35,6 +36,7 @@ const NAV_SECTIONS = [
     title: "OS MANAGEMENT",
     items: [
       { index: 2, label: "Install OS", icon: Disc },
+      { index: 9, label: "Manage OS", icon: Cpu },
       { index: 3, label: "Disk Partition", icon: HardDrive },
       { index: 6, label: "Boot Switcher", icon: Power }
     ]
@@ -205,6 +207,7 @@ function App() {
                 osSpace={osSpace}
                 backupEnabled={backupEnabled} catalog={catalog}
                 isInstalling={isInstalling} setIsInstalling={setIsInstalling} />;
+      case 9: return <StepManageOS onNext={() => setCurrentStep(3)} onBack={() => setCurrentStep(2)} />;
       default: return null;
     }
   };
