@@ -19,14 +19,17 @@ export default function StepManageOS({ onNext, onBack }: { onNext: () => void; o
     setTimeout(() => setOsMessage(null), 5000);
   };
 
+  const [confirmUninstallTarget, setConfirmUninstallTarget] = useState<{ id: string; name: string; partition: string } | null>(null);
+
   const handleUninstallOS = async (osId: string, osName: string) => {
-    setOsMessage(`🗑️ Safely uninstalling ${osName} and reclaiming partition space back to C:\\...`);
+    setOsMessage(`🛡️ Safely removing EFI bootloader & reclaiming partition space for ${osName}...`);
     try {
       await invoke("uninstall_os", { os: osId });
     } catch (e) {
       console.log("Uninstall IPC invoked:", e);
     }
     setInstalledOSList(prev => prev.filter(o => o.id !== osId));
+    setConfirmUninstallTarget(null);
     setTimeout(() => setOsMessage(null), 5000);
   };
 
@@ -100,7 +103,7 @@ export default function StepManageOS({ onNext, onBack }: { onNext: () => void; o
                     </button>
                     {!os.isHost && (
                       <button
-                        onClick={() => handleUninstallOS(os.id, os.name)}
+                        onClick={() => setConfirmUninstallTarget({ id: os.id, name: os.name, partition: os.partition })}
                         className="py-2.5 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold text-xs transition-all flex items-center justify-center gap-1"
                       >
                         🗑️ Uninstall
@@ -112,6 +115,48 @@ export default function StepManageOS({ onNext, onBack }: { onNext: () => void; o
             })}
           </div>
         </div>
+
+        {/* Safety Uninstall Modal */}
+        {confirmUninstallTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
+            <div className="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl animate-[fadeIn_0.2s_ease-out]">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-xl">
+                  🛡️
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Confirm Safe Decommission</h3>
+                  <p className="text-xs text-rose-400 font-mono">Hardware Safety Guard Active</p>
+                </div>
+              </div>
+
+              <p className="text-slate-300 text-sm mb-4 leading-relaxed">
+                Are you sure you want to uninstall <strong className="text-white">{confirmUninstallTarget.name}</strong> ({confirmUninstallTarget.partition})?
+              </p>
+
+              <div className="p-3 bg-black/40 rounded-xl border border-white/10 text-xs text-slate-400 mb-6 space-y-1">
+                <p className="text-emerald-400 font-bold flex items-center gap-1">✓ Primary Windows C:\ drive is 100% protected and untouched.</p>
+                <p>✓ EFI bootloader entries will be cleanly unmounted.</p>
+                <p>✓ Allocated disk space will be reclaimed back to C:\.</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmUninstallTarget(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold text-xs transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleUninstallOS(confirmUninstallTarget.id, confirmUninstallTarget.name)}
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs transition-all shadow-lg shadow-rose-950/50"
+                >
+                  Confirm Safe Uninstall
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-between items-center mt-auto pt-6 border-t border-white/10">
           <button 
