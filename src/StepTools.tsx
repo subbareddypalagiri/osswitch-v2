@@ -8,6 +8,9 @@ interface Tool {
   department: string;
   role: string;
   icon: string;
+  eligibility?: "windows_winget" | "linux_vm" | "vendor_direct";
+  source?: string;
+  vendorUrl?: string;
 }
 
 interface Catalog {
@@ -174,6 +177,31 @@ export default function StepTools({
                   </div>
                 </div>
                 
+                {/* Source & Eligibility Badges */}
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {tool.eligibility === "vendor_direct" ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+                      🟣 Vendor Link
+                    </span>
+                  ) : tool.eligibility === "linux_vm" ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/10 text-blue-400 border border-blue-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                      🔵 Requires Linux OS / VM
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      🟢 1-Click Windows
+                    </span>
+                  )}
+                  {tool.source && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/5 text-slate-400 border border-white/10">
+                      {tool.source}
+                    </span>
+                  )}
+                </div>
+
                 <p className="text-gray-400 text-sm mb-6 flex-grow">{tool.description}</p>
                 
                 <button 
