@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Home, Search, Disc, HardDrive, Package, Infinity as InfinityIcon, 
-  Power, ShieldCheck, TerminalSquare, Cpu 
+  Power, ShieldCheck, TerminalSquare, Cpu, Presentation 
 } from "lucide-react";
 import StepWelcome from "./StepWelcome";
 import StepScan from "./StepScan";
@@ -16,6 +16,7 @@ import StepInstall from "./StepInstall";
 import StepBootSwitch from "./StepBootSwitch";
 import SplashScreen from "./SplashScreen";
 import Onboarding from "./Onboarding";
+import PitchDeckModal from "./PitchDeckModal";
 import { OS_CATALOG } from "./constants";
 import Logo from "./Logo";
 import ThemeToggle from "./ThemeToggle";
@@ -79,6 +80,7 @@ function App() {
   const [backupEnabled, setBackupEnabled] = useState(true);
   const [perms, setPerms] = useState<boolean[]>([false, false, false, false]);
   const [osSpace, setOsSpace] = useState(100);
+  const [showPitchDeck, setShowPitchDeck] = useState(false);
   
   // 0ms Latency Local Caching Engine
   const [catalog, setCatalog] = useState(() => {
@@ -215,6 +217,18 @@ function App() {
   return (
     <>
       <ThemeToggle />
+      <div className="fixed top-4 right-16 z-40">
+        <button
+          onClick={() => setShowPitchDeck(true)}
+          className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-purple-600/30 to-cyan-500/30 border border-cyan-500/40 text-cyan-300 hover:text-white hover:border-cyan-400 text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.2)] flex items-center gap-1.5 backdrop-blur-md"
+        >
+          <Presentation size={14} />
+          🚀 Incubator Pitch Deck
+        </button>
+      </div>
+
+      <PitchDeckModal isOpen={showPitchDeck} onClose={() => setShowPitchDeck(false)} />
+
       <div className="mesh-bg">
         <div className="mesh-blob mesh-blob-1"></div>
         <div className="mesh-blob mesh-blob-2"></div>
