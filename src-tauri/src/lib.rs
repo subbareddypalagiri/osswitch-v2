@@ -21,6 +21,7 @@ pub fn run() {
             engine::run_safety_check,
             engine::backup_system,
             engine::install_packages,
+            engine::search_winget,
             engine::get_sys_info,
             engine::get_drives,
             engine::install_os,

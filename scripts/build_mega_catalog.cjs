@@ -152,7 +152,16 @@ const masterMarketTools = [
   { name: "Bitwarden", wingetId: "Bitwarden.Bitwarden", desc: "Open-source password manager for secure credential storage", dept: "Office & Business Productivity", role: "Independent User", el: "windows_winget", src: "Bitwarden", url: "https://bitwarden.com/" },
   { name: "Slack", wingetId: "SlackTechnologies.Slack", desc: "Team messaging and business collaboration platform", dept: "Browsers & Communication", role: "Independent User", el: "windows_winget", src: "Salesforce / Slack", url: "https://slack.com/" },
   { name: "Zoom", wingetId: "Zoom.Zoom", desc: "HD video conferencing and online meeting software", dept: "Browsers & Communication", role: "Independent User", el: "windows_winget", src: "Zoom Video", url: "https://zoom.us/" },
-  { name: "Brave Browser", wingetId: "Brave.Brave", desc: "Fast, privacy-focused web browser with built-in ad blocker", dept: "Browsers & Communication", role: "Independent User", el: "windows_winget", src: "Brave Software", url: "https://brave.com/" }
+  { name: "Brave Browser", wingetId: "Brave.Brave", desc: "Fast, privacy-focused web browser with built-in ad blocker", dept: "Browsers & Communication", role: "Independent User", el: "windows_winget", src: "Brave Software", url: "https://brave.com/" },
+
+  // --- 0-INSTALL PORTABLE WEBAPPS ---
+  { name: "CyberChef Web", wingetId: "Web.CyberChef", desc: "The Cyber Swiss Army Knife for data encoding, decoding & forensics", dept: "Digital Forensics & DFIR", role: "Cyber Forensic Investigator", el: "web_app", src: "GCHQ Open Source", url: "https://gchq.github.io/CyberChef/" },
+  { name: "Photopea Online", wingetId: "Web.Photopea", desc: "Full-featured advanced image editor supporting PSD, XCF, RAW", dept: "UI/UX & Graphic Design", role: "UI/UX Designer", el: "web_app", src: "Photopea Web", url: "https://www.photopea.com/" },
+  { name: "Excalidraw Web", wingetId: "Web.Excalidraw", desc: "Virtual collaborative hand-drawn style diagramming canvas", dept: "UI/UX & Graphic Design", role: "Full Stack Developer", el: "web_app", src: "Excalidraw Web", url: "https://excalidraw.com/" },
+  { name: "VS Code for Web", wingetId: "Web.VSCode", desc: "Zero-install lightweight Visual Studio Code running in browser", dept: "Computer Science & Software Eng", role: "Full Stack Developer", el: "web_app", src: "Microsoft Web", url: "https://vscode.dev/" },
+  { name: "Google Colaboratory", wingetId: "Web.GoogleColab", desc: "Hosted Jupyter notebook environment with free GPU/TPU access", dept: "Artificial Intelligence & LLMs", role: "Machine Learning Engineer", el: "web_app", src: "Google Research", url: "https://colab.research.google.com/" },
+  { name: "VirusTotal Web", wingetId: "Web.VirusTotal", desc: "Analyze suspicious files, domains, IPs and URLs for malware", dept: "Reverse Engineering & Malware", role: "Malware Analyst", el: "web_app", src: "Google Security", url: "https://www.virustotal.com/" },
+  { name: "Tinkercad Circuits", wingetId: "Web.Tinkercad", desc: "Interactive 3D design & circuit simulation for microcontrollers", dept: "Electronics & Circuit Design (ECE)", role: "Electronics Engineer", el: "web_app", src: "Autodesk Web", url: "https://www.tinkercad.com/" }
 ];
 
 console.log("🚀 Building Master Mega-Catalog (10,500+ Real Tools)...");

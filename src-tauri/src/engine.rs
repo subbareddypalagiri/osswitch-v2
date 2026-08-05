@@ -842,3 +842,48 @@ async fn generate_and_inject_ai_script(app: tauri::AppHandle, target_os: String,
         Err(e) => Err(format!("Failed to write AI script: {}", e)),
     }
 }
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct WingetSearchResult {
+    pub name: String,
+    pub id: String,
+    pub version: String,
+}
+
+#[tauri::command]
+pub async fn search_winget(query: String) -> Result<Vec<WingetSearchResult>, String> {
+    let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+    let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+
+    let output = std::process::Command::new(&winget_path)
+        .args(&["search", "-n", "30", "--accept-source-agreements", &query])
+        .output()
+        .map_err(|e| format!("Failed to execute winget: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut results = Vec::new();
+    let mut is_header = false;
+
+    for line in stdout.lines() {
+        if line.contains("------") {
+            is_header = true;
+            continue;
+        }
+        if !is_header || line.trim().is_empty() {
+            continue;
+        }
+        
+        let parts: Vec<&str> = line.split("  ").filter(|s| !s.trim().is_empty()).collect();
+        if parts.len() >= 2 {
+            let name = parts[0].trim().to_string();
+            let id = parts[1].trim().to_string();
+            let version = if parts.len() >= 3 { parts[2].trim().to_string() } else { "Latest".to_string() };
+            
+            if !id.is_empty() && id.len() >= 3 && !id.starts_with("9N") {
+                results.push(WingetSearchResult { name, id, version });
+            }
+        }
+    }
+
+    Ok(results)
+}
