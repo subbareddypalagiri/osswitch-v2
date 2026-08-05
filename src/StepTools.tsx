@@ -96,7 +96,7 @@ export default function StepTools({
 
   const totalPages = Math.ceil(filteredTools.length / ITEMS_PER_PAGE);
 
-  const toggleTool = (toolId: string, wingetId: string) => {
+  const toggleTool = (_toolId: string, wingetId: string) => {
     if (selectedTools.includes(wingetId)) {
       setSelectedTools(selectedTools.filter(t => t !== wingetId));
     } else {

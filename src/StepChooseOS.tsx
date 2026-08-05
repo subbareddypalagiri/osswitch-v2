@@ -274,10 +274,11 @@ export default function StepChooseOS({
                   )}
                 </div>
               );
+            })}
           </div>
         </div>
-        </>
-        )}
+      </>
+    )}
         
         <div className="flex justify-start gap-4 mt-auto">
           <button 
