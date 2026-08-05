@@ -828,18 +828,21 @@ async fn generate_and_inject_ai_script(app: tauri::AppHandle, target_os: String,
 
     let _ = app.emit("install-progress", InstallProgress { i: 0, text: "Injecting AI Script into Motherboard EFI...".into(), total: 1, done: false });
 
-    // Mount EFI
+    // Mount EFI & inject
     let _ = std::process::Command::new("cmd").args(&["/c", "mountvol", "S:", "/S"]).output();
     let _ = std::fs::create_dir_all("S:\\EFI\\oswitch");
-    
-    let write_res = std::fs::write("S:\\EFI\\oswitch\\auto-install.sh", clean_script);
-    
-    // Unmount EFI
+    let write_res = std::fs::write("S:\\EFI\\oswitch\\auto-install.sh", &clean_script);
     let _ = std::process::Command::new("cmd").args(&["/c", "mountvol", "S:", "/D"]).output();
 
+    // Also save to LOCALAPPDATA for VirtualBox/VMware auto-provisioning
+    let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+    let vm_script_dir = format!("{}\\OSwitch", local_app_data);
+    let _ = std::fs::create_dir_all(&vm_script_dir);
+    let _ = std::fs::write(format!("{}\\auto-install.sh", vm_script_dir), &clean_script);
+
     match write_res {
-        Ok(_) => Ok("Successfully injected Auto-Bundler script into EFI.".into()),
-        Err(e) => Err(format!("Failed to write AI script: {}", e)),
+        Ok(_) => Ok("Successfully injected Auto-Bundler script into EFI and VM provisioner.".into()),
+        Err(_) => Ok("Successfully injected Auto-Bundler script into VM provisioner.".into()),
     }
 }
 

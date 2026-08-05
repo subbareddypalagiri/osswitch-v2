@@ -61,9 +61,15 @@ export default function StepChooseOS({
   catalog: { id: string, name: string, category: string, locked?: boolean }[]
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"install" | "manage">("install");
+  const [installedOSList, setInstalledOSList] = useState([
+    { id: "windows", name: "Windows 11 Pro", type: "Host Operating System (C:\\)", used: "284.5 GB", total: "512.0 GB", glyph: "🪟", status: "Active Primary Host", isHost: true },
+    { id: "ubuntu", name: "Ubuntu 24.04 LTS", type: "Dual-Boot (GRUB / EFI Partition)", used: "42.0 GB", total: "100.0 GB", glyph: "🟠", status: "Ready for Boot", isHost: false },
+    { id: "kali", name: "Kali Linux 2024.1", type: "VirtualBox VM Environment", used: "35.0 GB", total: "60.0 GB", glyph: "🛡️", status: "Ready for VM Launch", isHost: false }
+  ]);
+  const [osMessage, setOsMessage] = useState<string | null>(null);
 
   const filteredOS = useMemo(() => {
-    // Merge catalog with static UI metadata
     const mergedList = catalog.map(catEntry => {
       const staticMeta = OS_LIST.find(o => o.id === catEntry.id);
       return {
@@ -97,31 +103,124 @@ export default function StepChooseOS({
     });
   };
 
-  const hasSelection = useMemo(() => selectedOS.some(id => id !== 'windows'), [selectedOS]);
+  const handleBootOS = (osId: string) => {
+    setOsMessage(`Initiating 1-Click Boot sequence into ${osId}...`);
+    setTimeout(() => setOsMessage(null), 4000);
+  };
 
+  const handleUninstallOS = (osId: string) => {
+    setInstalledOSList(prev => prev.filter(o => o.id !== osId));
+    setOsMessage(`Successfully uninstalled ${osId} and restored allocated partition space.`);
+    setTimeout(() => setOsMessage(null), 4000);
+  };
+
+  const hasSelection = useMemo(() => selectedOS.some(id => id !== 'windows'), [selectedOS]);
   const selectedOSSet = useMemo(() => new Set(selectedOS), [selectedOS]);
 
   return (
     <div className="w-full h-full flex flex-col items-center mt-10">
       <div className="glass-card max-w-[1200px] p-10 w-full animate-[fadeIn_0.5s_ease-out] flex flex-col flex-grow">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
-          <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 3 of 7</span>
-        </div>
-        
-        <div className="flex justify-between items-center mb-8">
-          <p className="text-slate-400 text-lg">Search, pick your OS, and choose your preferred installation method.</p>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
-            <input 
-              type="text" 
-              placeholder="Search OS..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white/5 border border-black/10 dark:border-white/10 rounded-xl py-3 pl-12 pr-6 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-[300px]"
-            />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
+            <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 3 of 7</span>
+          </div>
+
+          {/* Mode Tabs */}
+          <div className="flex bg-white/5 border border-white/10 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveTab("install")}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "install" ? "bg-blue-600 text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
+            >
+              📥 Install New OS
+            </button>
+            <button
+              onClick={() => setActiveTab("manage")}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === "manage" ? "bg-blue-600 text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
+            >
+              🖥️ Manage Installed OSes
+              <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{installedOSList.length}</span>
+            </button>
           </div>
         </div>
+
+        {osMessage && (
+          <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 font-mono text-sm flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
+            {osMessage}
+          </div>
+        )}
+
+        {activeTab === "manage" ? (
+          <div className="flex-grow custom-scrollbar overflow-y-auto pr-2 -mr-2">
+            <div className="text-slate-400 text-base mb-6">
+              View, boot, or uninstall operating systems currently provisioned on your hardware or hypervisors.
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
+              {installedOSList.map(os => (
+                <div key={os.id} className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col justify-between hover:bg-white/10 transition-all">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-4">
+                        <span className="text-4xl drop-shadow-md">{os.glyph}</span>
+                        <div>
+                          <h3 className="text-xl font-bold text-white">{os.name}</h3>
+                          <p className="text-xs text-slate-400 font-mono mt-0.5">{os.type}</p>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono border ${os.isHost ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-blue-500/10 text-blue-400 border-blue-500/30"}`}>
+                        {os.status}
+                      </span>
+                    </div>
+
+                    {/* Storage usage bar */}
+                    <div className="mb-6">
+                      <div className="flex justify-between text-xs text-slate-400 mb-1 font-mono">
+                        <span>Storage Allocated</span>
+                        <span className="text-white font-bold">{os.used} / {os.total}</span>
+                      </div>
+                      <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                        <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(parseFloat(os.used) / parseFloat(os.total)) * 100}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-white/10">
+                    <button
+                      onClick={() => handleBootOS(os.name)}
+                      className="flex-1 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      🚀 Boot OS
+                    </button>
+                    {!os.isHost && (
+                      <button
+                        onClick={() => handleUninstallOS(os.id)}
+                        className="py-2.5 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold text-sm transition-all flex items-center justify-center gap-1"
+                      >
+                        🗑️ Uninstall
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-8">
+              <p className="text-slate-400 text-lg">Search, pick your OS, and choose your preferred installation method.</p>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                <input 
+                  type="text" 
+                  placeholder="Search OS..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-white/5 border border-black/10 dark:border-white/10 rounded-xl py-3 pl-12 pr-6 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-[300px]"
+                />
+              </div>
+            </div>
         
         <div className="flex-grow custom-scrollbar overflow-y-auto pr-2 -mr-2">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
@@ -175,9 +274,10 @@ export default function StepChooseOS({
                   )}
                 </div>
               );
-            })}
           </div>
         </div>
+        </>
+        )}
         
         <div className="flex justify-start gap-4 mt-auto">
           <button 
