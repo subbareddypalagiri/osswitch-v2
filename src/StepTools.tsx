@@ -62,11 +62,11 @@ export default function StepTools({
 
   const totalPages = Math.ceil(filteredTools.length / ITEMS_PER_PAGE);
 
-  const toggleTool = (id: string) => {
-    if (selectedTools.includes(id)) {
-      setSelectedTools(selectedTools.filter(t => t !== id));
+  const toggleTool = (toolId: string, wingetId: string) => {
+    if (selectedTools.includes(wingetId)) {
+      setSelectedTools(selectedTools.filter(t => t !== wingetId));
     } else {
-      setSelectedTools([...selectedTools, id]);
+      setSelectedTools([...selectedTools, wingetId]);
     }
   };
 
@@ -159,16 +159,16 @@ export default function StepTools({
             paginatedTools.map(tool => (
               <div 
                 key={tool.id} 
-                className={`relative group bg-white/5 border ${selectedTools.includes(tool.id) ? 'border-cyan-500 bg-cyan-500/10' : 'border-black/10 dark:border-white/10'} rounded-2xl p-6 transition-all hover:bg-white/10 flex flex-col`}
+                className={`relative group bg-white/5 border ${selectedTools.includes(tool.wingetId) ? 'border-cyan-500 bg-cyan-500/10' : 'border-black/10 dark:border-white/10'} rounded-2xl p-6 transition-all hover:bg-white/10 flex flex-col`}
               >
-                <div className="flex items-start gap-4 mb-4 cursor-pointer" onClick={() => toggleTool(tool.id)}>
+                <div className="flex items-start gap-4 mb-4 cursor-pointer" onClick={() => toggleTool(tool.id, tool.wingetId)}>
                   <img src={tool.icon} alt={tool.name} className="w-12 h-12 rounded-xl object-cover" />
                   <div className="flex-grow">
                     <h3 className="text-xl font-bold">{tool.name}</h3>
                     <p className="text-xs text-cyan-400 font-mono mt-1">{tool.department} | {tool.role}</p>
                   </div>
-                  <div className={`w-6 h-6 rounded-md border flex items-center justify-center transition-colors ${selectedTools.includes(tool.id) ? 'border-cyan-500 bg-cyan-500 text-black' : 'border-gray-500'}`}>
-                    {selectedTools.includes(tool.id) && (
+                  <div className={`w-6 h-6 rounded-md border flex items-center justify-center transition-colors ${selectedTools.includes(tool.wingetId) ? 'border-cyan-500 bg-cyan-500 text-black' : 'border-gray-500'}`}>
+                    {selectedTools.includes(tool.wingetId) && (
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                     )}
                   </div>
@@ -247,10 +247,10 @@ export default function StepTools({
             
             <div className="p-6 border-t border-black/10 dark:border-white/10 bg-white/5 flex justify-end">
               <button 
-                onClick={() => { toggleTool(activeTool.id); setActiveTool(null); }}
+                onClick={() => { toggleTool(activeTool.id, activeTool.wingetId); setActiveTool(null); }}
                 className="px-6 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 hover:bg-cyan-500/30 font-bold transition-colors"
               >
-                {selectedTools.includes(activeTool.id) ? "Remove from Install Queue" : "Add to Install Queue"}
+                {selectedTools.includes(activeTool.wingetId) ? "Remove from Install Queue" : "Add to Install Queue"}
               </button>
             </div>
           </div>

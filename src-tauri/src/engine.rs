@@ -615,26 +615,69 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<String>, targ
         let mut overall_success = true;
         let mut error_msg = String::new();
         
-        for id in packages {
+        let total_packages = packages.len();
+        for (idx, id) in packages.iter().enumerate() {
             let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "installing".to_string() });
+            let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("Starting {} ({}/{})", id, idx + 1, total_packages), total: total_packages, done: false });
             
-            let args = vec!["install", "--silent", "--accept-package-agreements", "--accept-source-agreements", "--id", &id];
+            let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--id", id];
             let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
             let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-            let status = std::process::Command::new(&winget_path).args(&args).status();
+            let mut child = std::process::Command::new(&winget_path)
+                .args(&args)
+                .stdout(std::process::Stdio::piped())
+                .spawn();
             
-            match status {
-                Ok(s) if s.success() => {
-                    let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
-                },
-                Ok(_s) => {
-                    overall_success = false;
-                    error_msg.push_str(&format!("Failed to install {}. ", id));
-                    let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
+            match child {
+                Ok(mut c) => {
+                    let mut full_output = String::new();
+                    if let Some(stdout) = c.stdout.take() {
+                        use std::io::Read;
+                        let reader = std::io::BufReader::new(stdout);
+                        let mut current_line = String::new();
+                        for byte in reader.bytes() {
+                            if let Ok(b) = byte {
+                                let ch = b as char;
+                                if ch == '\r' || ch == '\n' {
+                                    if !current_line.trim().is_empty() {
+                                        let text = current_line.trim().to_string();
+                                        full_output.push_str(&text);
+                                        full_output.push(' ');
+                                        if text.contains("MB") || text.contains("KB") || text.contains("GB") || text.contains("%") || text.contains("Downloading") || text.contains("Installing") || text.contains("Found") || text.contains("installed") {
+                                            let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("{}: {}", id, text), total: total_packages, done: false });
+                                        }
+                                        current_line.clear();
+                                    }
+                                } else {
+                                    current_line.push(ch);
+                                }
+                            }
+                        }
+                    }
+                    
+                    let status = c.wait();
+                    let is_already_installed = full_output.contains("already installed") || full_output.contains("No available upgrade") || full_output.contains("No newer package");
+                    
+                    match status {
+                        Ok(s) if s.success() || is_already_installed => {
+                            let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
+                            let _ = app.emit("install-progress", InstallProgress { i: idx + 1, text: format!("Completed {}", id), total: total_packages, done: (idx + 1 == total_packages) });
+                        },
+                        Ok(_s) => {
+                            overall_success = false;
+                            error_msg.push_str(&format!("Failed to install {}. ", id));
+                            let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
+                        },
+                        Err(e) => {
+                            overall_success = false;
+                            error_msg.push_str(&format!("Failed winget for {}: {}. ", id, e));
+                            let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
+                        }
+                    }
                 },
                 Err(e) => {
                     overall_success = false;
-                    error_msg.push_str(&format!("Failed winget for {}: {}. ", id, e));
+                    error_msg.push_str(&format!("Failed to spawn winget for {}: {}. ", id, e));
                     let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
                 }
             }

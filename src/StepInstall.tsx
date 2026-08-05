@@ -5,6 +5,9 @@ import { listen, UnlistenFn, Event } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
+// Safety guard: Tauri APIs only work inside the desktop app, not in a browser
+const isTauri = () => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+
 export const InstallProgressBar = memo(function InstallProgressBar() {
   const [progress, setProgress] = useState({ i: 0, text: "", total: 1 });
 
@@ -12,6 +15,7 @@ export const InstallProgressBar = memo(function InstallProgressBar() {
     let unlistenFn: UnlistenFn | null = null;
     let isMounted = true;
     let rafId: number | null = null;
+    if (!isTauri()) return;
 
     listen("install-progress", (event: Event<{i: number, text: string, total: number}>) => {
       if (isMounted) {
@@ -80,27 +84,42 @@ export default function StepInstall({
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // AI Integration States
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("gemini_api_key") || "");
   const [modelsList, setModelsList] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [liveLog, setLiveLog] = useState("");
+  const [pkgProgressState, setPkgProgressState] = useState<{ i: number, total: number }>({ i: 0, total: 1 });
   
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
+    let unlistenLog: UnlistenFn | null = null;
     let isMounted = true;
+    if (!isTauri()) return;
+    
     listen("bundle-progress", (event: Event<{id: string, status: string}>) => {
       if (isMounted) {
         setBundleProgress(prev => ({ ...prev, [event.payload.id]: event.payload.status }));
       }
     }).then(un => { if (isMounted) unlisten = un; else un(); }).catch(console.error);
 
+    listen("install-progress", (event: Event<{i: number, text: string, total: number}>) => {
+      if (isMounted) {
+        setLiveLog(event.payload.text);
+        if (event.payload.total > 0) {
+          setPkgProgressState({ i: event.payload.i, total: event.payload.total });
+        }
+      }
+    }).then(un => { if (isMounted) unlistenLog = un; else un(); }).catch(console.error);
+
     return () => {
       isMounted = false;
       if (unlisten) unlisten();
+      if (unlistenLog) unlistenLog();
     };
   }, []);
 
@@ -109,6 +128,7 @@ export default function StepInstall({
       setAiError("Please enter a Gemini API Key first.");
       return;
     }
+    localStorage.setItem("gemini_api_key", apiKey.trim());
     try {
       setFetchingModels(true);
       setAiError(null);
@@ -138,19 +158,32 @@ export default function StepInstall({
 
   
   const runInstall = async (id: string, localIsoPath?: string) => {
-    const intent = selectedIntents[id] || "vbox_vm";
-    if (intent === "baremetal_grub") {
-      setSafetyPromptState({show: true, id, path: localIsoPath, accepted: false});
-      return;
+    try {
+      const intent = selectedIntents[id] || "vbox_vm";
+      // tools_only mode: skip all OS-related prompts, go straight to package install
+      if (id === "tools_only") {
+        await executeInstall(id, localIsoPath);
+        return;
+      }
+      if (intent === "baremetal_grub") {
+        setSafetyPromptState({show: true, id, path: localIsoPath, accepted: false});
+        return;
+      }
+      if (intent === "usb_flash") {
+        setUsbPromptState({show: true, id, path: localIsoPath, detected: false});
+        return;
+      }
+      await executeInstall(id, localIsoPath);
+    } catch (e: any) {
+      alert("CRASH in runInstall: " + e.toString());
     }
-    if (intent === "usb_flash") {
-      setUsbPromptState({show: true, id, path: localIsoPath, detected: false});
-      return;
-    }
-    await executeInstall(id, localIsoPath);
   };
 
   const executeInstall = async (id: string, localIsoPath?: string) => {
+    if (!isTauri()) {
+      setInstallStatus(prev => ({ ...prev, [id]: { status: "error", message: "Please open the OSwitch desktop app, not a browser. Tauri APIs are not available in browser mode." } }));
+      return;
+    }
     try {
       setIsInstalling(true);
       setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "" } })); // clear previous
@@ -180,8 +213,14 @@ export default function StepInstall({
       // Step 2: Install Packages (Bundles + Tools)
       const packagesToInstall = [...selectedBundles, ...(selectedTools || [])];
       if (packagesToInstall.length > 0) {
-          setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "OS installed. Now installing packages..." } }));
-          await invoke("install_packages", { packages: packagesToInstall, targetOs: id, intent: intent, apiKey: apiKey, aiModel: selectedModel ? selectedModel.replace("models/", "") : "gemini-2.5-flash" });
+          setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "Installing selected tools and bundles via Winget..." } }));
+          await invoke("install_packages", { 
+            packages: packagesToInstall, 
+            targetOs: id === "tools_only" ? null : id, 
+            intent: id === "tools_only" ? null : intent, 
+            apiKey: apiKey, 
+            aiModel: selectedModel ? selectedModel.replace("models/", "") : "gemini-2.5-flash" 
+          });
       }
       
     } catch (e: unknown) {
@@ -297,7 +336,7 @@ export default function StepInstall({
     );
   }
 
-  if (isInstalling) {
+  if (isInstalling && activeTab !== "tools_only") {
     return (
       <div className="flex flex-col items-center justify-center h-full pt-10">
         <div className="flex flex-col items-center">
@@ -353,13 +392,15 @@ export default function StepInstall({
             <span className="text-purple-400">✨</span>
             <span className="text-slate-900 dark:text-white font-bold text-sm tracking-wide">GEMINI AI AUTO-FIX</span>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <input 
-              type="password" 
-              placeholder="Enter Gemini API Key..." 
+              type="password"
+              placeholder="Enter Gemini API Key..."
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              disabled={isInstalling}
+              onChange={e => {
+                setApiKey(e.target.value);
+                localStorage.setItem("gemini_api_key", e.target.value);
+              }}
               className="flex-1 bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors placeholder:text-slate-500"
             />
             <button 
@@ -413,17 +454,80 @@ export default function StepInstall({
               </div>
             )}
 
-            {Object.entries(bundleProgress).length > 0 && (
+            {(isInstalling || Object.entries(bundleProgress).length > 0) && (
               <div className="mb-4">
                 <div className="text-slate-500"># Package Installation Progress</div>
-                {Object.entries(bundleProgress).map(([pkgId, status]) => (
-                   <div key={pkgId} className="flex items-center gap-2">
-                     <span className={status === "installing" ? "text-blue-400" : status === "success" ? "text-green-400" : "text-red-400"}>
-                        [{status === "installing" ? "..." : status === "success" ? "OK" : "ERR"}]
-                     </span>
-                     <span className="text-slate-300">{pkgId}</span>
-                   </div>
-                ))}
+                {[...selectedBundles, ...(selectedTools || [])].map(pkg => {
+                  return (
+                    <div key={pkg} className="flex items-center gap-2">
+                      {bundleProgress[pkg] === "success" ? <span className="text-green-500 font-bold">[OK]</span> : 
+                        bundleProgress[pkg] === "error" ? <span className="text-red-500 font-bold">[ERR]</span> :
+                        bundleProgress[pkg] === "installing" ? <span className="text-blue-400 font-bold animate-pulse">[..]</span> :
+                        <span className="text-slate-600 font-bold">[  ]</span>}
+                      <span className={bundleProgress[pkg] === "success" ? "text-green-400" : "text-slate-300"}>{pkg}</span>
+                    </div>
+                  )
+                })}
+                
+                {isInstalling && (
+                  <div className="mt-4 pt-4 border-t border-white/5">
+                    {(() => {
+                      const cleanLog = liveLog ? liveLog.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '').replace(/[\x00-\x1F\x7F-\x9F]/g, ' ') : "";
+                      const percentMatch = cleanLog.match(/(\d+)%/);
+                      const mbMatch = cleanLog.match(/([\d\.]+)\s*(MB|GB|KB)\s*[\/|of]\s*([\d\.]+)\s*(MB|GB|KB)/i);
+                      
+                      let packageSubPct = 0;
+                      let mbText = "";
+                      let hasRealData = false;
+
+                      if (percentMatch) {
+                        packageSubPct = parseInt(percentMatch[1], 10);
+                        hasRealData = true;
+                      } else if (mbMatch) {
+                        const cur = parseFloat(mbMatch[1]) * (mbMatch[2].toUpperCase() === "GB" ? 1024 : mbMatch[2].toUpperCase() === "KB" ? 0.001 : 1);
+                        const tot = parseFloat(mbMatch[3]) * (mbMatch[4].toUpperCase() === "GB" ? 1024 : mbMatch[4].toUpperCase() === "KB" ? 0.001 : 1);
+                        packageSubPct = Math.min(100, Math.round((cur / (tot || 1)) * 100));
+                        mbText = `(${mbMatch[1]} ${mbMatch[2]} / ${mbMatch[3]} ${mbMatch[4]})`;
+                        hasRealData = true;
+                      }
+
+                      const totalPkgs = pkgProgressState.total || 1;
+                      const currentPkgIdx = Math.min(pkgProgressState.i, totalPkgs - 1);
+                      const weightPerPkg = 100 / totalPkgs;
+                      const overallPct = Math.min(99, Math.round((currentPkgIdx * weightPerPkg) + ((packageSubPct * weightPerPkg) / 100)));
+
+                      let displayLabel = "";
+                      if (hasRealData) {
+                        displayLabel = `${overallPct}% Completed ${mbText}`;
+                      } else if (currentPkgIdx > 0) {
+                        displayLabel = `${overallPct}% Completed (Initializing...)`;
+                      } else {
+                        displayLabel = `Initializing Download...`;
+                      }
+
+                      return (
+                        <>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-slate-500"># Live Telemetry Stream</span>
+                            <span className="text-cyan-400 font-mono text-xs font-bold bg-cyan-500/10 px-2.5 py-1 rounded border border-cyan-500/30">
+                              {displayLabel}
+                            </span>
+                          </div>
+                          
+                          {/* Dynamic Progress Bar */}
+                          <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden mb-2 border border-white/10 relative">
+                            <div 
+                              className="bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 h-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(6,182,212,0.6)]"
+                              style={{ width: `${Math.max(5, overallPct)}%` }}
+                            />
+                          </div>
+                          
+                          <span className="text-cyan-400 font-mono text-xs font-bold break-all block">{cleanLog || "Initializing package provisioning..."}</span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             )}
             
