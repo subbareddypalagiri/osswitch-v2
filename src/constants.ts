@@ -80,7 +80,17 @@ export const OS_CATALOG: OSConfig[] = [
   { id: "clearlinux", name: "Clear Linux", category: "Linux", isoUrl: "https://cdn.download.clearlinux.org/releases/latest/clear/clear-linux-live-desktop.iso" },
   { id: "septor", name: "Septor Linux", category: "Security", isoUrl: "https://sourceforge.net/projects/septor/files/latest/download" },
   { id: "alpine-extended", name: "Alpine Extended", category: "Server", isoUrl: "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-extended-3.19.1-x86_64.iso" },
-  { id: "grapheneos", name: "GrapheneOS", category: "Security", isoUrl: "https://example.com/graphene-locked.iso", locked: true }
+  { id: "grapheneos", name: "GrapheneOS", category: "Security", isoUrl: "https://example.com/graphene-locked.iso", locked: true },
+  { id: "cachyos", name: "CachyOS", category: "Linux", isoUrl: "https://mirror.cachyos.org/ISO/desktop/240609/cachyos-desktop-linux-240609.iso", officialSite: "https://cachyos.org/" },
+  { id: "bazzite", name: "Bazzite Gaming OS", category: "Linux", isoUrl: "https://github.com/ublue-os/bazzite/releases/latest/download/bazzite-gnome.iso", officialSite: "https://bazzite.gg/" },
+  { id: "athena", name: "Athena OS", category: "Security", isoUrl: "https://sourceforge.net/projects/athena-os/files/latest/download", officialSite: "https://athenaos.org/" },
+  { id: "proxmox", name: "Proxmox VE 8.2", category: "Server", isoUrl: "https://www.proxmox.com/en/downloads/item/proxmox-ve-8-2-iso-installer", officialSite: "https://www.proxmox.com/" },
+  { id: "ghostbsd", name: "GhostBSD 24.01", category: "BSD", isoUrl: "https://ghostbsd.org/download", officialSite: "https://ghostbsd.org/" },
+  { id: "freedos", name: "FreeDOS 1.3", category: "Other", isoUrl: "https://www.freedos.org/download/download/FD13-FullUSB.zip", officialSite: "https://www.freedos.org/" },
+  { id: "commandovm", name: "Commando VM", category: "Security", isoUrl: "https://github.com/mandiant/commando-vm", officialSite: "https://www.mandiant.com/" },
+  { id: "eurolinux", name: "EuroLinux 9", category: "Server", isoUrl: "https://fdd.el.euro-linux.com/iso/eurolinux-9-x86_64-latest.iso", officialSite: "https://en.euro-linux.com/" },
+  { id: "pop-cosmic", name: "Pop!_OS 24.04 COSMIC", category: "Linux", isoUrl: "https://iso.pop-os.org/24.04/amd64/intel/pop-os_24.04_amd64_intel.iso", officialSite: "https://pop.system76.com/" },
+  { id: "asahi", name: "Asahi Linux (Apple Silicon)", category: "Linux", isoUrl: "https://asahilinux.org/", officialSite: "https://asahilinux.org/" }
 ];
 
 export interface SoftwareItem {

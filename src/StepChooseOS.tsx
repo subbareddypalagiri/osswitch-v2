@@ -40,7 +40,17 @@ export const OS_LIST = [
   {id:"qubes", name:"Qubes OS", sub:"Reasonably secure operating system", glyph:"🧊"},
   {id:"blissos", name:"Bliss OS", sub:"Open Source Android for PC", glyph:"📱"},
   {id:"templeos", name:"TempleOS", sub:"Public domain OS by Terry A. Davis", glyph:"⛪"},
-  {id:"kolibrios", name:"KolibriOS", sub:"Extremely small Assembly OS", glyph:"🕊️"}
+  {id:"kolibrios", name:"KolibriOS", sub:"Extremely small Assembly OS", glyph:"🕊️"},
+  {id:"cachyos", name:"CachyOS", sub:"Ultra CPU-optimized Arch Linux", glyph:"⚡"},
+  {id:"bazzite", name:"Bazzite Gaming OS", sub:"SteamOS alternative for PC & Handhelds", glyph:"🎮"},
+  {id:"athena", name:"Athena OS", sub:"Cyber Security & Pentesting Arch OS", glyph:"🪓"},
+  {id:"proxmox", name:"Proxmox VE 8.2", sub:"Enterprise Virtualization Hypervisor", glyph:"⚡"},
+  {id:"ghostbsd", name:"GhostBSD 24.01", sub:"User-friendly FreeBSD desktop", glyph:"👻"},
+  {id:"freedos", name:"FreeDOS 1.3", sub:"Open Source DOS for legacy & firmware", glyph:"💾"},
+  {id:"commandovm", name:"Commando VM", sub:"Mandiant Windows Security Suite", glyph:"🎯"},
+  {id:"eurolinux", name:"EuroLinux 9", sub:"Enterprise RHEL-compatible OS", glyph:"🇪🇺"},
+  {id:"pop-cosmic", name:"Pop!_OS 24.04 COSMIC", sub:"Next-gen Rust COSMIC desktop", glyph:"🌌"},
+  {id:"asahi", name:"Asahi Linux", sub:"Linux for Apple Silicon Macs", glyph:"🍎"}
 ];
 
 export default function StepChooseOS({ 
