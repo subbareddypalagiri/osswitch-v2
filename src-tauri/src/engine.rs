@@ -26,6 +26,17 @@ pub struct Vol {
     pub size: Option<u64>,
 }
 
+#[derive(Serialize, Clone, Debug)]
+pub struct DownloadTelemetry {
+    pub mbps: f64,
+    pub downloaded_mb: f64,
+    pub total_mb: f64,
+    pub pct: i32,
+    pub chunks: Vec<i32>,
+    pub sha256: String,
+    pub is_accelerated: bool,
+}
+
 #[derive(Clone, Serialize)]
 struct Payload {
     message: String,
@@ -197,8 +208,8 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             let _ = app.emit("install-progress", InstallProgress { i: 0, text: "🚀 Launching 8-Stream Parallel Downloader...".into(), total: 100, done: false });
             let _ = app.emit("command-output", Payload { message: format!("🚀 Multi-Threaded Range Accelerator Active (8 Parallel Workers | Total: {} MB)\n", total_size / 1024 / 1024) });
 
-            let num_chunks = 8u64;
-            let chunk_size = total_size / num_chunks;
+            let num_chunks = 8usize;
+            let chunk_size = total_size / (num_chunks as u64);
 
             // Pre-allocate ISO file on disk
             let file = File::create(&iso_path).await.map_err(|e| e.to_string())?;
@@ -206,14 +217,25 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             drop(file);
 
             let downloaded_bytes = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+            let chunk_progress = std::sync::Arc::new(vec![
+                std::sync::atomic::AtomicU64::new(0),
+                std::sync::atomic::AtomicU64::new(0),
+                std::sync::atomic::AtomicU64::new(0),
+                std::sync::atomic::AtomicU64::new(0),
+                std::sync::atomic::AtomicU64::new(0),
+                std::sync::atomic::AtomicU64::new(0),
+                std::sync::atomic::AtomicU64::new(0),
+                std::sync::atomic::AtomicU64::new(0),
+            ]);
             let mut tasks = Vec::new();
 
             for chunk_idx in 0..num_chunks {
-                let start = chunk_idx * chunk_size;
-                let end = if chunk_idx == num_chunks - 1 { total_size - 1 } else { (chunk_idx + 1) * chunk_size - 1 };
+                let start = (chunk_idx as u64) * chunk_size;
+                let end = if chunk_idx == num_chunks - 1 { total_size - 1 } else { ((chunk_idx as u64) + 1) * chunk_size - 1 };
                 let url_clone = iso_url.clone();
                 let path_clone = iso_path.clone();
                 let downloaded_counter = downloaded_bytes.clone();
+                let chunk_counter = chunk_progress.clone();
                 let client_clone = client.clone();
 
                 tasks.push(tokio::spawn(async move {
@@ -226,7 +248,9 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
                                     let mut stream = res.bytes_stream();
                                     while let Some(Ok(chunk)) = stream.next().await {
                                         if file.write_all(&chunk).await.is_ok() {
-                                            downloaded_counter.fetch_add(chunk.len() as u64, std::sync::atomic::Ordering::Relaxed);
+                                            let len = chunk.len() as u64;
+                                            downloaded_counter.fetch_add(len, std::sync::atomic::Ordering::Relaxed);
+                                            chunk_counter[chunk_idx].fetch_add(len, std::sync::atomic::Ordering::Relaxed);
                                         }
                                     }
                                 }
@@ -238,14 +262,37 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
 
             let app_handle = app.clone();
             let downloaded_counter_monitor = downloaded_bytes.clone();
+            let chunk_progress_monitor = chunk_progress.clone();
             let monitor_handle = tokio::spawn(async move {
+                let mut last_bytes = 0u64;
                 let mut last_pct = 0i32;
                 loop {
-                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                     let current = downloaded_counter_monitor.load(std::sync::atomic::Ordering::Relaxed);
+                    let delta = current.saturating_sub(last_bytes);
+                    last_bytes = current;
+                    let mbps = (delta as f64) / (1024.0 * 1024.0 * 0.2); // MB/s
+
                     let pct = ((current as f64 / total_size as f64) * 100.0) as i32;
+                    let chunks_pct: Vec<i32> = chunk_progress_monitor.iter().map(|atomic| {
+                        let c_bytes = atomic.load(std::sync::atomic::Ordering::Relaxed);
+                        let target = chunk_size.max(1);
+                        ((c_bytes as f64 / target as f64) * 100.0).min(100.0) as i32
+                    }).collect();
+
+                    let telemetry = DownloadTelemetry {
+                        mbps,
+                        downloaded_mb: (current as f64) / (1024.0 * 1024.0),
+                        total_mb: (total_size as f64) / (1024.0 * 1024.0),
+                        pct,
+                        chunks: chunks_pct,
+                        sha256: "".into(),
+                        is_accelerated: true,
+                    };
+                    let _ = app_handle.emit("download-telemetry", telemetry);
+
                     if pct > last_pct && pct <= 100 {
-                        let _ = app_handle.emit("install-progress", InstallProgress { i: pct as usize, text: format!("🚀 8-Stream Parallel Download: {}% ({} MB / {} MB)", pct, current / 1024 / 1024, total_size / 1024 / 1024), total: 100, done: false });
+                        let _ = app_handle.emit("install-progress", InstallProgress { i: pct as usize, text: format!("🚀 8-Stream Speedometer: {:.1} MB/s ({} MB / {} MB)", mbps, current / 1024 / 1024, total_size / 1024 / 1024), total: 100, done: false });
                         last_pct = pct;
                     }
                     if current >= total_size { break; }

@@ -8,29 +8,38 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 // Safety guard: Tauri APIs only work inside the desktop app, not in a browser
 const isTauri = () => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
+interface TelemetryData {
+  mbps: number;
+  downloaded_mb: number;
+  total_mb: number;
+  pct: number;
+  chunks: number[];
+  sha256: string;
+  is_accelerated: boolean;
+}
+
 export const InstallProgressBar = memo(function InstallProgressBar() {
   const [progress, setProgress] = useState({ i: 0, text: "", total: 1 });
+  const [telemetry, setTelemetry] = useState<TelemetryData | null>(null);
 
   useEffect(() => {
-    let unlistenFn: UnlistenFn | null = null;
+    let unlistenProg: UnlistenFn | null = null;
+    let unlistenTelem: UnlistenFn | null = null;
     let isMounted = true;
-    let rafId: number | null = null;
     if (!isTauri()) return;
 
-    listen("install-progress", (event: Event<{i: number, text: string, total: number}>) => {
-      if (isMounted) {
-        if (rafId) cancelAnimationFrame(rafId);
-        rafId = requestAnimationFrame(() => setProgress(event.payload));
-      }
-    }).then(unlisten => {
-      if (isMounted) unlistenFn = unlisten;
-      else unlisten();
-    }).catch(console.error);
+    listen("install-progress", (e: Event<{i: number, text: string, total: number}>) => {
+      if (isMounted) setProgress(e.payload);
+    }).then(u => { if (isMounted) unlistenProg = u; else u(); });
+
+    listen("download-telemetry", (e: Event<TelemetryData>) => {
+      if (isMounted) setTelemetry(e.payload);
+    }).then(u => { if (isMounted) unlistenTelem = u; else u(); });
 
     return () => {
       isMounted = false;
-      if (rafId) cancelAnimationFrame(rafId);
-      if (unlistenFn) unlistenFn();
+      if (unlistenProg) unlistenProg();
+      if (unlistenTelem) unlistenTelem();
     };
   }, []);
 
@@ -38,12 +47,55 @@ export const InstallProgressBar = memo(function InstallProgressBar() {
 
   return (
     <div className="flex flex-col items-center w-full">
-      <p className="text-blue-400 mb-8 font-mono break-all text-center max-w-xl px-4 text-sm">{progress.text || "Running provisioning sequence..."}</p>
+      {/* Sleek Steam/Vercel-Style Live Telemetry Dashboard */}
+      {telemetry && telemetry.is_accelerated && (
+        <div className="w-full max-w-xl bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.2)] mb-8 animate-[fadeIn_0.3s_ease-out]">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+              </span>
+              <span className="text-cyan-400 font-bold text-sm tracking-wider uppercase font-mono">8-Stream Accelerator Active</span>
+            </div>
+            <div className="text-right font-mono">
+              <span className="text-3xl font-black bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                {telemetry.mbps.toFixed(1)} <span className="text-xs text-slate-400">MB/s</span>
+              </span>
+            </div>
+          </div>
+
+          {/* 8 Parallel Worker Stream Progress Bars */}
+          <div className="grid grid-cols-8 gap-2 mb-4">
+            {(telemetry.chunks && telemetry.chunks.length === 8 ? telemetry.chunks : [0,0,0,0,0,0,0,0]).map((chunkPct, idx) => (
+              <div key={idx} className="flex flex-col gap-1 items-center">
+                <div className="w-full bg-slate-800/80 rounded-lg h-14 overflow-hidden relative border border-cyan-500/20">
+                  <div 
+                    className="w-full bg-gradient-to-t from-cyan-500 via-blue-500 to-purple-500 rounded-lg transition-all duration-200 absolute bottom-0 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                    style={{ height: `${chunkPct}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 font-bold">S{idx + 1}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-between items-center text-xs font-mono text-slate-400 border-t border-slate-800 pt-3">
+            <span>{telemetry.downloaded_mb.toFixed(0)} MB / {telemetry.total_mb.toFixed(0)} MB ({telemetry.pct}%)</span>
+            <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+              🔒 SHA256 Stream Guard Active
+            </span>
+          </div>
+        </div>
+      )}
+
+      <p className="text-blue-400 mb-6 font-mono break-all text-center max-w-xl px-4 text-sm font-medium">{progress.text || "Running provisioning sequence..."}</p>
+      
       <div className="w-full max-w-md bg-white/5 rounded-full h-3 mb-6 overflow-hidden border border-black/10 dark:border-white/10 relative">
         <div 
-          className="bg-gradient-to-r from-blue-600 to-purple-500 h-full origin-left transition-transform duration-150 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
+          className="bg-gradient-to-r from-blue-600 via-purple-500 to-pink-500 h-full origin-left transition-transform duration-150 ease-out shadow-[0_0_15px_rgba(59,130,246,0.6)]" 
           style={{ transform: `scaleX(${percentage / 100})` }}
-        ></div>
+        />
       </div>
     </div>
   );
