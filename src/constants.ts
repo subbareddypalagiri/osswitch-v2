@@ -90,7 +90,31 @@ export const OS_CATALOG: OSConfig[] = [
   { id: "commandovm", name: "Commando VM", category: "Security", isoUrl: "https://github.com/mandiant/commando-vm", officialSite: "https://www.mandiant.com/" },
   { id: "eurolinux", name: "EuroLinux 9", category: "Server", isoUrl: "https://fdd.el.euro-linux.com/iso/eurolinux-9-x86_64-latest.iso", officialSite: "https://en.euro-linux.com/" },
   { id: "pop-cosmic", name: "Pop!_OS 24.04 COSMIC", category: "Linux", isoUrl: "https://iso.pop-os.org/24.04/amd64/intel/pop-os_24.04_amd64_intel.iso", officialSite: "https://pop.system76.com/" },
-  { id: "asahi", name: "Asahi Linux (Apple Silicon)", category: "Linux", isoUrl: "https://asahilinux.org/", officialSite: "https://asahilinux.org/" }
+  { id: "asahi", name: "Asahi Linux (Apple Silicon)", category: "Linux", isoUrl: "https://asahilinux.org/", officialSite: "https://asahilinux.org/" },
+  
+  // PHASE 1: 10 NEW SPECIALIZED WORKSTATION & RECOVERY OSES
+  { id: "garuda-dragonfly", name: "Garuda Linux Wayfire", category: "Linux", isoUrl: "https://iso.builds.garudalinux.org/iso/garuda/wayfire/240501/garuda-wayfire-linux-zen-240501.iso", officialSite: "https://garudalinux.org/" },
+  { id: "fedora-kinoite", name: "Fedora Kinoite 40", category: "Linux", isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/40/Kinoite/x86_64/iso/Fedora-Kinoite-ostree-x86_64-40-1.14.iso", officialSite: "https://fedoraproject.org/kinoite/" },
+  { id: "fedora-silverblue", name: "Fedora Silverblue 40", category: "Linux", isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/40/Silverblue/x86_64/iso/Fedora-Silverblue-ostree-x86_64-40-1.14.iso", officialSite: "https://fedoraproject.org/silverblue/" },
+  { id: "opensuse-leap", name: "openSUSE Leap 15.6", category: "Server", isoUrl: "https://download.opensuse.org/distribution/leap/15.6/iso/openSUSE-Leap-15.6-DVD-x86_64-Media.iso", officialSite: "https://get.opensuse.org/leap/" },
+  { id: "systemrescue", name: "SystemRescue 11.01", category: "Security", isoUrl: "https://osdn.net/dl/systemrescue/systemrescue-11.01-amd64.iso", officialSite: "https://www.system-rescue.org/" },
+  { id: "clonezilla", name: "Clonezilla Live 3.1.2", category: "Security", isoUrl: "https://free.nchc.org.tw/clonezilla-live/alternative/testing/3.1.2-22/clonezilla-live-3.1.2-22-amd64.iso", officialSite: "https://clonezilla.org/" },
+  { id: "gparted-live", name: "GParted Live 1.6", category: "Other", isoUrl: "https://sourceforge.net/projects/gparted/files/gparted-live-stable/1.6.0-1/gparted-live-1.6.0-1-amd64.iso", officialSite: "https://gparted.org/" },
+  { id: "endlessos", name: "Endless OS 6", category: "Linux", isoUrl: "https://images-flatpak.endlessm.com/eos-amd64-amd64/base/eos-amd64-amd64.6.0.0.iso", officialSite: "https://endlessos.org/" },
+  { id: "kaos", name: "KaOS 2024", category: "Linux", isoUrl: "https://sourceforge.net/projects/kaosx/files/ISO/KaOS-2024.05-x86_64.iso/download", officialSite: "https://kaosx.us/" },
+  { id: "easyos", name: "EasyOS 6.0", category: "Linux", isoUrl: "https://distro.ibiblio.org/easyos/amd64/releases/bookworm/2024/easy-6.0-amd64.img", officialSite: "https://easyos.org/" },
+  
+  // PHASE 2: 10 NEW ENTERPRISE, GAMING & SPECIALIZED UNIX OSES
+  { id: "miraclelinux", name: "Miracle Linux 9", category: "Server", isoUrl: "https://miraclelinux.com/iso/MiracleLinux-9.2-x86_64-dvd.iso", officialSite: "https://miraclelinux.com/" },
+  { id: "springdale", name: "Springdale Linux 9", category: "Server", isoUrl: "http://springdale.math.ias.edu/data/puias/9.3/x86_64/os/images/boot.iso", officialSite: "http://springdale.math.ias.edu/" },
+  { id: "solus", name: "Solus 4.5 Resilience", category: "Linux", isoUrl: "https://cdn.getsol.us/images/Solus-4.5-Budgie.iso", officialSite: "https://getsol.us/" },
+  { id: "void", name: "Void Linux", category: "Linux", isoUrl: "https://repo-default.voidlinux.org/live/current/void-live-x86_64-20230628-xfce.iso", officialSite: "https://voidlinux.org/" },
+  { id: "devuan", name: "Devuan GNU/Linux 5", category: "Linux", isoUrl: "https://files.devuan.org/devuan_daedalus/desktop-live/devuan_daedalus_5.0.0_amd64_desktop-live.iso", officialSite: "https://www.devuan.org/" },
+  { id: "q4os", name: "Q4OS 5.4 Aquarius", category: "Linux", isoUrl: "https://sourceforge.net/projects/q4os/files/stable/q4os-5.4-x64.r1.iso", officialSite: "https://q4os.org/" },
+  { id: "zorin-lite", name: "Zorin OS 17.1 Lite", category: "Linux", isoUrl: "https://mirrors.edge.kernel.org/zorinos/17/Zorin-OS-17.1-Lite-64-bit.iso", officialSite: "https://zorin.com/os/" },
+  { id: "lakka", name: "LAKKA Retrogaming OS", category: "Other", isoUrl: "https://le.builds.lakka.tv/Generic.x86_64/Lakka-Generic.x86_64-5.0.img.gz", officialSite: "https://www.lakka.tv/" },
+  { id: "batocera", name: "Batocera.linux 39", category: "Other", isoUrl: "https://mirrors.kodi.tv/batocera/x86_64/batocera-x86_64-39-20240304.img.gz", officialSite: "https://batocera.org/" },
+  { id: "arcaos", name: "ArcaOS 5.1 (OS/2 Warp)", category: "Other", isoUrl: "https://www.arcanoae.com/arcaos-5-1-0-now-available/", locked: true, officialSite: "https://www.arcanoae.com/" }
 ];
 
 export interface SoftwareItem {

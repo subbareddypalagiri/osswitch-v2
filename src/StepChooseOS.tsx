@@ -50,7 +50,27 @@ export const OS_LIST = [
   {id:"commandovm", name:"Commando VM", sub:"Mandiant Windows Security Suite", glyph:"🎯"},
   {id:"eurolinux", name:"EuroLinux 9", sub:"Enterprise RHEL-compatible OS", glyph:"🇪🇺"},
   {id:"pop-cosmic", name:"Pop!_OS 24.04 COSMIC", sub:"Next-gen Rust COSMIC desktop", glyph:"🌌"},
-  {id:"asahi", name:"Asahi Linux", sub:"Linux for Apple Silicon Macs", glyph:"🍎"}
+  {id:"asahi", name:"Asahi Linux", sub:"Linux for Apple Silicon Macs", glyph:"🍎"},
+  {id:"garuda-dragonfly", name:"Garuda Linux Wayfire", sub:"Fluid Wayfire compositor Arch Linux", glyph:"🐉"},
+  {id:"fedora-kinoite", name:"Fedora Kinoite 40", sub:"Immutable KDE Plasma atomic desktop", glyph:"⚛️"},
+  {id:"fedora-silverblue", name:"Fedora Silverblue 40", sub:"Immutable GNOME container-first desktop", glyph:"🛡️"},
+  {id:"opensuse-leap", name:"openSUSE Leap 15.6", sub:"Enterprise stable community Linux", glyph:"🦎"},
+  {id:"systemrescue", name:"SystemRescue 11.01", sub:"Linux system repair & disk recovery", glyph:"🚑"},
+  {id:"clonezilla", name:"Clonezilla Live 3.1.2", sub:"Bare-metal disk imaging & cloning", glyph:"👯"},
+  {id:"gparted-live", name:"GParted Live 1.6", sub:"Dedicated drive partitioning toolkit", glyph:"✂️"},
+  {id:"endlessos", name:"Endless OS 6", sub:"Educational & offline-first Linux OS", glyph:"♾️"},
+  {id:"kaos", name:"KaOS 2024", sub:"Independent rolling KDE Plasma & Qt OS", glyph:"💫"},
+  {id:"easyos", name:"EasyOS 6.0", sub:"Containerized experimental mini Linux", glyph:"🧪"},
+  {id:"miraclelinux", name:"Miracle Linux 9", sub:"Japanese Enterprise RHEL distribution", glyph:"🌸"},
+  {id:"springdale", name:"Springdale Linux 9", sub:"Princeton IAS Academic Enterprise Linux", glyph:"🏫"},
+  {id:"solus", name:"Solus 4.5 Resilience", sub:"Independent Budgie desktop OS", glyph:"⛵"},
+  {id:"void", name:"Void Linux", sub:"Independent xbps systemd-free Linux", glyph:"🌌"},
+  {id:"devuan", name:"Devuan GNU/Linux 5", sub:"Debian init freedom sans systemd", glyph:"🕊️"},
+  {id:"q4os", name:"Q4OS 5.4 Aquarius", sub:"Windows-styled Trinity desktop Linux", glyph:"🖥️"},
+  {id:"zorin-lite", name:"Zorin OS 17.1 Lite", sub:"Resource-friendly XFCE Zorin edition", glyph:"💎"},
+  {id:"lakka", name:"LAKKA Retrogaming OS", sub:"Lightweight Libretro retrogaming OS", glyph:"🕹️"},
+  {id:"batocera", name:"Batocera.linux 39", sub:"Standalone plug-and-play gaming platform", glyph:"👾"},
+  {id:"arcaos", name:"ArcaOS 5.1", sub:"Modernized OS/2 Warp operating system", glyph:"🌀", locked:true}
 ];
 
 export default function StepChooseOS({ 
