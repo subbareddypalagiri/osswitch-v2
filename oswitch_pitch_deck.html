@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OSwitch - Executive Pitch Deck</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --cyan: #06b6d4;
+      --purple: #a855f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    .slide {
+      min-height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-col: column;
+      justify-content: center;
+      padding: 4rem 6rem;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+      page-break-after: always;
+    }
+
+    /* Ambient background blobs */
+    .slide::before {
+      content: "";
+      position: absolute;
+      width: 40vw;
+      height: 40vw;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.05) 0%, transparent 70%);
+      top: 10%;
+      left: 10%;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .slide:nth-child(even)::before {
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.05) 0%, transparent 70%);
+      top: 30%;
+      left: 50%;
+    }
+
+    .slide-content {
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .slide-tag {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--cyan);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .slide-tag::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--cyan);
+      border-radius: 50%;
+    }
+
+    h1 {
+      font-size: 3.5rem;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+    }
+
+    h1 span {
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    h2 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 2rem;
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.lead {
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      max-width: 800px;
+      margin-bottom: 2.5rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 2rem;
+      margin-top: 1.5rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 2rem;
+      backdrop-filter: blur(20px);
+      transition: border-color 0.3s;
+    }
+
+    .card:hover {
+      border-color: rgba(6, 182, 212, 0.3);
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: #fff;
+    }
+
+    .card-desc {
+      font-size: 1rem;
+      color: var(--text-muted);
+    }
+
+    .metrics-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+    }
+
+    .metrics-table th, .metrics-table td {
+      padding: 1.25rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .metrics-table th {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metrics-table td {
+      font-size: 1.1rem;
+    }
+
+    .highlight-number {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: var(--cyan);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .highlight-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Print Specific styles to generate publication-grade PDF */
+    @media print {
+      body {
+        background: #000;
+        color: #fff;
+      }
+      .slide {
+        min-height: 100vh;
+        height: 100vh;
+        page-break-after: always;
+        border: none;
+        padding: 3rem 4rem;
+        justify-content: center;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Slide 1: Title -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="slide-tag">Executive Summary</div>
+      <h1><span>OSwitch</span>: The Universal Operating Platform</h1>
+      <p class="lead">Simplifying multi-OS partitioning and developer environment setup from hours to a single click.</p>
+      <div class="grid-3" style="margin-top: 4rem;">
+        <div class="card" style="border-left: 4px solid var(--cyan);">
+          <div class="highlight-number">101+</div>
+          <div class="highlight-label">Operating Systems</div>
+        </div>
+        <div class="card" style="border-left: 4px solid var(--purple);">
+          <div class="highlight-number">10,590+</div>
+          <div class="highlight-label">Audited Dev Tools</div>
+        </div>
+        <div class="card" style="border-left: 4px solid var(--cyan);">
+          <div class="highlight-number">8x</div>
+          <div class="highlight-label">Download Speedup</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 2: The Problem -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="slide-tag">The Challenge</div>
+      <h2>The Onboarding & Bootstrapping Bottleneck</h2>
+      <p class="lead">STEM students, developers, and lab administrators waste days configuring environments and risk data loss partitioning drives.</p>
+      
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">🚨 Disk Partitioning Fear</div>
+          <div class="card-desc">Users are terrified of resizing hard drives. Manual partition mistakes often lead to primary OS corruption and total data loss.</div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--purple);">⏰ Syllabus Setup Friction</div>
+          <div class="card-desc">Installing toolchains (Matlab, Docker, Python) and resolving path variables wastes up to 40 hours of productivity at the start of a semester.</div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">📉 Fragmented WAN Downloads</div>
+          <div class="card-desc">Downloading 5GB+ ISOs over unstable networks leads to failed downloads and corrupted payloads, requiring repeated retries.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 3: The Solution -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="slide-tag">The Architecture</div>
+      <h2>OSwitch Product Ecosystem</h2>
+      <p class="lead">A unified desktop application that automates disk manipulation, downloads, and workspace provisioning.</p>
+      
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📱 Safe Partitioning Engine</div>
+          <div class="card-desc">Automated drive shrinking protected by a 3-layer Safety Guard. Users allocate partition space securely using an Apple-style slider.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">📦 Master Infinite Store</div>
+          <div class="card-desc">Pre-verified catalog of 10,590+ tools. Students select their syllabus or engineering branch, and OSwitch installs all relevant packages in 1 click.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">⚡ 8-Stream Parallel Accelerator</div>
+          <div class="card-desc">Spawns 8 simultaneous download chunks via HTTP Range requests. Integrates real-time stream-computed SHA256 integrity verification.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">🎛️ Unified Control Panel</div>
+          <div class="card-desc">Real-time disk volume analytics, 1-click boot selection, and a clean OS uninstallation tool that instantly reclaims disk storage.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 4: Market Opportunity -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="slide-tag">Market Size</div>
+      <h2>Total & Serviceable Addressable Market</h2>
+      <p class="lead">OSwitch targets millions of technical users across academia, start-ups, and enterprise organizations.</p>
+      
+      <table class="metrics-table">
+        <thead>
+          <tr>
+            <th>Market Segment</th>
+            <th>Total Addressable Market (TAM)</th>
+            <th>Serviceable Segment (OSwitch SAM)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight: 600;">Global Developers</td>
+            <td>28 Million Software Engineers</td>
+            <td>Organizations requiring rapid local environment isolation</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">STEM & Engineering Students</td>
+            <td>150 Million Students Worldwide</td>
+            <td>University computer labs, CS departments, and hackathons</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">Incubators & Startup Hubs</td>
+            <td>12,000+ Active Hubs Globally</td>
+            <td>Standardized workstation setups for new portfolio startups</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Slide 5: Revenue Model -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="slide-tag">Monetization</div>
+      <h2>OSwitch B2B SaaS Revenue Streams</h2>
+      <p class="lead">Sustainable, recurring revenue driven by enterprise software licensing and power-user subscriptions.</p>
+      
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">🏢 B2B Site Licensing</div>
+          <div class="card-desc">Annual site licenses sold to universities. Enables lab admins to deploy and reset 100+ lab computers with standardized syllabus configurations.</div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--purple);">💎 Developer Premium</div>
+          <div class="card-desc">Monthly user subscriptions for isolated sandboxes, local VM integrations (VirtualBox/VMware), and cloud-saved snapshot configurations.</div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">🌐 Cloud Sync Add-On</div>
+          <div class="card-desc">Cloud storage and collaborative configurations. Teachers share a 6-letter code to instantly sync the exact same workspace on student machines.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 6: Moat & Defensibility -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="slide-tag">Defensibility</div>
+      <h2>Our Technology Moat</h2>
+      <p class="lead">High-performance engineering coupled with network-effects configurations makes OSwitch highly defensible.</p>
+      
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">⚙️ Rust-Tauri Engine</div>
+          <div class="card-desc">Deep low-level async Rust memory-safe system calls combined with a lightweight, hardware-accelerated frontend.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">💾 Edge Cache Architecture</div>
+          <div class="card-desc">Local client caching of catalog metadata, offering instant 0ms latency cold-starts without relying on WAN network performance.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">🤝 Shareable Ecosystem</div>
+          <div class="card-desc">Configuration share codes create viral growth loops inside engineering classes, making OSwitch the standard classroom deployment tool.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 7: Go-To-Market -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="slide-tag">Growth Plan</div>
+      <h2>Go-To-Market & Growth Strategy</h2>
+      <p class="lead">Driving bottom-up user adoption and top-down institutional site agreements.</p>
+      
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">🎓 Student Ambassador Loop</div>
+          <div class="card-desc">Recruiting tech-leads on engineering campuses to run hackathons and distribute the OSwitch installer to students.</div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--purple);">🏫 Syllabus Integration</div>
+          <div class="card-desc">Working directly with college CS departments to bundle their official course toolsets into OSwitch as pre-built default packages.</div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--cyan);">🚀 Incubator Standard</div>
+          <div class="card-desc">Partnering with incubator hubs to pre-install OSwitch on default startup workstation bundles for instant team onboarding.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 8: Roadmap & Milestones -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="slide-tag">Roadmap</div>
+      <h2>Execution Milestones</h2>
+      <p class="lead">Clear quarterly targets focusing on user growth, enterprise scale, and network deployment features.</p>
+      
+      <div class="grid-3">
+        <div class="card" style="border-top: 4px solid var(--cyan);">
+          <div class="card-title" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--cyan);">PHASE 1</div>
+          <div class="card-title">Launch v1.0.0 Stable</div>
+          <div class="card-desc">Release audited 101 OS catalog, 10,590+ tools. Onboard 15,000+ student developers across 10 pilot colleges.</div>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--purple);">
+          <div class="card-title" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--purple);">PHASE 2</div>
+          <div class="card-title">B2B SaaS Dashboard</div>
+          <div class="card-desc">Deploy administrative controls for college lab PCs. Introduce cloud configuration sync and classroom profiles.</div>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--cyan);">
+          <div class="card-title" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--cyan);">PHASE 3</div>
+          <div class="card-title">Network Deployer</div>
+          <div class="card-desc">Deploy local PXE/TFTP multicast network installation engine for Zero-USB mass lab setups.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>
