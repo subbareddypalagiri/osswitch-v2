@@ -124,13 +124,13 @@ export default function StepTools({
   }
 
   return (
-    <div className="min-h-screen flex flex-col p-8 pt-16 text-slate-900 dark:text-white relative">
+    <div className="w-full h-full flex flex-col text-slate-900 dark:text-white relative">
       <div className="absolute top-0 left-0 w-full h-full -z-10 pointer-events-none">
          <div className="absolute top-[10%] left-[20%] w-[30vw] h-[30vw] bg-cyan-600/10 rounded-full blur-[120px]"></div>
          <div className="absolute bottom-[10%] right-[20%] w-[40vw] h-[40vw] bg-purple-600/10 rounded-full blur-[150px]"></div>
       </div>
 
-      <div className="max-w-7xl mx-auto w-full flex-grow flex flex-col">
+      <div className="w-full flex-grow flex flex-col max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500 mb-2">
@@ -154,14 +154,14 @@ export default function StepTools({
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <div className="flex-grow relative flex gap-2">
+        <div className="flex flex-col xl:flex-row gap-4 mb-8 w-full">
+          <div className="flex-grow relative flex gap-2 w-full xl:max-w-2xl">
             <input 
               type="text" 
               placeholder="Search 10,500+ tools by name, category or Winget ID..." 
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="flex-grow bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-lg focus:outline-none focus:border-cyan-500 transition-colors backdrop-blur-md"
+              className="flex-grow bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-base focus:outline-none focus:border-cyan-500 transition-colors backdrop-blur-md min-w-0"
             />
             <button
               onClick={handleLiveSearch}
@@ -181,23 +181,25 @@ export default function StepTools({
             </button>
           </div>
           
-          <select 
-            className="bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-lg focus:outline-none focus:border-cyan-500 backdrop-blur-md cursor-pointer"
-            value={filterDept || ""}
-            onChange={(e) => { setFilterDept(e.target.value || null); setPage(1); }}
-          >
-            <option value="">All Departments</option>
-            {catalog.departments.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          <div className="flex flex-col sm:flex-row gap-4 flex-grow w-full xl:w-auto">
+            <select 
+              className="flex-grow xl:w-64 bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-base focus:outline-none focus:border-cyan-500 backdrop-blur-md cursor-pointer min-w-0"
+              value={filterDept || ""}
+              onChange={(e) => { setFilterDept(e.target.value || null); setPage(1); }}
+            >
+              <option value="">All Departments</option>
+              {catalog.departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
 
-          <select 
-            className="bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-lg focus:outline-none focus:border-cyan-500 backdrop-blur-md cursor-pointer"
-            value={filterRole || ""}
-            onChange={(e) => { setFilterRole(e.target.value || null); setPage(1); }}
-          >
-            <option value="">All Roles</option>
-            {catalog.roles.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
+            <select 
+              className="flex-grow xl:w-64 bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-base focus:outline-none focus:border-cyan-500 backdrop-blur-md cursor-pointer min-w-0"
+              value={filterRole || ""}
+              onChange={(e) => { setFilterRole(e.target.value || null); setPage(1); }}
+            >
+              <option value="">All Roles</option>
+              {catalog.roles.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pr-2 custom-scrollbar pb-10">
