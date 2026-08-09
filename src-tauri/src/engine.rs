@@ -80,7 +80,7 @@ pub async fn get_sys_info() -> Result<SysInfo, String> {
     let mut disk_free_gb = 0.0;
     let mut disk_total_gb = 0.0;
     
-    let out = Command::new("powershell").args(&["-Command", "Get-Volume -DriveLetter C | Select-Object SizeRemaining, Size | ConvertTo-Json"]).output().await;
+    let out = Command::new("powershell").args(["-Command", "Get-Volume -DriveLetter C | Select-Object SizeRemaining, Size | ConvertTo-Json"]).output().await;
     if let Ok(o) = out {
         let stdout = String::from_utf8_lossy(&o.stdout);
         if let Ok(v) = serde_json::from_str::<Vol>(&stdout) {
@@ -95,7 +95,7 @@ pub async fn get_sys_info() -> Result<SysInfo, String> {
 #[tauri::command]
 pub async fn get_drives() -> Result<String, String> {
     let out = Command::new("powershell")
-        .args(&["-Command", "Get-Volume | Where-Object DriveType -eq 'Fixed' | Select-Object DriveLetter, SizeRemaining, Size | ConvertTo-Json"])
+        .args(["-Command", "Get-Volume | Where-Object DriveType -eq 'Fixed' | Select-Object DriveLetter, SizeRemaining, Size | ConvertTo-Json"])
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -127,21 +127,22 @@ pub async fn get_drives() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: String, os_space: Option<u32>, frugal_kernel: Option<String>, frugal_initrd: Option<String>, frugal_append: Option<String>) -> Result<String, String> {
+#[allow(clippy::too_many_arguments)]
+pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: String, _os_space: Option<u32>, _frugal_kernel: Option<String>, _frugal_initrd: Option<String>, _frugal_append: Option<String>) -> Result<String, String> {
     // Global Validations for Edge Cases
     if id.to_lowercase().contains("macos") && iso_url.starts_with("http") {
         return Err("ISO_DOWNLOAD_FAILED: Automated download of macOS is disabled due to Apple's EULA. Please provide a local ISO file.".into());
     }
 
     if intent == "wsl" {
-        let wsl_supported = vec!["ubuntu", "debian", "kali", "opensuse", "sles", "oracle", "alpine"];
+        let wsl_supported = ["ubuntu", "debian", "kali", "opensuse", "sles", "oracle", "alpine"];
         if !wsl_supported.contains(&id.as_str()) {
             return Err(format!("Windows Subsystem for Linux (WSL) does not natively support '{}'. Please choose VirtualBox or VMware instead.", id));
         }
     }
     
     if intent == "baremetal_grub" && id.to_lowercase().contains("arch") {
-        let sb_check = Command::new("powershell").args(&["-Command", "Confirm-SecureBootUEFI"]).output().await;
+        let sb_check = Command::new("powershell").args(["-Command", "Confirm-SecureBootUEFI"]).output().await;
         if let Ok(out) = sb_check {
             let res = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
             if res == "true" {
@@ -394,7 +395,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             );
             let _ = tokio::fs::write(&master_ps1, ps1_content).await;
             
-            let master_out = Command::new("powershell").args(&["-Command", &format!("Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"' -Verb RunAs -Wait -PassThru", master_ps1.display())]).output().await;
+            let master_out = Command::new("powershell").args(["-Command", &format!("Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"' -Verb RunAs -Wait -PassThru", master_ps1.display())]).output().await;
             if master_out.is_err() {
                 return Err("Failed to execute VM VHD generation script.".into());
             }
@@ -404,7 +405,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             
             let detach_script = temp_dir.join("osw_vm_detach.txt");
             let _ = tokio::fs::write(&detach_script, format!("select vdisk file=\"{}\"\ndetach vdisk\n", installer_vhd)).await;
-            let _ = Command::new("powershell").args(&["-Command", &format!("Start-Process diskpart -ArgumentList '/s \"{}\"' -Verb RunAs -Wait", detach_script.display())]).output().await;
+            let _ = Command::new("powershell").args(["-Command", &format!("Start-Process diskpart -ArgumentList '/s \"{}\"' -Verb RunAs -Wait", detach_script.display())]).output().await;
         }
 
         if intent == "vbox_vm" {
@@ -413,7 +414,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
                 let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VirtualBox via Winget...".into(), total: 3, done: false });
                 let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
                 let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-                let output = Command::new(&winget_path).args(&["install", "-e", "--id", "Oracle.VirtualBox", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+                let output = Command::new(&winget_path).args(["install", "-e", "--id", "Oracle.VirtualBox", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
                 let code = output.status.code().unwrap_or(-1);
                 if code != 0 && code != 3010 {
                     return Err(format!("VirtualBox installation failed (exit code {}).", code));
@@ -434,7 +435,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
                     vbox_path, vm_name, vm_name, vm_name, vm_name, iso_path.display(), vm_name
                 )
             };
-            let _ = Command::new("powershell").args(&["-Command", &script]).output().await;
+            let _ = Command::new("powershell").args(["-Command", &script]).output().await;
             let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
         } else if intent == "vmware_vm" {
             let vmware_paths = [
@@ -447,7 +448,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
                 let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VMware via Winget...".into(), total: 3, done: false });
                 let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
                 let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-                let output = Command::new(&winget_path).args(&["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+                let output = Command::new(&winget_path).args(["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
                 let code = output.status.code().unwrap_or(-1);
                 if code != 0 && code != 3010 {
                     return Err(format!("VMware installation failed (exit code {}).", code));
@@ -494,7 +495,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             }
         }
         if rufus_path.exists() {
-             let _ = Command::new("powershell").args(&["-Command", &format!("Start-Process '{}' -ArgumentList '-i {}' -Wait", rufus_path.display(), iso_path.display())]).output().await;
+             let _ = Command::new("powershell").args(["-Command", &format!("Start-Process '{}' -ArgumentList '-i {}' -Wait", rufus_path.display(), iso_path.display())]).output().await;
         } else {
              return Err("Failed to download Rufus.".into());
         }
@@ -578,7 +579,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         );
         let _ = tokio::fs::write(&master_ps1, ps1_content).await;
         
-        let master_out = Command::new("powershell").args(&["-Command", &format!("Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"' -Verb RunAs -Wait -PassThru", master_ps1.display())]).output().await;
+        let master_out = Command::new("powershell").args(["-Command", &format!("Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"' -Verb RunAs -Wait -PassThru", master_ps1.display())]).output().await;
         if master_out.is_err() {
             return Err("Failed to execute Master Admin script.".into());
         }
@@ -633,10 +634,10 @@ pub async fn clean_orphaned_downloads() -> Result<String, String> {
     let mut cleaned = 0;
     if let Ok(mut entries) = tokio::fs::read_dir(temp_dir).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
-            if entry.file_name().to_string_lossy().ends_with(".iso") {
-                if tokio::fs::remove_file(entry.path()).await.is_ok() {
-                    cleaned += 1;
-                }
+            if entry.file_name().to_string_lossy().ends_with(".iso")
+                && tokio::fs::remove_file(entry.path()).await.is_ok()
+            {
+                cleaned += 1;
             }
         }
     }
@@ -665,7 +666,7 @@ pub async fn run_safety_check() -> Result<SafetyReport, String> {
     
     // 2. Check Secure Boot
     let mut secure_boot_enabled = false;
-    if let Ok(out) = Command::new("powershell").args(&["-Command", "Confirm-SecureBootUEFI"]).output().await {
+    if let Ok(out) = Command::new("powershell").args(["-Command", "Confirm-SecureBootUEFI"]).output().await {
         let res = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
         if res == "true" { secure_boot_enabled = true; }
     }
@@ -698,16 +699,16 @@ pub async fn backup_system() -> Result<String, String> {
     // 1. Create a System Restore Point
     let restore_script = "Checkpoint-Computer -Description 'OSwitch Pre-Install Backup' -RestorePointType 'MODIFY_SETTINGS'";
     let _ = Command::new("powershell")
-        .args(&["-Command", restore_script])
+        .args(["-Command", restore_script])
         .output().await;
         
     // 2. Backup BCD (Bootloader)
     let bcd_path = "C:\\OSwitch_BCD_Backup";
     let _ = Command::new("cmd")
-        .args(&["/c", "mkdir", bcd_path])
+        .args(["/c", "mkdir", bcd_path])
         .output().await;
     let _ = Command::new("bcdedit")
-        .args(&["/export", &format!("{}\\bcd_backup", bcd_path)])
+        .args(["/export", &format!("{}\\bcd_backup", bcd_path)])
         .output().await;
         
     Ok("Backup completed successfully.".into())
@@ -741,7 +742,7 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<String>, targ
             let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--id", id];
             let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
             let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-            let mut child = std::process::Command::new(&winget_path)
+            let child = std::process::Command::new(&winget_path)
                 .args(&args)
                 .stdout(std::process::Stdio::piped())
                 .spawn();
@@ -753,22 +754,20 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<String>, targ
                         use std::io::Read;
                         let reader = std::io::BufReader::new(stdout);
                         let mut current_line = String::new();
-                        for byte in reader.bytes() {
-                            if let Ok(b) = byte {
-                                let ch = b as char;
-                                if ch == '\r' || ch == '\n' {
-                                    if !current_line.trim().is_empty() {
-                                        let text = current_line.trim().to_string();
-                                        full_output.push_str(&text);
-                                        full_output.push(' ');
-                                        if text.contains("MB") || text.contains("KB") || text.contains("GB") || text.contains("%") || text.contains("Downloading") || text.contains("Installing") || text.contains("Found") || text.contains("installed") {
-                                            let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("{}: {}", id, text), total: total_packages, done: false });
-                                        }
-                                        current_line.clear();
+                        for b in reader.bytes().flatten() {
+                            let ch = b as char;
+                            if ch == '\r' || ch == '\n' {
+                                if !current_line.trim().is_empty() {
+                                    let text = current_line.trim().to_string();
+                                    full_output.push_str(&text);
+                                    full_output.push(' ');
+                                    if text.contains("MB") || text.contains("KB") || text.contains("GB") || text.contains("%") || text.contains("Downloading") || text.contains("Installing") || text.contains("Found") || text.contains("installed") {
+                                        let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("{}: {}", id, text), total: total_packages, done: false });
                                     }
-                                } else {
-                                    current_line.push(ch);
+                                    current_line.clear();
                                 }
+                            } else {
+                                current_line.push(ch);
                             }
                         }
                     }
@@ -838,15 +837,14 @@ pub async fn get_gemini_models(api_key: String) -> Result<Vec<String>, String> {
         if let Some(arr) = json["models"].as_array() {
             for item in arr {
                 if let Some(name) = item["name"].as_str() {
-                    if name.contains("gemini") && name.contains("generateContent") { models.push(name.to_string()); }
-                    else if name.contains("gemini") { models.push(name.to_string()); }
+                    if name.contains("gemini") { models.push(name.to_string()); }
                 }
             }
         }
-        return Ok(models);
+        Ok(models)
     } else {
         let err_text = res.text().await.unwrap_or_default();
-        return Err(format!("API Error: {}", err_text));
+        Err(format!("API Error: {}", err_text))
     }
 }
 
@@ -947,10 +945,10 @@ async fn generate_and_inject_ai_script(app: tauri::AppHandle, target_os: String,
     let _ = app.emit("install-progress", InstallProgress { i: 0, text: "Injecting AI Script into Motherboard EFI...".into(), total: 1, done: false });
 
     // Mount EFI & inject
-    let _ = std::process::Command::new("cmd").args(&["/c", "mountvol", "S:", "/S"]).output();
+    let _ = std::process::Command::new("cmd").args(["/c", "mountvol", "S:", "/S"]).output();
     let _ = std::fs::create_dir_all("S:\\EFI\\oswitch");
     let write_res = std::fs::write("S:\\EFI\\oswitch\\auto-install.sh", &clean_script);
-    let _ = std::process::Command::new("cmd").args(&["/c", "mountvol", "S:", "/D"]).output();
+    let _ = std::process::Command::new("cmd").args(["/c", "mountvol", "S:", "/D"]).output();
 
     // Also save to LOCALAPPDATA for VirtualBox/VMware auto-provisioning
     let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
@@ -977,7 +975,7 @@ pub async fn search_winget(query: String) -> Result<Vec<WingetSearchResult>, Str
     let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
 
     let output = std::process::Command::new(&winget_path)
-        .args(&["search", "-n", "30", "--accept-source-agreements", &query])
+        .args(["search", "-n", "30", "--accept-source-agreements", &query])
         .output()
         .map_err(|e| format!("Failed to execute winget: {}", e))?;
 

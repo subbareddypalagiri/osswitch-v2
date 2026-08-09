@@ -41,7 +41,7 @@ pub fn get_boot_menu() -> Result<Vec<BootEntry>, String> {
 #[command]
 pub fn set_default_boot(identifier: String) -> Result<String, String> {
     let output = Command::new("bcdedit")
-        .args(&["/default", &identifier])
+        .args(["/default", &identifier])
         .output()
         .map_err(|e| format!("Failed to set default boot: {}", e))?;
         
