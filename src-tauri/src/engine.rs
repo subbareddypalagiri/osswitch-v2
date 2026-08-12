@@ -755,6 +755,7 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<String>, targ
                         let reader = std::io::BufReader::new(stdout);
                         let mut current_line = String::new();
                         for b in reader.bytes().flatten() {
+                            if b == 0 { continue; }
                             let ch = b as char;
                             if ch == '\r' || ch == '\n' {
                                 if !current_line.trim().is_empty() {
@@ -979,7 +980,8 @@ pub async fn search_winget(query: String) -> Result<Vec<WingetSearchResult>, Str
         .output()
         .map_err(|e| format!("Failed to execute winget: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let clean_bytes: Vec<u8> = output.stdout.iter().copied().filter(|&b| b != 0).collect();
+    let stdout = String::from_utf8_lossy(&clean_bytes);
     let mut results = Vec::new();
     let mut is_header = false;
 
