@@ -202,7 +202,7 @@
   "qubes": {
     "name": "Qubes OS 4.2.1",
     "category": "Security",
-    "isoUrl": "https://mirrors.edge.kernel.org/qubes/iso/Qubes-R4.2.1-x86_64.iso"
+    "isoUrl": "https://mirrors.edge.kernel.org/qubes/iso/Qubes-R4.3.0-x86_64.iso"
   },
   "whonix": {
     "name": "Whonix XFCE",
