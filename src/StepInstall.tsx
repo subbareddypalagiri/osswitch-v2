@@ -112,7 +112,10 @@ export default function StepInstall({
   catalog,
   isInstalling,
   setIsInstalling,
-  osSpace
+  osSpace,
+  userName = "archer",
+  userPassword = "password123",
+  hostName = "oswitch-pc"
 }: { 
   onNext: () => void, 
   onBack: () => void,
@@ -124,7 +127,10 @@ export default function StepInstall({
   catalog: { id: string, name: string, isoUrl?: string, officialSite?: string, frugalKernel?: string, frugalInitrd?: string, frugalAppend?: string }[],
   isInstalling: boolean,
   setIsInstalling: (b: boolean) => void,
-  osSpace: number
+  osSpace: number,
+  userName?: string,
+  userPassword?: string,
+  hostName?: string
 }) {
   const targets = selectedOS.filter(id => id !== 'windows');
   const [activeTab, setActiveTab] = useState(targets.length > 0 ? targets[0] : "tools_only");
@@ -274,7 +280,10 @@ export default function StepInstall({
           osSpace: osSpace,
           frugalKernel: catalogEntry?.frugalKernel,
           frugalInitrd: catalogEntry?.frugalInitrd,
-          frugalAppend: catalogEntry?.frugalAppend
+          frugalAppend: catalogEntry?.frugalAppend,
+          username: userName,
+          password: userPassword,
+          hostname: hostName
         });
       }
       

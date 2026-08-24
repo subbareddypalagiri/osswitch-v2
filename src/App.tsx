@@ -79,6 +79,9 @@ function App() {
   const [backupEnabled, setBackupEnabled] = useState(true);
   const [perms, setPerms] = useState<boolean[]>([false, false, false, false]);
   const [osSpace, setOsSpace] = useState(100);
+  const [userName, setUserName] = useState("archer");
+  const [userPassword, setUserPassword] = useState("oswitch123");
+  const [hostName, setHostName] = useState("oswitch-node");
   
   // 0ms Latency Local Caching Engine
   const [catalog, setCatalog] = useState(() => {
@@ -183,14 +186,18 @@ function App() {
       case 7: return <StepConfigure 
                 onNext={goNext} onBack={goBack} 
                 backupEnabled={backupEnabled} setBackupEnabled={setBackupEnabled}
-                perms={perms} setPerms={setPerms} />;
+                perms={perms} setPerms={setPerms}
+                userName={userName} setUserName={setUserName}
+                userPassword={userPassword} setUserPassword={setUserPassword}
+                hostName={hostName} setHostName={setHostName} />;
       case 8: return <StepInstall 
                 onNext={goNext} onBack={goBack}
                 selectedOS={selectedOS} selectedIntents={selectedIntents}
                 selectedBundles={selectedBundles} selectedTools={selectedTools}
                 osSpace={osSpace}
                 backupEnabled={backupEnabled} catalog={catalog}
-                isInstalling={isInstalling} setIsInstalling={setIsInstalling} />;
+                isInstalling={isInstalling} setIsInstalling={setIsInstalling}
+                userName={userName} userPassword={userPassword} hostName={hostName} />;
       case 9: return <StepManageOS onNext={() => setCurrentStep(3)} onBack={() => setCurrentStep(2)} />;
       default: return null;
     }

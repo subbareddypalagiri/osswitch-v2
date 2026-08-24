@@ -226,7 +226,19 @@ fn get_oswitch_dir() -> PathBuf {
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: String, os_space: Option<u32>, _frugal_kernel: Option<String>, _frugal_initrd: Option<String>, _frugal_append: Option<String>) -> Result<String, String> {
+pub async fn install_os(
+    app: AppHandle, 
+    id: String, 
+    intent: String, 
+    iso_url: String, 
+    os_space: Option<u32>, 
+    _frugal_kernel: Option<String>, 
+    _frugal_initrd: Option<String>, 
+    _frugal_append: Option<String>,
+    username: Option<String>,
+    password: Option<String>,
+    hostname: Option<String>
+) -> Result<String, String> {
     // Global Validations for Edge Cases
     if id.to_lowercase().contains("macos") && iso_url.starts_with("http") {
         return Err("ISO_DOWNLOAD_FAILED: Automated download of macOS is disabled due to Apple's EULA. Please provide a local ISO file.".into());
@@ -665,6 +677,11 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             _ => id.as_str(),
         };
 
+        let user = username.unwrap_or_else(|| "archer".into());
+        let _pass = password.unwrap_or_else(|| "oswitch123".into());
+        let host = hostname.unwrap_or_else(|| "oswitch-node".into());
+        let allocated_space = os_space.unwrap_or(75);
+
         let work_dir = get_oswitch_dir();
         let _ = tokio::fs::create_dir_all(&work_dir).await;
         let target_iso = work_dir.join(format!("{}.iso", id));
@@ -674,6 +691,9 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         }
 
         if cfg!(target_os = "windows") {
+            // 🛡️ BitLocker Auto-Pause Guard (Prevents TPM recovery lockout on reboot)
+            let _ = Command::new("powershell").args(["-Command", "Suspend-BitLocker -MountPoint C: -RebootCount 1 -ErrorAction SilentlyContinue"]).output().await;
+
             // Backup Windows BCD before making any changes
             let _ = Command::new("cmd").args(["/c", "mkdir", "C:\\OSwitch_BCD_Backup"]).output().await;
             let _ = Command::new("bcdedit").args(["/export", "C:\\OSwitch_BCD_Backup\\bcd_backup"]).output().await;
@@ -695,14 +715,14 @@ insmod loopback\n\
 menuentry \"OSwitch - $name (Native Bare-Metal)\" {{\n\
     search --no-floppy --file --set=root /OSwitch/$isoName\n\
     loopback loop /OSwitch/$isoName\n\
-    linux (loop)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch img_dev=/dev/disk/by-label/OSW_NTFS img_loop=/OSwitch/$isoName earlymodules=loop\n\
+    linux (loop)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch img_dev=/dev/disk/by-label/OSW_NTFS img_loop=/OSwitch/$isoName earlymodules=loop cow_spacesize={allocated_space}G hostname={host}\n\
     initrd (loop)/arch/boot/x86_64/initramfs-linux.img\n\
 }}\n\
 \n\
 menuentry \"OSwitch - Universal Live Linux\" {{\n\
     search --no-floppy --file --set=root /OSwitch/$isoName\n\
     loopback loop /OSwitch/$isoName\n\
-    linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=/OSwitch/$isoName noeject noprompt\n\
+    linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=/OSwitch/$isoName noeject noprompt cow_spacesize={allocated_space}G\n\
     initrd (loop)/casper/initrd\n\
 }}\n\
 \"@;\n\
@@ -736,11 +756,11 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
                 let _ = Command::new("umount").arg("/mnt/iso").output().await;
 
                 let entry_content = format!(
-                    "title   BlackArch Linux (75GB Dedicated)\n\
+                    "title   {} ({}GB Dedicated)\n\
                     linux   /blackarch/vmlinuz-linux\n\
                     initrd  /blackarch/initramfs-linux.img\n\
-                    options archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize=75G\n",
-                    target_iso.display()
+                    options archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={}\n",
+                    display_name, allocated_space, target_iso.display(), allocated_space, host
                 );
                 let _ = tokio::fs::write("/boot/loader/entries/blackarch.conf", entry_content).await;
             }
@@ -748,15 +768,15 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
             // 2. Also inject GRUB custom if GRUB exists
             if std::path::Path::new("/etc/grub.d").exists() {
                 let grub_entry = format!(
-                    "\nmenuentry 'OSwitch - {} (75GB Bare-Metal)' {{\n\
+                    "\nmenuentry 'OSwitch - {} ({}GB Bare-Metal)' {{\n\
                         search --no-floppy --file --set=root {}\n\
                         loopback loop {}\n\
-                        linux (loop)/blackarch/boot/x86_64/vmlinuz-linux archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize=75G\n\
+                        linux (loop)/blackarch/boot/x86_64/vmlinuz-linux archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={}\n\
                         initrd (loop)/blackarch/boot/x86_64/initramfs-linux.img\n\
                     }}\n",
-                    display_name, target_iso.display(), target_iso.display(), target_iso.display()
+                    display_name, allocated_space, target_iso.display(), target_iso.display(), target_iso.display(), allocated_space, host
                 );
-                let mut f = tokio::fs::OpenOptions::new().write(true).append(true).open("/etc/grub.d/40_custom").await;
+                let f = tokio::fs::OpenOptions::new().write(true).append(true).open("/etc/grub.d/40_custom").await;
                 if let Ok(mut file) = f {
                     let _ = file.write_all(grub_entry.as_bytes()).await;
                 }
