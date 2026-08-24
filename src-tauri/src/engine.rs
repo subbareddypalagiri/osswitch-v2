@@ -651,50 +651,27 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
     } else if intent == "baremetal_grub" {
         let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Stage 1: Pre-Flight Safety & BCD Backup...".into(), total: 3, done: false });
         
-        let oswitch_dir = std::path::PathBuf::from("C:\\OSwitch");
-        let _ = tokio::fs::create_dir_all(&oswitch_dir).await;
-        let target_iso = oswitch_dir.join(format!("{}.iso", id));
+        if cfg!(target_os = "windows") {
+            let oswitch_dir = std::path::PathBuf::from("C:\\OSwitch");
+            let _ = tokio::fs::create_dir_all(&oswitch_dir).await;
+            let target_iso = oswitch_dir.join(format!("{}.iso", id));
 
-        if iso_path.exists() && (!target_iso.exists() || target_iso != iso_path) {
-            let _ = tokio::fs::copy(&iso_path, &target_iso).await;
-        }
+            if iso_path.exists() && (!target_iso.exists() || target_iso != iso_path) {
+                let _ = tokio::fs::copy(&iso_path, &target_iso).await;
+            }
 
-        // Backup Windows BCD before making any changes
-        let _ = Command::new("cmd").args(["/c", "mkdir", "C:\\OSwitch_BCD_Backup"]).output().await;
-        let _ = Command::new("bcdedit").args(["/export", "C:\\OSwitch_BCD_Backup\\bcd_backup"]).output().await;
+            // Backup Windows BCD before making any changes
+            let _ = Command::new("cmd").args(["/c", "mkdir", "C:\\OSwitch_BCD_Backup"]).output().await;
+            let _ = Command::new("bcdedit").args(["/export", "C:\\OSwitch_BCD_Backup\\bcd_backup"]).output().await;
 
-        let _ = app.emit("download-telemetry", DownloadTelemetry {
-            mbps: 0.0,
-            downloaded_mb: (target_iso.metadata().map(|m| m.len()).unwrap_or(0) as f64) / (1024.0 * 1024.0),
-            total_mb: (target_iso.metadata().map(|m| m.len()).unwrap_or(0) as f64) / (1024.0 * 1024.0),
-            pct: 100,
-            chunks: vec![100; 8],
-            sha256: "".into(),
-            is_accelerated: true,
-            eta_seconds: 0,
-            stage: "Stage 4: Injecting UEFI Bootloader & BCD Entry...".into(),
-            stage_index: 4,
-        });
-        let _ = app.emit("install-progress", InstallProgress { i: 2, text: "⚙️ Stage 4: Configuring Windows BCD Dual-Boot Menu...".into(), total: 3, done: false });
-
-        let display_name = match id.as_str() {
-            "blackarch" => "BlackArch Linux",
-            "kali" => "Kali Linux",
-            "ubuntu" => "Ubuntu Desktop",
-            "arch" => "Arch Linux",
-            "fedora" => "Fedora Workstation",
-            "debian" => "Debian GNU/Linux",
-            _ => id.as_str(),
-        };
-
-        let ps_script = format!(
-            "$id = '{}';\n\
-            $name = '{}';\n\
-            $isoName = \"$id.iso\";\n\
-            mountvol S: /S 2>$null;\n\
-            if (Test-Path 'S:\\') {{\n\
-                New-Item -ItemType Directory -Force -Path 'S:\\EFI\\OSwitch' | Out-Null;\n\
-                $grubCfg = @\"\n\
+            let ps_script = format!(
+                "$id = '{}';\n\
+                $name = '{}';\n\
+                $isoName = \"$id.iso\";\n\
+                mountvol S: /S 2>$null;\n\
+                if (Test-Path 'S:\\') {{\n\
+                    New-Item -ItemType Directory -Force -Path 'S:\\EFI\\OSwitch' | Out-Null;\n\
+                    $grubCfg = @\"\n\
 set timeout=10\n\
 set default=0\n\
 insmod gpt\n\
@@ -715,25 +692,70 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
     initrd (loop)/casper/initrd\n\
 }}\n\
 \"@;\n\
-                Set-Content -Path 'S:\\EFI\\OSwitch\\grub.cfg' -Value $grubCfg -Force;\n\
-                if (Test-Path 'S:\\EFI\\Boot\\bootx64.efi') {{\n\
-                    Copy-Item -Path 'S:\\EFI\\Boot\\bootx64.efi' -Destination 'S:\\EFI\\OSwitch\\bootx64.efi' -Force;\n\
+                    Set-Content -Path 'S:\\EFI\\OSwitch\\grub.cfg' -Value $grubCfg -Force;\n\
+                    if (Test-Path 'S:\\EFI\\Boot\\bootx64.efi') {{\n\
+                        Copy-Item -Path 'S:\\EFI\\Boot\\bootx64.efi' -Destination 'S:\\EFI\\OSwitch\\bootx64.efi' -Force;\n\
+                    }}\n\
+                    mountvol S: /D 2>$null;\n\
                 }}\n\
-                mountvol S: /D 2>$null;\n\
-            }}\n\
-            $osTitle = \"OSwitch - $name (Bare-Metal)\";\n\
-            $out = bcdedit /create /d \"$osTitle\" /application bootapp;\n\
-            if ($out -match '\\{{([^}}]+)\\}}') {{\n\
-                $guid = \"{{$($matches[1])}}\";\n\
-                bcdedit /set $guid device boot;\n\
-                bcdedit /set $guid path \\EFI\\OSwitch\\bootx64.efi;\n\
-                bcdedit /displayorder $guid /addlast;\n\
-                bcdedit /timeout 10;\n\
-            }}",
-            id, display_name
-        );
+                $osTitle = \"OSwitch - $name (Bare-Metal)\";\n\
+                $out = bcdedit /create /d \"$osTitle\" /application bootapp;\n\
+                if ($out -match '\\{{([^}}]+)\\}}') {{\n\
+                    $guid = \"{{$($matches[1])}}\";\n\
+                    bcdedit /set $guid device boot;\n\
+                    bcdedit /set $guid path \\EFI\\OSwitch\\bootx64.efi;\n\
+                    bcdedit /displayorder $guid /addlast;\n\
+                    bcdedit /timeout 10;\n\
+                }}",
+                id, display_name
+            );
 
-        let _ = Command::new("powershell").args(["-Command", &ps_script]).output().await;
+            let _ = Command::new("powershell").args(["-Command", &ps_script]).output().await;
+        } else {
+            // Linux Dual-Boot configuration (systemd-boot and GRUB)
+            let work_dir = get_oswitch_dir();
+            let _ = tokio::fs::create_dir_all(&work_dir).await;
+            let target_iso = work_dir.join(format!("{}.iso", id));
+            if iso_path.exists() && target_iso != iso_path {
+                let _ = tokio::fs::copy(&iso_path, &target_iso).await;
+            }
+
+            // 1. Check systemd-boot (/boot/loader/entries)
+            if std::path::Path::new("/boot/loader/entries").exists() {
+                let _ = Command::new("mkdir").args(["-p", "/mnt/iso", "/boot/blackarch"]).output().await;
+                let _ = Command::new("mount").args(["-o", "loop", &target_iso.to_string_lossy(), "/mnt/iso"]).output().await;
+                let _ = Command::new("cp").args(["/mnt/iso/blackarch/boot/x86_64/vmlinuz-linux", "/boot/blackarch/"]).output().await;
+                let _ = Command::new("cp").args(["/mnt/iso/blackarch/boot/x86_64/initramfs-linux.img", "/boot/blackarch/"]).output().await;
+                let _ = Command::new("umount").arg("/mnt/iso").output().await;
+
+                let entry_content = format!(
+                    "title   BlackArch Linux (75GB Dedicated)\n\
+                    linux   /blackarch/vmlinuz-linux\n\
+                    initrd  /blackarch/initramfs-linux.img\n\
+                    options archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize=75G\n",
+                    target_iso.display()
+                );
+                let _ = tokio::fs::write("/boot/loader/entries/blackarch.conf", entry_content).await;
+            }
+
+            // 2. Also inject GRUB custom if GRUB exists
+            if std::path::Path::new("/etc/grub.d").exists() {
+                let grub_entry = format!(
+                    "\nmenuentry 'OSwitch - {} (75GB Bare-Metal)' {{\n\
+                        search --no-floppy --file --set=root {}\n\
+                        loopback loop {}\n\
+                        linux (loop)/blackarch/boot/x86_64/vmlinuz-linux archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize=75G\n\
+                        initrd (loop)/blackarch/boot/x86_64/initramfs-linux.img\n\
+                    }}\n",
+                    display_name, target_iso.display(), target_iso.display(), target_iso.display()
+                );
+                let mut f = tokio::fs::OpenOptions::new().write(true).append(true).open("/etc/grub.d/40_custom").await;
+                if let Ok(mut file) = f {
+                    let _ = file.write_all(grub_entry.as_bytes()).await;
+                }
+                let _ = Command::new("grub-mkconfig").args(["-o", "/boot/grub/grub.cfg"]).output().await;
+            }
+        }
 
         let _ = app.emit("download-telemetry", DownloadTelemetry {
             mbps: 0.0,
