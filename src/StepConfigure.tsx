@@ -14,11 +14,11 @@ export default function StepConfigure({
   setBackupEnabled,
   perms,
   setPerms,
-  userName = "archer",
+  userName = "subbu",
   setUserName,
-  userPassword = "password123",
+  userPassword = "3333",
   setUserPassword,
-  hostName = "oswitch-pc",
+  hostName = "subbareddy",
   setHostName
 }: { 
   onNext: () => void, 

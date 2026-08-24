@@ -677,9 +677,9 @@ pub async fn install_os(
             _ => id.as_str(),
         };
 
-        let user = username.unwrap_or_else(|| "archer".into());
-        let _pass = password.unwrap_or_else(|| "oswitch123".into());
-        let host = hostname.unwrap_or_else(|| "oswitch-node".into());
+        let user = username.unwrap_or_else(|| "subbu".into());
+        let _pass = password.unwrap_or_else(|| "3333".into());
+        let host = hostname.unwrap_or_else(|| "subbareddy".into());
         let allocated_space = os_space.unwrap_or(75);
 
         let work_dir = get_oswitch_dir();
