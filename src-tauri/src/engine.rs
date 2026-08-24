@@ -6,7 +6,33 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::path::{Path, PathBuf};
 use sysinfo::System;
 use futures_util::StreamExt;
-use wmi::{COMLibrary, WMIConnection};
+
+fn check_virtualization() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(com_con) = wmi::COMLibrary::new() {
+            if let Ok(wmi_con) = wmi::WMIConnection::new(com_con) {
+                let res: Result<Vec<std::collections::HashMap<String, wmi::Variant>>, _> = wmi_con.raw_query("SELECT VirtualizationFirmwareEnabled FROM Win32_Processor");
+                if let Ok(info) = res {
+                    if let Some(first) = info.first() {
+                        if let Some(wmi::Variant::Bool(v)) = first.get("VirtualizationFirmwareEnabled") {
+                            return *v;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+            return cpuinfo.contains("vmx") || cpuinfo.contains("svm");
+        }
+    }
+
+    true
+}
 
 #[derive(Serialize)]
 pub struct SysInfo {
@@ -103,22 +129,8 @@ pub async fn get_sys_info() -> Result<SysInfo, String> {
     let cpu = sys.cpus().first().map(|c| c.brand().to_string()).unwrap_or_else(|| "Unknown CPU".into());
     let ram_gb = (sys.total_memory() as f32) / (1024.0 * 1024.0 * 1024.0);
     
-    let os = "Windows 11".to_string();
-    
-    // Virtualization check via WMI
-    let mut virtualization = true; 
-    if let Ok(com_con) = COMLibrary::new() {
-        if let Ok(wmi_con) = WMIConnection::new(com_con) {
-            let res: Result<Vec<std::collections::HashMap<String, wmi::Variant>>, _> = wmi_con.raw_query("SELECT VirtualizationFirmwareEnabled FROM Win32_Processor");
-            if let Ok(info) = res {
-                if let Some(first) = info.first() {
-                    if let Some(wmi::Variant::Bool(v)) = first.get("VirtualizationFirmwareEnabled") {
-                        virtualization = *v;
-                    }
-                }
-            }
-        }
-    }
+    let os = if cfg!(target_os = "windows") { "Windows 11".to_string() } else { "Linux".to_string() };
+    let virtualization = check_virtualization();
     
     // Safely check C: drive space
     let mut disk_free_gb = 0.0;
@@ -897,19 +909,7 @@ pub async fn run_safety_check() -> Result<SafetyReport, String> {
     }
     
     // 3. Check Virtualization
-    let mut virtualization_enabled = true; 
-    if let Ok(com_con) = COMLibrary::new() {
-        if let Ok(wmi_con) = WMIConnection::new(com_con) {
-            let res: Result<Vec<std::collections::HashMap<String, wmi::Variant>>, _> = wmi_con.raw_query("SELECT VirtualizationFirmwareEnabled FROM Win32_Processor");
-            if let Ok(info) = res {
-                if let Some(first) = info.first() {
-                    if let Some(wmi::Variant::Bool(v)) = first.get("VirtualizationFirmwareEnabled") {
-                        virtualization_enabled = *v;
-                    }
-                }
-            }
-        }
-    }
+    let virtualization_enabled = check_virtualization();
     
     Ok(SafetyReport {
         is_admin,
