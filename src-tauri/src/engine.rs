@@ -172,7 +172,7 @@ pub async fn get_drives() -> Result<String, String> {
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: String, _os_space: Option<u32>, _frugal_kernel: Option<String>, _frugal_initrd: Option<String>, _frugal_append: Option<String>) -> Result<String, String> {
+pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: String, os_space: Option<u32>, _frugal_kernel: Option<String>, _frugal_initrd: Option<String>, _frugal_append: Option<String>) -> Result<String, String> {
     // Global Validations for Edge Cases
     if id.to_lowercase().contains("macos") && iso_url.starts_with("http") {
         return Err("ISO_DOWNLOAD_FAILED: Automated download of macOS is disabled due to Apple's EULA. Please provide a local ISO file.".into());
@@ -483,6 +483,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             let vm_name = format!("OSwitch-{}-VM", id);
             let vdi_path = temp_dir.join(format!("OSwitch_{}.vdi", id));
             let ostype = if id.contains("win") { "Windows10_64" } else { "Linux26_64" };
+            let disk_size_mb = os_space.unwrap_or(30) * 1024;
             
             let ps_script = format!(
                 "$vbox = 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe';\n\
@@ -498,11 +499,11 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
                 & $vbox createvm --name $vm --ostype '{}' --register;\n\
                 & $vbox modifyvm $vm --memory 4096 --cpus 2 --vram 128;\n\
                 & $vbox storagectl $vm --name 'SATA' --add sata --controller IntelAhci;\n\
-                & $vbox createmedium disk --filename $vdi --size 30720;\n\
+                & $vbox createmedium disk --filename $vdi --size {};\n\
                 & $vbox storageattach $vm --storagectl 'SATA' --port 0 --device 0 --type hdd --medium $vdi;\n\
                 & $vbox storageattach $vm --storagectl 'SATA' --port 1 --device 0 --type dvddrive --medium $iso;\n\
                 & $vbox startvm $vm;",
-                vm_name, vdi_path.display(), iso_path.display(), ostype
+                vm_name, vdi_path.display(), iso_path.display(), ostype, disk_size_mb
             );
             let _ = Command::new("powershell").args(["-Command", &ps_script]).output().await;
 
