@@ -1,13 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export default function StepManageOS({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
-  const [installedOSList, setInstalledOSList] = useState([
-    { id: "windows", name: "Windows 11 Pro", type: "Primary Host OS (C:\\)", used: "284.5 GB", total: "512.0 GB", glyph: "🪟", status: "Active Host System", isHost: true, partition: "C:\\ (NTFS)" },
-    { id: "ubuntu", name: "Ubuntu 24.04.1 LTS", type: "Dual-Boot (GRUB / EFI Partition)", used: "42.0 GB", total: "100.0 GB", glyph: "🟠", status: "Ready for Dual Boot", isHost: false, partition: "S:\\ (EXT4)" },
-    { id: "kali", name: "Kali Linux 2024.1", type: "VirtualBox VM Environment", used: "35.0 GB", total: "60.0 GB", glyph: "🛡️", status: "Hypervisor Ready", isHost: false, partition: "VirtualDisk (.vdi)" }
-  ]);
+  const [installedOSList, setInstalledOSList] = useState<any[]>([]);
   const [osMessage, setOsMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchOS = async () => {
+      try {
+        const list = await invoke<any[]>("get_installed_os_list");
+        setInstalledOSList(list);
+      } catch(e) {
+        console.error(e);
+      }
+    };
+    fetchOS();
+  }, []);
 
   const handleBootOS = async (osName: string, osId: string) => {
     setOsMessage(`🚀 Initiating 1-Click Boot sequence into ${osName}...`);

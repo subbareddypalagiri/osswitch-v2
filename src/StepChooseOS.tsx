@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 export const OS_LIST = [
   {id:"windows", name:"Windows 11", sub:"Currently installed Microsoft OS", glyph:"🪟", locked:true},
@@ -92,12 +93,16 @@ export default function StepChooseOS({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"install" | "manage">("install");
-  const [installedOSList, setInstalledOSList] = useState([
-    { id: "windows", name: "Windows 11 Pro", type: "Host Operating System (C:\\)", used: "284.5 GB", total: "512.0 GB", glyph: "🪟", status: "Active Primary Host", isHost: true },
-    { id: "ubuntu", name: "Ubuntu 24.04 LTS", type: "Dual-Boot (GRUB / EFI Partition)", used: "42.0 GB", total: "100.0 GB", glyph: "🟠", status: "Ready for Boot", isHost: false },
-    { id: "kali", name: "Kali Linux 2024.1", type: "VirtualBox VM Environment", used: "35.0 GB", total: "60.0 GB", glyph: "🛡️", status: "Ready for VM Launch", isHost: false }
-  ]);
+  const [installedOSList, setInstalledOSList] = useState<any[]>([]);
   const [osMessage, setOsMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab === "manage") {
+      invoke<any[]>("get_installed_os_list")
+        .then(list => setInstalledOSList(list))
+        .catch(e => console.error(e));
+    }
+  }, [activeTab]);
 
   const filteredOS = useMemo(() => {
     const mergedList = catalog.map(catEntry => {
@@ -291,14 +296,14 @@ export default function StepChooseOS({
                     <div className="mt-3 pt-3 border-t border-black/10 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
                       <label className="text-xs text-slate-400 block mb-1">Install Method:</label>
                       <select 
-                        className="bg-black/60 border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white w-full text-sm focus:outline-none focus:border-blue-500"
+                        className="bg-black/60 border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white w-full text-xs font-semibold focus:outline-none focus:border-cyan-500"
                         value={intent}
                         onChange={(e) => handleIntentChange(os.id, e.target.value)}
                       >
-                        <option value="baremetal_grub">Virtual USB (Direct Boot)</option>
-                        <option value="usb_flash">Physical USB</option>
-                        <option value="vbox_vm">VirtualBox VM</option>
-                        <option value="vmware_vm">VMware VM</option>
+                        <option value="vbox_vm">💻 VirtualBox VM (Safe Sandbox in Windows)</option>
+                        <option value="baremetal_grub">🚀 Native Bare-Metal (No USB Needed — 100% Hardware Speed)</option>
+                        <option value="usb_flash">🔌 Physical USB Flash Drive (Rufus Flasher)</option>
+                        <option value="vmware_vm">⚡ VMware Workstation Pro VM</option>
                       </select>
                     </div>
                   )}

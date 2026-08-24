@@ -83,23 +83,7 @@ function App() {
   // 0ms Latency Local Caching Engine
   const [catalog, setCatalog] = useState(() => {
     try {
-      const cached = localStorage.getItem("oswitch_catalog_cache");
-      if (cached) {
-        const cloudData = JSON.parse(cached);
-        const merged = OS_CATALOG.map(entry => {
-          const normalizedId = entry.id.replace("-", "_");
-          const cloud = cloudData[normalizedId] || cloudData[entry.id];
-          if (cloud && typeof cloud === "object") {
-            return {
-              ...entry,
-              isoUrl: (typeof cloud.isoUrl === "string" && cloud.isoUrl.trim() !== "") ? cloud.isoUrl : entry.isoUrl,
-              officialSite: typeof cloud.officialSite === "string" ? cloud.officialSite : entry.officialSite
-            };
-          }
-          return entry;
-        });
-        return merged;
-      }
+      localStorage.removeItem("oswitch_catalog_cache");
     } catch (e) {}
     return OS_CATALOG;
   });

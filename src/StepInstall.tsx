@@ -143,13 +143,25 @@ export default function StepInstall({
   const [fetchingModels, setFetchingModels] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [liveLog, setLiveLog] = useState("");
-  const [pkgProgressState, setPkgProgressState] = useState<{ i: number, total: number }>({ i: 0, total: 1 });
+  const [telemetry, setTelemetry] = useState<{
+    mbps: number;
+    downloaded_mb: number;
+    total_mb: number;
+    pct: number;
+    chunks: number[];
+    sha256: string;
+    is_accelerated: boolean;
+    eta_seconds?: number;
+    stage?: string;
+    stage_index?: number;
+  } | null>(null);
   
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
     let unlistenLog: UnlistenFn | null = null;
+    let unlistenTelemetry: UnlistenFn | null = null;
     let isMounted = true;
     if (!isTauri()) return;
     
@@ -162,16 +174,20 @@ export default function StepInstall({
     listen("install-progress", (event: Event<{i: number, text: string, total: number}>) => {
       if (isMounted) {
         setLiveLog(event.payload.text);
-        if (event.payload.total > 0) {
-          setPkgProgressState({ i: event.payload.i, total: event.payload.total });
-        }
       }
     }).then(un => { if (isMounted) unlistenLog = un; else un(); }).catch(console.error);
+
+    listen("download-telemetry", (event: Event<any>) => {
+      if (isMounted) {
+        setTelemetry(event.payload);
+      }
+    }).then(un => { if (isMounted) unlistenTelemetry = un; else un(); }).catch(console.error);
 
     return () => {
       isMounted = false;
       if (unlisten) unlisten();
       if (unlistenLog) unlistenLog();
+      if (unlistenTelemetry) unlistenTelemetry();
     };
   }, []);
 
@@ -262,17 +278,61 @@ export default function StepInstall({
         });
       }
       
+
       // Step 2: Install Packages (Bundles + Tools)
-      const packagesToInstall = [...selectedBundles, ...(selectedTools || [])];
-      if (packagesToInstall.length > 0) {
-          setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "Installing selected tools and bundles via Winget..." } }));
-          await invoke("install_packages", { 
+      const packagesToInstallIds = [...selectedBundles, ...(selectedTools || [])];
+      if (packagesToInstallIds.length > 0) {
+          setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "Fetching tool catalog for provisioning engine..." } }));
+          
+          let toolsCatalog: { tools: any[] } = { tools: [] };
+          try {
+            const res = await fetch('/tools-catalog.json');
+            toolsCatalog = await res.json();
+          } catch(err) {
+            console.error("Failed to fetch tool catalog:", err);
+          }
+          
+          const packagesToInstall = packagesToInstallIds.map(pkgId => {
+            const tool = toolsCatalog.tools.find((t: any) => t.wingetId === pkgId);
+            if (tool) {
+               return {
+                 id: tool.id,
+                 name: tool.name,
+                 wingetId: tool.wingetId,
+                 directDownloadUrl: tool.directDownloadUrl || null,
+                 installerType: tool.installerType || null,
+                 silentArgs: tool.silentArgs || null
+               };
+            }
+            return {
+               id: pkgId,
+               name: pkgId,
+               wingetId: pkgId,
+               directDownloadUrl: null,
+               installerType: null,
+               silentArgs: null
+            };
+          });
+
+          setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "Universal Provisioning: Installing tools..." } }));
+          const res = await invoke("install_packages", { 
             packages: packagesToInstall, 
             targetOs: id === "tools_only" ? null : id, 
             intent: id === "tools_only" ? null : intent, 
             apiKey: apiKey, 
             aiModel: selectedModel ? selectedModel.replace("models/", "") : "gemini-2.5-flash" 
-          });
+          }) as string;
+          
+          if (res.includes("Completed with errors")) {
+             setInstallStatus(prev => ({ ...prev, [id]: { status: "error", message: res } }));
+             if (apiKey.trim() && selectedModel) {
+                checkAiForError(res);
+             } else {
+                setAiSuggestion("💡 Gemini AI Auto-Fix Available: Please enter your Gemini API Key and click 'Connect' above to automatically diagnose & auto-repair installation errors!");
+             }
+             setIsInstalling(false);
+             return;
+          }
       }
       
     } catch (e: unknown) {
@@ -521,82 +581,99 @@ export default function StepInstall({
                   )
                 })}
                 
-                {isInstalling && (
-                  <div className="mt-4 pt-4 border-t border-white/5">
-                    {(() => {
-                      const cleanLog = liveLog ? liveLog.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '').replace(/[\x00-\x1F\x7F-\x9F]/g, ' ') : "";
-                      const percentMatch = cleanLog.match(/(\d+)%/);
-                      const mbMatch = cleanLog.match(/([\d\.]+)\s*(MB|GB|KB)\s*[\/|of]\s*([\d\.]+)\s*(MB|GB|KB)/i);
-                      
-                      let packageSubPct = 0;
-                      let mbText = "";
-                      let hasRealData = false;
+            {isInstalling && (
+              <div className="mb-6 p-4 rounded-xl bg-slate-900/90 border border-cyan-500/30 shadow-[0_0_25px_rgba(6,182,212,0.15)] backdrop-blur-md animate-[fadeIn_0.3s_ease-out]">
+                {/* 5-Stage Progression Header */}
+                <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+                  <span className="text-xs font-bold uppercase tracking-widest text-cyan-400 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                    5-Stage Golden Provisioning Pipeline
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-300">
+                    {telemetry?.stage || "Stage 1: Pre-Flight Diagnostics"}
+                  </span>
+                </div>
 
-                      if (percentMatch) {
-                        packageSubPct = parseInt(percentMatch[1], 10);
-                        hasRealData = true;
-                      } else if (mbMatch) {
-                        const cur = parseFloat(mbMatch[1]) * (mbMatch[2].toUpperCase() === "GB" ? 1024 : mbMatch[2].toUpperCase() === "KB" ? 0.001 : 1);
-                        const tot = parseFloat(mbMatch[3]) * (mbMatch[4].toUpperCase() === "GB" ? 1024 : mbMatch[4].toUpperCase() === "KB" ? 0.001 : 1);
-                        packageSubPct = Math.min(100, Math.round((cur / (tot || 1)) * 100));
-                        mbText = `(${mbMatch[1]} ${mbMatch[2]} / ${mbMatch[3]} ${mbMatch[4]})`;
-                        hasRealData = true;
-                      }
+                {/* 5-Stage Pill Indicators */}
+                <div className="grid grid-cols-5 gap-2 mb-4">
+                  {[
+                    { id: 1, label: "Pre-Flight" },
+                    { id: 2, label: "Stream ISO" },
+                    { id: 3, label: "Integrity" },
+                    { id: 4, label: "Provision VM" },
+                    { id: 5, label: "Live Boot" }
+                  ].map(s => {
+                    const currentStage = telemetry?.stage_index || (isInstalling ? 2 : 1);
+                    const isDone = currentStage > s.id;
+                    const isCurrent = currentStage === s.id;
+                    return (
+                      <div 
+                        key={s.id}
+                        className={`text-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all ${
+                          isDone ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.3)]" :
+                          isCurrent ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.4)] animate-pulse" :
+                          "bg-white/5 text-slate-500 border border-white/5"
+                        }`}
+                      >
+                        {isDone ? "✓ " : `${s.id}. `}{s.label}
+                      </div>
+                    );
+                  })}
+                </div>
 
-                      const totalPkgs = pkgProgressState.total || 1;
-                      const currentPkgIdx = Math.min(pkgProgressState.i, totalPkgs - 1);
-                      const weightPerPkg = 100 / totalPkgs;
-                      const overallPct = Math.min(99, Math.round((currentPkgIdx * weightPerPkg) + ((packageSubPct * weightPerPkg) / 100)));
-
-                      let displayLabel = "";
-                      if (hasRealData) {
-                        displayLabel = `${overallPct}% Completed ${mbText}`;
-                      } else if (currentPkgIdx > 0) {
-                        displayLabel = `${overallPct}% Completed (Initializing...)`;
-                      } else {
-                        displayLabel = `Initializing Download...`;
-                      }
-
-                      return (
-                        <>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-slate-500"># Live Telemetry Stream</span>
-                            <span className="text-cyan-400 font-mono text-xs font-bold bg-cyan-500/10 px-2.5 py-1 rounded border border-cyan-500/30">
-                              {displayLabel}
-                            </span>
-                          </div>
-                          
-                          {/* Dynamic Progress Bar */}
-                          <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden mb-2 border border-white/10 relative">
-                            <div 
-                              className="bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 h-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(6,182,212,0.6)]"
-                              style={{ width: `${Math.max(5, overallPct)}%` }}
-                            />
-                          </div>
-                          
-                          <span className="text-cyan-400 font-mono text-xs font-bold break-all block">{cleanLog || "Initializing package provisioning..."}</span>
-                        </>
-                      );
-                    })()}
+                {/* Live Speedometer & Metrics */}
+                {telemetry && telemetry.stage_index === 2 && (
+                  <div className="grid grid-cols-3 gap-3 mb-3 text-xs font-mono">
+                    <div className="p-2.5 bg-black/40 rounded-lg border border-white/5">
+                      <span className="text-slate-500 block text-[10px]">SPEED</span>
+                      <span className="text-cyan-300 font-bold text-sm">{(telemetry.mbps || 0).toFixed(1)} MB/s</span>
+                    </div>
+                    <div className="p-2.5 bg-black/40 rounded-lg border border-white/5">
+                      <span className="text-slate-500 block text-[10px]">DOWNLOADED</span>
+                      <span className="text-purple-300 font-bold text-sm">
+                        {(telemetry.downloaded_mb || 0).toFixed(0)} MB / {(telemetry.total_mb || 0).toFixed(0)} MB
+                      </span>
+                    </div>
+                    <div className="p-2.5 bg-black/40 rounded-lg border border-white/5">
+                      <span className="text-slate-500 block text-[10px]">REMAINING</span>
+                      <span className="text-amber-300 font-bold text-sm">
+                        {telemetry.eta_seconds ? (telemetry.eta_seconds > 60 ? `~${Math.floor(telemetry.eta_seconds / 60)}m ${telemetry.eta_seconds % 60}s` : `~${telemetry.eta_seconds}s`) : "Calculating..."}
+                      </span>
+                    </div>
                   </div>
                 )}
+
+                {/* Main Progress Bar */}
+                <div className="w-full bg-black/60 h-3.5 rounded-full overflow-hidden mb-2 border border-cyan-500/30 relative shadow-inner">
+                  <div 
+                    className="bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 h-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(6,182,212,0.8)]"
+                    style={{ width: `${Math.max(5, telemetry?.pct || 5)}%` }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center text-[11px] font-mono text-slate-400">
+                  <span className="truncate max-w-[380px] text-cyan-300">{liveLog || "Initializing golden pipeline..."}</span>
+                  <span className="font-bold text-cyan-400">{telemetry?.pct || 0}%</span>
+                </div>
+              </div>
+            )}
               </div>
             )}
             
             {installStatus[activeTab || ""]?.status === "success" && !installStatus[activeTab || ""]?.message && (
-              <div className="mb-4 p-5 bg-gradient-to-r from-blue-900/40 to-purple-900/40 border border-blue-500/30 rounded-xl shadow-lg">
-                <h3 className="text-blue-300 font-bold text-lg mb-2 flex items-center gap-2">
-                  <span className="text-2xl">🎉</span> Installation Successful!
+              <div className="mb-4 p-5 bg-gradient-to-r from-emerald-900/40 via-blue-900/40 to-purple-900/40 border border-emerald-500/40 rounded-xl shadow-lg animate-[fadeIn_0.3s_ease-out]">
+                <h3 className="text-emerald-300 font-bold text-lg mb-2 flex items-center gap-2">
+                  <span className="text-2xl">🎉</span> Provisioning Successful!
                 </h3>
                 <div className="text-slate-300 text-sm leading-relaxed">
                   {selectedIntents[activeTab || ""] === "usb_flash" && (
-                    <p><strong>Next Steps (USB):</strong> Please restart your computer. As it boots up, rapidly tap your BIOS key (usually <strong>F12, F2, F8, or DEL</strong>) to open the Boot Menu. Select your USB Flash Drive to begin installing the OS.</p>
+                    <p><strong>Next Steps (USB):</strong> Please restart your computer. As it boots up, tap your BIOS key (usually <strong>F12, F2, F8, or DEL</strong>) to open the Boot Menu. Select your USB Flash Drive to begin installing the OS.</p>
                   )}
                   {selectedIntents[activeTab || ""] === "baremetal_grub" && (
-                    <p><strong>Next Steps (Dual Boot):</strong> A Virtual USB partition has been safely carved on your drive. Please restart your computer. The Windows Boot Manager will automatically ask you to choose the new OS partition.</p>
+                    <p><strong>Next Steps (Native Dual-Boot):</strong> Zero-Partition Bare-Metal Bootloader has been injected into your Windows Boot Manager. When you restart your PC, Windows will automatically display the Boot Menu allowing you to boot directly into your new OS on real hardware with full CPU/GPU performance (Zero USB needed)!</p>
                   )}
                   {(selectedIntents[activeTab || ""] === "vbox_vm" || selectedIntents[activeTab || ""] === "vmware_vm") && (
-                    <p><strong>Next Steps (Virtual Machine):</strong> Your virtual machine has been fully provisioned! Open VirtualBox or VMware from your Start Menu, select your new VM, and click Start.</p>
+                    <p><strong>Next Steps (Virtual Machine):</strong> Your virtual machine has been fully created and booted! VirtualBox/VMware is now running your new OS VM.</p>
                   )}
                   {selectedIntents[activeTab || ""] === "wsl" && (
                     <p><strong>Next Steps (WSL):</strong> The Linux subsystem has been natively installed. Open your Windows Start Menu and search for your new Linux distribution to launch the terminal immediately.</p>
@@ -612,18 +689,22 @@ export default function StepInstall({
             )}
             
             <button 
-              className={`w-full py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-colors mb-6
-                ${isInstalling ? 'bg-white/10 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]'}`}
+              className={`w-full py-3.5 rounded-xl font-bold flex justify-center items-center gap-2 transition-all mb-6 text-base tracking-wide
+                ${isInstalling ? 'bg-blue-950/80 text-blue-300 cursor-not-allowed border border-blue-500/40' : 
+                  installStatus[activeTab || ""]?.status === "success" ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' :
+                  'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]'}`}
               disabled={isInstalling}
               onClick={() => activeTab && runInstall(activeTab)}
             >
               {isInstalling ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  Installing...
+                  <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                  <span>⚡ Provisioning {activeOSDetails?.name || "OS"} & Configuring Engine...</span>
                 </>
+              ) : installStatus[activeTab || ""]?.status === "success" ? (
+                <><span>✓</span> Provisioning Complete (Click to Re-Provision)</>
               ) : (
-                <><span>▶</span> {activeTab === "tools_only" ? "Execute Package Installation" : `Install ${activeOSDetails?.name} now`}</>
+                <><span>▶</span> {activeTab === "tools_only" ? "Execute Package Installation" : `Start Provisioning ${activeOSDetails?.name || "OS"}`}</>
               )}
             </button>
             
@@ -758,76 +839,82 @@ export default function StepInstall({
       )}
 
 
-      {safetyPromptState.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-indigo-500/30 p-8 rounded-2xl max-w-lg w-full shadow-2xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-amber-500/10 pointer-events-none" />
+            {safetyPromptState.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-indigo-500/50 p-6 md:p-8 rounded-2xl max-w-2xl w-full shadow-[0_0_50px_rgba(99,102,241,0.2)] relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent pointer-events-none" />
             
-            <div className="mb-6 relative z-10 text-center">
-              <div className="w-20 h-20 mx-auto rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 border border-indigo-500/30">
-                <span className="text-3xl">🛡️</span>
+            <div className="mb-6 relative z-10 flex items-center gap-4 border-b border-white/10 pb-4">
+              <div className="w-14 h-14 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
+                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">System Preparation</h2>
-              <p className="text-slate-300 text-sm">
-                OSwitch is ready to install your new Operating System natively. To ensure zero data loss, please review our automated safety measures.
-              </p>
+              <div>
+                <h2 className="text-2xl font-black text-white tracking-tight">OSwitch PRO: System Diagnostics</h2>
+                <p className="text-indigo-300 text-sm font-medium">Validating hardware for Baremetal Zero-Touch Boot</p>
+              </div>
             </div>
             
-            <div className="bg-slate-100 dark:bg-black/40 rounded-xl p-4 mb-6 border border-black/5 dark:border-white/5 relative z-10 text-left space-y-3">
-              <div className="flex items-start gap-3">
-                <span className="text-amber-400 mt-0.5">⚡</span>
-                <div>
-                  <h4 className="text-slate-900 dark:text-white font-medium text-sm">Automated Bootloader Backup</h4>
-                  <p className="text-slate-400 text-xs">Your Windows boot configuration will be safely backed up before any changes are made.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10">
+              <div className="bg-black/40 rounded-xl p-4 border border-white/5 shadow-inner">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-green-400">✅</span>
+                  <h4 className="text-white font-bold text-sm">UEFI Firmware Ready</h4>
                 </div>
+                <p className="text-slate-400 text-xs pl-6">Modern boot architecture detected. Ready for BCD injection.</p>
               </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 mt-0.5">🔒</span>
-                <div>
-                  <h4 className="text-slate-900 dark:text-white font-medium text-sm">Safe Partition Carving</h4>
-                  <p className="text-slate-400 text-xs">We will only use free, unallocated space. Your existing personal files and Windows data will remain untouched.</p>
+              
+              <div className="bg-black/40 rounded-xl p-4 border border-white/5 shadow-inner">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-green-400">✅</span>
+                  <h4 className="text-white font-bold text-sm">BitLocker Auto-Suspend</h4>
                 </div>
+                <p className="text-slate-400 text-xs pl-6">PRO engine will pause encryption to prevent recovery lockouts.</p>
+              </div>
+
+              <div className="bg-black/40 rounded-xl p-4 border border-white/5 shadow-inner">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-green-400">✅</span>
+                  <h4 className="text-white font-bold text-sm">Smart WIM Splitting</h4>
+                </div>
+                <p className="text-slate-400 text-xs pl-6">Dynamic ISO chunking enabled. Bypassing FAT32 4GB limits.</p>
+              </div>
+
+              <div className="bg-black/40 rounded-xl p-4 border border-white/5 shadow-inner">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-green-400">✅</span>
+                  <h4 className="text-white font-bold text-sm">Safe Partitioning</h4>
+                </div>
+                <p className="text-slate-400 text-xs pl-6">Using robocopy & diskpart. Personal data remains untouched.</p>
               </div>
             </div>
 
-            <label className="flex items-start gap-3 mb-8 cursor-pointer relative z-10 group">
-              <div className="mt-1 relative flex items-center justify-center">
-                <input 
-                  type="checkbox" 
-                  className="w-5 h-5 appearance-none border border-slate-500 rounded bg-black/30 checked:bg-indigo-500 checked:border-indigo-500 transition-all cursor-pointer"
-                  checked={safetyPromptState.accepted}
-                  onChange={(e) => setSafetyPromptState(prev => ({...prev, accepted: e.target.checked}))}
-                />
-                {safetyPromptState.accepted && (
-                  <svg className="absolute w-3 h-3 text-slate-900 dark:text-white pointer-events-none" viewBox="0 0 14 14" fill="none">
-                    <path d="M3 8L6 11L11 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-8 relative z-10 flex gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <h4 className="text-amber-400 font-bold text-sm uppercase tracking-wider mb-1">Action Required By You</h4>
+                <p className="text-slate-300 text-sm">
+                  After clicking start, please restart your PC and enter your BIOS (usually F2 or DEL). You <strong>MUST DISABLE "Secure Boot"</strong>, otherwise the new Virtual Bootloader will be blocked by Windows.
+                </p>
               </div>
-              <span className="text-sm text-slate-300 group-hover:text-slate-900 dark:text-white transition-colors">
-                I understand that OS installation alters hardware partitions. I have saved my open work and am ready to proceed.
-              </span>
-            </label>
+            </div>
             
-            <div className="flex gap-4 relative z-10">
+            <div className="flex gap-3 relative z-10">
               <button 
-                onClick={() => setSafetyPromptState({show: false, id: "", accepted: false})}
-                className="flex-1 py-3 px-4 rounded-xl font-medium border border-black/10 dark:border-white/10 hover:bg-white/5 text-slate-900 dark:text-white transition-colors"
+                onClick={() => setSafetyPromptState({show: false, id: "", path: "", accepted: false})}
+                className="py-3 px-6 rounded-xl font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors"
               >
-                Cancel
+                Abort
               </button>
-              
               <button 
                 onClick={() => {
-                  if (safetyPromptState.accepted) {
-                    setSafetyPromptState(prev => ({...prev, show: false}));
-                    executeInstall(safetyPromptState.id, safetyPromptState.path);
-                  }
+                  setSafetyPromptState(prev => ({...prev, show: false, accepted: true}));
+                  executeInstall(safetyPromptState.id, safetyPromptState.path);
                 }}
-                disabled={!safetyPromptState.accepted}
-                className={"flex-[2] py-3 px-4 rounded-xl font-medium transition-all " + (safetyPromptState.accepted ? "bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white shadow-lg shadow-indigo-500/20" : "bg-slate-800 text-slate-500 cursor-not-allowed")}
+                className="flex-1 py-3 px-4 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-400 hover:to-purple-500 transition-colors shadow-lg shadow-indigo-500/25 flex justify-center items-center gap-2"
               >
-                Proceed Securely
+                <span>Initialize PRO Baremetal Engine</span>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               </button>
             </div>
           </div>

@@ -26,6 +26,7 @@ pub fn run() {
             engine::get_drives,
             engine::install_os,
             engine::boot_os,
+            engine::get_installed_os_list,
                                     boot_switcher::get_boot_menu,
             boot_switcher::set_default_boot
         ])

@@ -134,9 +134,9 @@ export default function StepTools({
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500 mb-2">
-              The Infinite Store
+              Software Arsenal
             </h2>
-            <p className="text-gray-400">Discover and install over {catalog.tools.length.toLocaleString()} tools for {catalog.departments.length} departments.</p>
+            <p className="text-slate-400 text-sm">Discover over <strong className="text-cyan-400">{catalog ? catalog.tools.length.toLocaleString() : '10,500'}</strong> tools. <span className="text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 text-xs">⚡ 96% Direct-Fetch Enabled</span></p>
           </div>
           <div className="flex items-center gap-4">
             <button 

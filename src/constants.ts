@@ -29,7 +29,7 @@ export const OS_CATALOG: OSConfig[] = [
   { id: "sles", name: "SUSE Linux Enterprise", category: "Server", isoUrl: "https://www.suse.com/download/sles/" },
   { id: "tails", name: "Tails 6.5", category: "Security", isoUrl: "https://mirrors.wikimedia.org/tails/stable/tails-amd64-6.5/tails-amd64-6.5.iso" },
   { id: "parrot", name: "Parrot Security 6.1", category: "Security", isoUrl: "https://deb.parrot.sh/parrot/iso/6.1/Parrot-security-6.1_amd64.iso" },
-  { id: "blackarch", name: "BlackArch Linux", category: "Security", isoUrl: "https://blackarch.org/blackarch-linux-live-2023.12.01-x86_64.iso" },
+  { id: "blackarch", name: "BlackArch Linux", category: "Security", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso" },
   { id: "win10", name: "Windows 10 Pro", category: "Windows", isoUrl: "https://software.download.prss.microsoft.com/db/Win10_English_x64.iso", locked: true },
   { id: "winserver", name: "Windows Server 2022", category: "Server", isoUrl: "https://go.microsoft.com/fwlink/p/?LinkID=2164993", locked: true },
   { id: "ubuntu-server", name: "Ubuntu Server 24.04", category: "Server", isoUrl: "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-live-server-amd64.iso" },

@@ -1,5 +1,6 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { invoke } from "@tauri-apps/api/core";
 
 export default function StepDiskSpace({ 
   onNext, 
@@ -16,12 +17,22 @@ export default function StepDiskSpace({
 }) {
   const osName = selectedOS.length > 0 ? selectedOS[0].replace(/_/g, " ").toUpperCase() : "NEW OS";
   
-  // Mock total disk size
-  const TOTAL_GB = 500;
+  const [totalGb, setTotalGb] = useState(500);
+
+  useEffect(() => {
+    invoke<any>("get_sys_info")
+      .then((info) => {
+        if (info && info.disk_total_gb) {
+          setTotalGb(Math.round(info.disk_total_gb));
+        }
+      })
+      .catch(console.error);
+  }, []);
+
   const MIN_WINDOWS_GB = 100;
   const MIN_OS_GB = 50;
 
-  const windowsSpace = TOTAL_GB - osSpace;
+  const windowsSpace = totalGb - osSpace;
   const sliderRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
@@ -30,13 +41,13 @@ export default function StepDiskSpace({
     const rect = sliderRef.current.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     
-    let newWindowsSpace = Math.round(percent * TOTAL_GB);
+    let newWindowsSpace = Math.round(percent * totalGb);
     
     // Apply constraints
     if (newWindowsSpace < MIN_WINDOWS_GB) newWindowsSpace = MIN_WINDOWS_GB;
-    if (TOTAL_GB - newWindowsSpace < MIN_OS_GB) newWindowsSpace = TOTAL_GB - MIN_OS_GB;
+    if (totalGb - newWindowsSpace < MIN_OS_GB) newWindowsSpace = totalGb - MIN_OS_GB;
     
-    setOsSpace(TOTAL_GB - newWindowsSpace);
+    setOsSpace(totalGb - newWindowsSpace);
   };
 
   useEffect(() => {
@@ -112,7 +123,7 @@ export default function StepDiskSpace({
             {/* Windows Bar */}
             <motion.div 
               className="h-full bg-gradient-to-r from-slate-800 to-slate-700 flex items-center pl-6"
-              animate={{ width: `${(windowsSpace / TOTAL_GB) * 100}%` }}
+              animate={{ width: `${(windowsSpace / totalGb) * 100}%` }}
               transition={{ type: "spring", bounce: 0, duration: 0.2 }}
             >
               <span className="text-white/30 font-bold text-xl select-none">🪟 Windows</span>
@@ -121,7 +132,7 @@ export default function StepDiskSpace({
             {/* New OS Bar */}
             <motion.div 
               className="h-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-end pr-6 shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]"
-              animate={{ width: `${(osSpace / TOTAL_GB) * 100}%` }}
+              animate={{ width: `${(osSpace / totalGb) * 100}%` }}
               transition={{ type: "spring", bounce: 0, duration: 0.2 }}
             >
               <span className="text-white/80 font-bold text-xl select-none">{osName}</span>
@@ -132,7 +143,7 @@ export default function StepDiskSpace({
               onPointerDown={(e) => { e.stopPropagation(); startDrag(e); }}
               className="absolute top-0 bottom-0 w-4 bg-white hover:bg-blue-100 cursor-ew-resize flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.5)] z-10"
               style={{ transform: "translateX(-50%)" }}
-              animate={{ left: `${(windowsSpace / TOTAL_GB) * 100}%` }}
+              animate={{ left: `${(windowsSpace / totalGb) * 100}%` }}
               transition={{ type: "spring", bounce: 0, duration: 0.2 }}
             >
               <div className="w-1 h-8 bg-slate-300 rounded-full pointer-events-none"></div>
@@ -141,7 +152,7 @@ export default function StepDiskSpace({
           
           <div className="flex justify-between text-xs text-slate-500 mt-3 px-2 font-medium tracking-wide">
             <span>Min: {MIN_WINDOWS_GB} GB</span>
-            <span>Total: {TOTAL_GB} GB</span>
+            <span>Total: {totalGb} GB</span>
             <span>Min: {MIN_OS_GB} GB</span>
           </div>
         </div>
