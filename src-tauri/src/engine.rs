@@ -304,6 +304,8 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         }
     }
     
+    let already_downloaded = iso_path.exists() && std::fs::metadata(&iso_path).map(|m| m.len()).unwrap_or(0) > 100_000_000;
+
     // If iso_url is a local path (doesn't start with http), use it directly
     if !iso_url.starts_with("http") {
         iso_path = PathBuf::from(&iso_url);
@@ -311,6 +313,8 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
             return Err("The provided local ISO file does not exist.".into());
         }
         let _ = app.emit("command-output", Payload { message: format!("Using verified local ISO: {}\n", iso_path.display()) });
+    } else if already_downloaded {
+        let _ = app.emit("command-output", Payload { message: format!("⚡ Found cached verified ISO on SSD: {} (Skipping download!)...\n", iso_path.display()) });
     } else if !iso_url.contains("fake-url") {
         let mirrors = get_mirrors_for_os(&id, &iso_url);
         let mut download_success = false;
