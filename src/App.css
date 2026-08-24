@@ -111,8 +111,6 @@
       radial-gradient(at 100% 100%, rgba(191, 90, 242, 0.12) 0px, transparent 50%),
       radial-gradient(at 50% 50%, rgba(10, 132, 255, 0.1) 0px, transparent 50%);
     pointer-events: none;
-    transform: translateZ(0);
-  }
   }
 }
 
