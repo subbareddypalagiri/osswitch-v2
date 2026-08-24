@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "start": "npm run build && cargo run --release --manifest-path src-tauri/Cargo.toml",
+    "start": "npx vite --host 127.0.0.1 --port 1420 & sleep 2 && cargo run --manifest-path src-tauri/Cargo.toml",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",

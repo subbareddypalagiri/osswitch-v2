@@ -10,6 +10,7 @@ fn greet(name: &str) -> String {
 pub fn run() {
     #[cfg(target_os = "linux")]
     {
+        std::env::set_var("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1");
         std::env::set_var("WEBKIT_FORCE_SANDBOX", "0");
         std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
