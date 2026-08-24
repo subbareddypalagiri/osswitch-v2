@@ -651,15 +651,25 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
     } else if intent == "baremetal_grub" {
         let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Stage 1: Pre-Flight Safety & BCD Backup...".into(), total: 3, done: false });
         
+        let display_name = match id.as_str() {
+            "blackarch" => "BlackArch Linux",
+            "kali" => "Kali Linux",
+            "ubuntu" => "Ubuntu Desktop",
+            "arch" => "Arch Linux",
+            "fedora" => "Fedora Workstation",
+            "debian" => "Debian GNU/Linux",
+            _ => id.as_str(),
+        };
+
+        let work_dir = get_oswitch_dir();
+        let _ = tokio::fs::create_dir_all(&work_dir).await;
+        let target_iso = work_dir.join(format!("{}.iso", id));
+
+        if iso_path.exists() && (!target_iso.exists() || target_iso != iso_path) {
+            let _ = tokio::fs::copy(&iso_path, &target_iso).await;
+        }
+
         if cfg!(target_os = "windows") {
-            let oswitch_dir = std::path::PathBuf::from("C:\\OSwitch");
-            let _ = tokio::fs::create_dir_all(&oswitch_dir).await;
-            let target_iso = oswitch_dir.join(format!("{}.iso", id));
-
-            if iso_path.exists() && (!target_iso.exists() || target_iso != iso_path) {
-                let _ = tokio::fs::copy(&iso_path, &target_iso).await;
-            }
-
             // Backup Windows BCD before making any changes
             let _ = Command::new("cmd").args(["/c", "mkdir", "C:\\OSwitch_BCD_Backup"]).output().await;
             let _ = Command::new("bcdedit").args(["/export", "C:\\OSwitch_BCD_Backup\\bcd_backup"]).output().await;
@@ -713,13 +723,6 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
             let _ = Command::new("powershell").args(["-Command", &ps_script]).output().await;
         } else {
             // Linux Dual-Boot configuration (systemd-boot and GRUB)
-            let work_dir = get_oswitch_dir();
-            let _ = tokio::fs::create_dir_all(&work_dir).await;
-            let target_iso = work_dir.join(format!("{}.iso", id));
-            if iso_path.exists() && target_iso != iso_path {
-                let _ = tokio::fs::copy(&iso_path, &target_iso).await;
-            }
-
             // 1. Check systemd-boot (/boot/loader/entries)
             if std::path::Path::new("/boot/loader/entries").exists() {
                 let _ = Command::new("mkdir").args(["-p", "/mnt/iso", "/boot/blackarch"]).output().await;
