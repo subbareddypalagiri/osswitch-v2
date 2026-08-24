@@ -79,9 +79,9 @@ function App() {
   const [backupEnabled, setBackupEnabled] = useState(true);
   const [perms, setPerms] = useState<boolean[]>([false, false, false, false]);
   const [osSpace, setOsSpace] = useState(100);
-  const [userName, setUserName] = useState("subbu");
-  const [userPassword, setUserPassword] = useState("3333");
-  const [hostName, setHostName] = useState("subbareddy");
+  const [userName, setUserName] = useState("");
+  const [userPassword, setUserPassword] = useState("");
+  const [hostName, setHostName] = useState("");
   
   // 0ms Latency Local Caching Engine
   const [catalog, setCatalog] = useState(() => {
