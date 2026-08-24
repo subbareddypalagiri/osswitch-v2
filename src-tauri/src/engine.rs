@@ -182,6 +182,19 @@ pub async fn get_drives() -> Result<String, String> {
     Ok(drive_strings.join("\n"))
 }
 
+fn get_oswitch_dir() -> PathBuf {
+    if cfg!(target_os = "windows") {
+        let p = PathBuf::from("C:\\OSwitch");
+        let _ = std::fs::create_dir_all(&p);
+        p
+    } else {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/var/tmp".into());
+        let p = PathBuf::from(home).join("OSwitch");
+        let _ = std::fs::create_dir_all(&p);
+        p
+    }
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: String, os_space: Option<u32>, _frugal_kernel: Option<String>, _frugal_initrd: Option<String>, _frugal_append: Option<String>) -> Result<String, String> {
@@ -235,7 +248,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
         return Ok("WSL Installation completed.".into());
     }
 
-    let temp_dir = std::env::temp_dir();
+    let temp_dir = get_oswitch_dir();
     let mut iso_path = temp_dir.join(format!("{}.iso", id));
     
     // Stage 1: Pre-Flight Environment Diagnostics
@@ -345,7 +358,7 @@ pub async fn install_os(app: AppHandle, id: String, intent: String, iso_url: Str
                 }
             };
 
-            let mut writer = tokio::io::BufWriter::with_capacity(16 * 1024 * 1024, file);
+            let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1024, file);
             let mut downloaded: u64 = if is_partial { existing_bytes } else { 0 };
             let mut stream = res.bytes_stream();
             let mut last_reported_pct = 0i32;
