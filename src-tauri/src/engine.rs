@@ -755,12 +755,37 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
                 let _ = Command::new("cp").args(["/mnt/iso/blackarch/boot/x86_64/initramfs-linux.img", "/boot/blackarch/"]).output().await;
                 let _ = Command::new("umount").arg("/mnt/iso").output().await;
 
+                // Write automated first-boot user creation & zero-lock hook
+                let init_script = format!(
+                    "#!/bin/bash\n\
+                    user='{}'\n\
+                    pass='{}'\n\
+                    host='{}'\n\
+                    useradd -m -G wheel,audio,video,storage,network,power -s /bin/zsh \"$user\" 2>/dev/null || true\n\
+                    echo \"$user:$pass\" | chpasswd\n\
+                    echo \"root:$pass\" | chpasswd\n\
+                    mkdir -p /etc/sudoers.d\n\
+                    echo '%wheel ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/99-oswitch\n\
+                    mkdir -p \"/home/$user/Desktop\"\n\
+                    cp -r /etc/skel/Desktop/* \"/home/$user/Desktop/\" 2>/dev/null || true\n\
+                    cp -r /home/liveuser/Desktop/* \"/home/$user/Desktop/\" 2>/dev/null || true\n\
+                    chmod +x /home/$user/Desktop/*.desktop 2>/dev/null || true\n\
+                    chmod 777 /home/*/Desktop/*.desktop 2>/dev/null || true\n\
+                    chown -R \"$user:$user\" \"/home/$user\"\n\
+                    if [ -f /etc/lightdm/lightdm.conf ]; then\n\
+                        sed -i \"s/autologin-user=.*/autologin-user=$user/\" /etc/lightdm/lightdm.conf\n\
+                    fi\n",
+                    user, _pass, host
+                );
+                let _ = tokio::fs::write("/boot/blackarch/oswitch-init.sh", &init_script).await;
+                let _ = Command::new("chmod").args(["+x", "/boot/blackarch/oswitch-init.sh"]).output().await;
+
                 let entry_content = format!(
-                    "title   {} ({}GB Dedicated)\n\
+                    "title   {} ({}GB - {})\n\
                     linux   /blackarch/vmlinuz-linux\n\
                     initrd  /blackarch/initramfs-linux.img\n\
-                    options archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={}\n",
-                    display_name, allocated_space, target_iso.display(), allocated_space, host
+                    options archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={} script=/boot/blackarch/oswitch-init.sh\n",
+                    display_name, allocated_space, user, target_iso.display(), allocated_space, host
                 );
                 let _ = tokio::fs::write("/boot/loader/entries/blackarch.conf", entry_content).await;
             }
@@ -768,13 +793,13 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
             // 2. Also inject GRUB custom if GRUB exists
             if std::path::Path::new("/etc/grub.d").exists() {
                 let grub_entry = format!(
-                    "\nmenuentry 'OSwitch - {} ({}GB Bare-Metal)' {{\n\
+                    "\nmenuentry 'OSwitch - {} ({}GB - {})' {{\n\
                         search --no-floppy --file --set=root {}\n\
                         loopback loop {}\n\
-                        linux (loop)/blackarch/boot/x86_64/vmlinuz-linux archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={}\n\
+                        linux (loop)/blackarch/boot/x86_64/vmlinuz-linux archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={} script=/boot/blackarch/oswitch-init.sh\n\
                         initrd (loop)/blackarch/boot/x86_64/initramfs-linux.img\n\
                     }}\n",
-                    display_name, allocated_space, target_iso.display(), target_iso.display(), target_iso.display(), allocated_space, host
+                    display_name, allocated_space, user, target_iso.display(), target_iso.display(), target_iso.display(), allocated_space, host
                 );
                 let f = tokio::fs::OpenOptions::new().write(true).append(true).open("/etc/grub.d/40_custom").await;
                 if let Ok(mut file) = f {
