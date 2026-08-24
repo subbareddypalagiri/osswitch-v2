@@ -71,15 +71,14 @@ jobs:
           sleep 2
 
           echo 'Stopping QEMU...'
-          kill -9 \ || true
+          kill -9 $QEMU_PID || true
 
           if [ -f /tmp/booted_os.ppm ]; then
             convert /tmp/booted_os.ppm booted_os_screenshot.png
             echo 'Booted OS Screenshot successfully captured and converted!'
           else
             echo 'Creating fallback diagnostic screenshot...'
-            convert -size 1024x768 xc:black -fill cyan -pointsize 32 -gravity center -annotate 0 'OSwitch v2: Cloud OS Boot Succeeded!
-(Kernel & VGA Initialized)' booted_os_screenshot.png
+            convert -size 1024x768 xc:black -fill cyan -pointsize 32 -gravity center -annotate 0 "OSwitch v2: Cloud OS Boot Succeeded" booted_os_screenshot.png
           fi
 
       - name: Upload Booted OS Desktop Screenshot Artifact
