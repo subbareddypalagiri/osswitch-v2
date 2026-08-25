@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Cpu, HardDrive, Layers, ShieldCheck, CheckCircle2, ArrowRight, ArrowLeft, RefreshCw } from "lucide-react";
 
 export default function StepScan({ 
   onNext, 
@@ -35,55 +36,87 @@ export default function StepScan({
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center mt-10">
-      <div className="glass-card max-w-[800px] p-10 w-full animate-[fadeIn_0.5s_ease-out] flex flex-col min-h-[500px]">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
-          <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 2 of 6</span>
+    <div className="w-full h-full flex flex-col items-center pt-8 pb-4">
+      <div className="bg-[#111522]/95 border border-white/10 rounded-3xl max-w-[840px] p-8 w-full animate-[fadeIn_0.3s_ease-out] flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
+        
+        {/* Step Indicator */}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
+          <span className="text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">Step 2 of 7</span>
         </div>
         
-        <h2 className="text-[32px] font-bold mb-8 text-slate-900 dark:text-white tracking-tight hero-title">System Scan</h2>
+        <h2 className="text-2xl font-extrabold text-white tracking-tight mb-1">
+          Hardware & Virtualization Audit
+        </h2>
+        <p className="text-slate-400 text-sm mb-6">
+          Verifying host compute capacity, hypervisor acceleration, and storage partitions.
+        </p>
         
         <div className="flex-grow">
           {error ? (
             <div className="flex flex-col items-center justify-center py-10">
-              <div className="text-red-400 mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-center">
-                <strong>Scan Failed:</strong> {error}
+              <div className="text-red-400 mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-center text-xs font-mono">
+                <strong>Hardware Scan Error:</strong> {error}
               </div>
               <button 
-                className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white font-semibold py-2 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-5 rounded-xl transition-all flex items-center gap-2 text-xs"
                 onClick={fetchSysInfo}
               >
-                Retry Scan
+                <RefreshCw className="w-3.5 h-3.5" /> Retry Scan
               </button>
             </div>
           ) : sysInfo ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl flex flex-col shadow-sm hover:border-slate-300 dark:hover:bg-white/10 transition-colors">
-                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-[1.5px] mb-2 font-bold">CPU</span>
-                <span className="text-xl text-slate-900 dark:text-white font-semibold">{sysInfo.cpu}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              {/* CPU Card */}
+              <div className="bg-white/[0.02] border border-white/10 p-5 rounded-2xl flex flex-col justify-between hover:border-white/20 transition-colors shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+                    <Cpu className="w-4 h-4" />
+                  </div>
+                  <span className="text-slate-400 text-xs font-mono font-semibold uppercase tracking-wider">Processor</span>
+                </div>
+                <span className="text-base text-white font-bold tracking-tight">{sysInfo.cpu}</span>
               </div>
               
-              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl flex flex-col shadow-sm hover:border-slate-300 dark:hover:bg-white/10 transition-colors">
-                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-[1.5px] mb-2 font-bold">RAM</span>
-                <span className="text-xl text-slate-900 dark:text-white font-semibold">{formatBytes(sysInfo.ram_gb * 1024 * 1024 * 1024)}</span>
+              {/* RAM Card */}
+              <div className="bg-white/[0.02] border border-white/10 p-5 rounded-2xl flex flex-col justify-between hover:border-white/20 transition-colors shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <span className="text-slate-400 text-xs font-mono font-semibold uppercase tracking-wider">System Memory</span>
+                </div>
+                <span className="text-base text-white font-bold tracking-tight">{formatBytes(sysInfo.ram_gb * 1024 * 1024 * 1024)}</span>
               </div>
 
-              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl flex flex-col shadow-sm hover:border-slate-300 dark:hover:bg-white/10 transition-colors">
-                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-[1.5px] mb-2 font-bold">Disk Space</span>
-                <span className="text-xl text-slate-900 dark:text-white font-semibold">{formatBytes(sysInfo.disk_free_gb * 1024 * 1024 * 1024)} free</span>
+              {/* Disk Space Card */}
+              <div className="bg-white/[0.02] border border-white/10 p-5 rounded-2xl flex flex-col justify-between hover:border-white/20 transition-colors shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <HardDrive className="w-4 h-4" />
+                  </div>
+                  <span className="text-slate-400 text-xs font-mono font-semibold uppercase tracking-wider">Available Storage</span>
+                </div>
+                <span className="text-base text-white font-bold tracking-tight">{formatBytes(sysInfo.disk_free_gb * 1024 * 1024 * 1024)} Free</span>
               </div>
 
-              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl flex flex-col shadow-sm hover:border-slate-300 dark:hover:bg-white/10 transition-colors">
-                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-[1.5px] mb-2 font-bold">Virtualization</span>
-                <span className="text-xl font-semibold">
+              {/* Virtualization Card */}
+              <div className="bg-white/[0.02] border border-white/10 p-5 rounded-2xl flex flex-col justify-between hover:border-white/20 transition-colors shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <span className="text-slate-400 text-xs font-mono font-semibold uppercase tracking-wider">VT-x / AMD-V Hardware Acceleration</span>
+                </div>
+                <span className="text-base font-bold">
                   {sysInfo.virtualization ? (
-                    <span className="text-blue-500 dark:text-blue-400 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div> Enabled
+                    <span className="text-emerald-400 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" /> Enabled & Ready
                     </span>
                   ) : (
-                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-slate-400"></div> Disabled
+                    <span className="text-amber-400 flex items-center gap-2">
+                      Disabled (Bare-Metal Only)
                     </span>
                   )}
                 </span>
@@ -91,26 +124,26 @@ export default function StepScan({
             </div>
           ) : (
             <div className="flex flex-col justify-center items-center py-20">
-              <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <span className="text-slate-400 text-lg">Scanning hardware...</span>
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+              <span className="text-slate-400 text-xs font-mono">Querying hardware descriptors...</span>
             </div>
           )}
         </div>
 
-        <div className="flex justify-start gap-4 mt-10 pt-4 border-t border-slate-200/50 dark:border-white/5">
+        {/* Footer Navigation */}
+        <div className="flex justify-between items-center pt-4 border-t border-white/10 mt-6">
           <button 
-            className="bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-slate-200 dark:border-white/10"
+            className="bg-white/5 hover:bg-white/10 text-white text-xs font-semibold py-2.5 px-5 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
             onClick={onBack}
           >
-            <span>←</span> Back
+            <ArrowLeft className="w-3.5 h-3.5" /> Back
           </button>
+          
           <button 
-            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 text-white
-              ${sysInfo ? 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-slate-300 dark:bg-white/10 text-slate-500 cursor-not-allowed'}`}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2.5 px-6 rounded-xl transition-all shadow-[0_2px_12px_rgba(59,130,246,0.4)] flex items-center gap-2"
             onClick={onNext}
-            disabled={!sysInfo}
           >
-            Continue <span>→</span>
+            Continue <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

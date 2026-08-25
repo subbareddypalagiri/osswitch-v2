@@ -131,149 +131,154 @@ export default function StepTools({
       </div>
 
       <div className="w-full flex-grow flex flex-col max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        {/* Header Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-3xl md:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-cyan-400 dark:to-purple-500 mb-1">
-              Software Arsenal
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
+              <span className="text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">Step 5 of 7</span>
+            </div>
+            <h2 className="text-2xl font-extrabold text-white tracking-tight">
+              Software & Tool Ecosystem
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">Discover over <strong className="text-blue-600 dark:text-cyan-400">{catalog ? catalog.tools.length.toLocaleString() : '10,500'}</strong> tools. <span className="text-emerald-600 dark:text-green-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 text-xs">⚡ 96% Direct-Fetch Enabled</span></p>
+            <p className="text-slate-400 text-xs mt-0.5">
+              Browse 10,500+ curated tools powered by direct repository mirrors and Microsoft Winget.
+            </p>
           </div>
+
           <div className="flex items-center gap-3">
             <button 
               onClick={onBack}
-              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 font-medium transition-colors"
+              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs border border-white/10 transition-colors"
             >
               Back
             </button>
             <button 
               onClick={onNext}
-              className="px-7 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all"
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-[0_2px_10px_rgba(59,130,246,0.4)] transition-all"
             >
               Next ({selectedTools.length} Selected)
             </button>
           </div>
         </div>
 
-        <div className="flex flex-col xl:flex-row gap-3 mb-6 w-full">
+        {/* Search and Filters Bar */}
+        <div className="flex flex-col xl:flex-row gap-3 mb-5 w-full">
           <div className="flex-grow relative flex gap-2 w-full xl:max-w-2xl">
             <input 
               type="text" 
-              placeholder="Search 10,500+ tools by name, category or Winget ID..." 
+              placeholder="Search 10,500+ tools by name, category, or Winget ID..." 
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="flex-grow bg-white dark:bg-black/40 border border-slate-300 dark:border-white/10 rounded-xl px-5 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors shadow-sm min-w-0"
+              className="flex-grow bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors min-w-0"
             />
             <button
               onClick={handleLiveSearch}
               disabled={isSearchingLive || !search.trim()}
-              className="px-4 py-3 rounded-xl bg-blue-500/10 dark:bg-cyan-500/20 text-blue-600 dark:text-cyan-400 border border-blue-500/30 dark:border-cyan-500/40 hover:bg-blue-500/20 font-bold transition-all disabled:opacity-50 text-xs whitespace-nowrap flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 font-semibold transition-all disabled:opacity-50 text-xs whitespace-nowrap flex items-center gap-1.5"
             >
               {isSearchingLive ? (
                 <>
-                  <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin"></span>
+                  <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin"></span>
                   Searching...
                 </>
               ) : (
-                <>
-                  ⚡ Cloud Search
-                </>
+                "Cloud Search"
               )}
             </button>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3 flex-grow w-full xl:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2.5 flex-grow w-full xl:w-auto">
             <select 
-              className="flex-grow xl:w-64 bg-white dark:bg-black/40 border border-slate-300 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-sm cursor-pointer min-w-0"
+              className="flex-grow xl:w-56 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer min-w-0"
               value={filterDept || ""}
               onChange={(e) => { setFilterDept(e.target.value || null); setPage(1); }}
             >
-              <option value="">All Departments</option>
-              {catalog.departments.map(d => <option key={d} value={d}>{d}</option>)}
+              <option value="" className="bg-[#090b10]">All Departments</option>
+              {catalog.departments.map(d => <option key={d} value={d} className="bg-[#090b10]">{d}</option>)}
             </select>
 
             <select 
-              className="flex-grow xl:w-64 bg-white dark:bg-black/40 border border-slate-300 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-sm cursor-pointer min-w-0"
+              className="flex-grow xl:w-56 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer min-w-0"
               value={filterRole || ""}
               onChange={(e) => { setFilterRole(e.target.value || null); setPage(1); }}
             >
-              <option value="">All Roles</option>
-              {catalog.roles.map(r => <option key={r} value={r}>{r}</option>)}
+              <option value="" className="bg-[#090b10]">All Roles</option>
+              {catalog.roles.map(r => <option key={r} value={r} className="bg-[#090b10]">{r}</option>)}
             </select>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-grow overflow-y-auto pr-2 custom-scrollbar pb-8">
+        {/* Tool Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 flex-grow overflow-y-auto pr-2 custom-scrollbar pb-6">
           {paginatedTools.length === 0 ? (
-            <div className="col-span-full flex items-center justify-center text-slate-400 py-20">
+            <div className="col-span-full flex items-center justify-center text-slate-400 py-16 text-xs font-mono">
               No tools found matching your criteria.
             </div>
           ) : (
             paginatedTools.map(tool => (
               <div 
                 key={tool.id} 
-                className={`relative group bg-white dark:bg-white/5 border ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:bg-white/10'} rounded-2xl p-5 transition-all flex flex-col`}
+                className={`relative group border ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]' : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'} rounded-2xl p-4.5 transition-all flex flex-col justify-between`}
               >
-                <div className="flex items-start gap-3.5 mb-3 cursor-pointer" onClick={() => toggleTool(tool.id, tool.wingetId)}>
-                  <img src={tool.icon} alt={tool.name} className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-white/10" />
-                  <div className="flex-grow min-w-0">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{tool.name}</h3>
-                    <p className="text-xs text-blue-600 dark:text-cyan-400 font-mono mt-0.5 truncate">{tool.department} | {tool.role}</p>
+                <div>
+                  <div className="flex items-start gap-3 mb-2.5 cursor-pointer" onClick={() => toggleTool(tool.id, tool.wingetId)}>
+                    <img src={tool.icon} alt={tool.name} className="w-9 h-9 rounded-xl object-cover border border-white/10 shrink-0" />
+                    <div className="flex-grow min-w-0">
+                      <h3 className="text-sm font-bold text-white leading-tight truncate">{tool.name}</h3>
+                      <p className="text-[11px] text-blue-400 font-mono mt-0.5 truncate">{tool.department} • {tool.role}</p>
+                    </div>
+                    <div className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500 text-white' : 'border-white/20 bg-black/40'}`}>
+                      {selectedTools.includes(tool.wingetId) && (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                      )}
+                    </div>
                   </div>
-                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 dark:border-slate-600'}`}>
-                    {selectedTools.includes(tool.wingetId) && (
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  
+                  {/* Clean Unified Pill Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                    {tool.eligibility === "web_app" ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                        Web App
+                      </span>
+                    ) : tool.eligibility === "vendor_direct" ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                        Vendor Direct
+                      </span>
+                    ) : tool.eligibility === "linux_vm" ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                        Linux / VM
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        Windows 1-Click
+                      </span>
+                    )}
+                    {tool.source && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/5 text-slate-400 border border-white/10">
+                        {tool.source}
+                      </span>
                     )}
                   </div>
-                </div>
-                
-                {/* Source & Eligibility Badges */}
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  {tool.eligibility === "web_app" ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse"></span>
-                      🌐 0-Install WebApp
-                    </span>
-                  ) : tool.eligibility === "vendor_direct" ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
-                      🟣 Vendor Link
-                    </span>
-                  ) : tool.eligibility === "linux_vm" ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/10 text-blue-400 border border-blue-500/30 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                      🔵 Requires Linux OS / VM
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                      🟢 1-Click Windows
-                    </span>
-                  )}
-                  {tool.source && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/5 text-slate-400 border border-white/10">
-                      {tool.source}
-                    </span>
-                  )}
-                </div>
 
-                <p className="text-gray-400 text-sm mb-6 flex-grow">{tool.description}</p>
+                  <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed mb-4">{tool.description}</p>
+                </div>
                 
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-2 border-t border-white/5">
                   {(tool.eligibility === "web_app" || tool.eligibility === "vendor_direct") && tool.vendorUrl ? (
                     <button 
                       onClick={() => openUrl(tool.vendorUrl!)}
-                      className="flex-1 py-2 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 transition-colors text-xs font-bold flex items-center justify-center gap-1"
+                      className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
                     >
-                      🚀 Open Launch URL
+                      Open Link
                     </button>
                   ) : null}
 
                   <button 
                     onClick={() => openAiGuide(tool)}
-                    className="flex-1 py-2 rounded-lg bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 hover:border-purple-500/50 hover:bg-purple-500/10 text-purple-300 transition-colors text-xs font-semibold flex items-center justify-center gap-1"
+                    className="flex-1 py-1.5 rounded-lg bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-300 transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                    How to Use
+                    Quick Guide
                   </button>
                 </div>
               </div>

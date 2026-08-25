@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
+import { ArrowRight, ArrowLeft } from "lucide-react";
 
 export default function StepDiskSpace({ 
   onNext, 
@@ -15,7 +16,7 @@ export default function StepDiskSpace({
   osSpace: number,
   setOsSpace: (val: number) => void
 }) {
-  const osName = selectedOS.length > 0 ? selectedOS[0].replace(/_/g, " ").toUpperCase() : "NEW OS";
+  const osName = selectedOS.length > 0 ? selectedOS[0].replace(/_/g, " ").toUpperCase() : "TARGET OS";
   
   const [totalGb, setTotalGb] = useState(500);
 
@@ -43,7 +44,6 @@ export default function StepDiskSpace({
     
     let newWindowsSpace = Math.round(percent * totalGb);
     
-    // Apply constraints
     if (newWindowsSpace < MIN_WINDOWS_GB) newWindowsSpace = MIN_WINDOWS_GB;
     if (totalGb - newWindowsSpace < MIN_OS_GB) newWindowsSpace = totalGb - MIN_OS_GB;
     
@@ -71,7 +71,6 @@ export default function StepDiskSpace({
     isDragging.current = true;
     handleDrag(e.clientX);
     
-    // Using native DOM events on document for smoother global dragging
     const onPointerMove = (ev: PointerEvent) => {
       if (!isDragging.current) return;
       handleDrag(ev.clientX);
@@ -87,88 +86,92 @@ export default function StepDiskSpace({
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center mt-10">
-      <div className="glass-card max-w-[800px] p-10 w-full animate-[fadeIn_0.5s_ease-out]">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
-          <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 3 of 8</span>
+    <div className="w-full h-full flex flex-col items-center pt-8 pb-4">
+      <div className="bg-[#111522]/95 border border-white/10 rounded-3xl max-w-[840px] p-8 w-full animate-[fadeIn_0.3s_ease-out] shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
+        
+        {/* Step Indicator */}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
+          <span className="text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">Step 4 of 7</span>
         </div>
         
-        <h2 className="text-[32px] font-bold text-slate-900 dark:text-white tracking-tight mb-2">
-          Intelligent <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Partitioning</span>
+        <h2 className="text-2xl font-extrabold text-white tracking-tight mb-1">
+          Non-Destructive Storage Allocation
         </h2>
-        <p className="text-slate-400 mb-10 text-lg">
-          Drag the slider to allocate disk space. OSwitch will safely shrink your Windows drive without deleting your files.
+        <p className="text-slate-400 text-sm mb-8">
+          Adjust the visual slider to dynamically slice partition boundaries. Host files remain 100% untouched.
         </p>
 
-        {/* The Apple-Tier Slider Visualization */}
-        <div className="mb-16">
-          <div className="flex justify-between text-slate-900 dark:text-white font-bold text-2xl mb-4 px-2">
+        {/* Partition Size Readout */}
+        <div className="mb-10">
+          <div className="flex justify-between text-white font-bold text-xl mb-3 px-1">
             <div className="flex flex-col">
-              <span className="text-slate-400 text-sm font-normal uppercase tracking-wider mb-1">Windows C:</span>
-              <span>{windowsSpace} GB</span>
+              <span className="text-slate-400 text-xs font-mono font-semibold uppercase tracking-wider mb-0.5">Host Windows C:</span>
+              <span className="text-white font-bold">{windowsSpace} GB</span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-blue-400 text-sm font-normal uppercase tracking-wider mb-1">{osName}</span>
-              <span className="text-blue-400">{osSpace} GB</span>
+              <span className="text-blue-400 text-xs font-mono font-semibold uppercase tracking-wider mb-0.5">{osName}</span>
+              <span className="text-blue-400 font-bold">{osSpace} GB</span>
             </div>
           </div>
 
+          {/* Interactive Partition Slider */}
           <div 
             ref={sliderRef}
-            className="relative w-full h-24 bg-[#141419] rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden flex shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)]"
+            className="relative w-full h-20 bg-[#090b10] rounded-2xl border border-white/10 overflow-hidden flex shadow-inner cursor-ew-resize"
             onPointerDown={(e) => handleDrag(e.clientX)}
             style={{ touchAction: "none" }}
           >
             {/* Windows Bar */}
             <motion.div 
-              className="h-full bg-gradient-to-r from-slate-800 to-slate-700 flex items-center pl-6"
+              className="h-full bg-gradient-to-r from-slate-800 to-slate-700 flex items-center pl-5 select-none"
               animate={{ width: `${(windowsSpace / totalGb) * 100}%` }}
-              transition={{ type: "spring", bounce: 0, duration: 0.2 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.15 }}
             >
-              <span className="text-white/30 font-bold text-xl select-none">🪟 Windows</span>
+              <span className="text-white/60 font-semibold text-sm">Windows C: ({windowsSpace} GB)</span>
             </motion.div>
             
             {/* New OS Bar */}
             <motion.div 
-              className="h-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-end pr-6 shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]"
+              className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-end pr-5 select-none"
               animate={{ width: `${(osSpace / totalGb) * 100}%` }}
-              transition={{ type: "spring", bounce: 0, duration: 0.2 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.15 }}
             >
-              <span className="text-white/80 font-bold text-xl select-none">{osName}</span>
+              <span className="text-white font-semibold text-sm">{osName} ({osSpace} GB)</span>
             </motion.div>
 
-            {/* The Draggable Handle */}
+            {/* Draggable Handle */}
             <motion.div 
               onPointerDown={(e) => { e.stopPropagation(); startDrag(e); }}
-              className="absolute top-0 bottom-0 w-4 bg-white hover:bg-blue-100 cursor-ew-resize flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.5)] z-10"
+              className="absolute top-0 bottom-0 w-3.5 bg-white hover:bg-blue-100 cursor-ew-resize flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.6)] z-10 rounded-sm"
               style={{ transform: "translateX(-50%)" }}
               animate={{ left: `${(windowsSpace / totalGb) * 100}%` }}
-              transition={{ type: "spring", bounce: 0, duration: 0.2 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.15 }}
             >
-              <div className="w-1 h-8 bg-slate-300 rounded-full pointer-events-none"></div>
+              <div className="w-0.5 h-6 bg-slate-400 rounded-full pointer-events-none"></div>
             </motion.div>
           </div>
           
-          <div className="flex justify-between text-xs text-slate-500 mt-3 px-2 font-medium tracking-wide">
-            <span>Min: {MIN_WINDOWS_GB} GB</span>
-            <span>Total: {totalGb} GB</span>
-            <span>Min: {MIN_OS_GB} GB</span>
+          <div className="flex justify-between text-[11px] text-slate-400 mt-2 px-1 font-mono">
+            <span>Minimum: {MIN_WINDOWS_GB} GB</span>
+            <span>Total Capacity: {totalGb} GB</span>
+            <span>Minimum: {MIN_OS_GB} GB</span>
           </div>
         </div>
         
-        <div className="flex justify-start gap-4 pt-4 border-t border-slate-200/50 dark:border-white/5">
+        {/* Footer Navigation */}
+        <div className="flex justify-between items-center pt-4 border-t border-white/10">
           <button 
-            className="bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-slate-200 dark:border-white/10"
+            className="bg-white/5 hover:bg-white/10 text-white text-xs font-semibold py-2.5 px-5 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
             onClick={onBack}
           >
-            <span>←</span> Back
+            <ArrowLeft className="w-3.5 h-3.5" /> Back
           </button>
           <button 
-            className="bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2.5 px-6 rounded-xl transition-all shadow-[0_2px_12px_rgba(59,130,246,0.4)] flex items-center gap-2"
             onClick={onNext}
           >
-            Confirm Partition <span>→</span>
+            Confirm Allocation <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

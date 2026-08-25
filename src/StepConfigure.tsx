@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { User, Lock, Monitor, Zap, ShieldCheck, Layers, Check, ArrowRight, ArrowLeft } from "lucide-react";
 
 export const PERMS = [
   {title:"Administrator elevation (UAC / root)", desc:"OSwitch requires elevation to configure kernel bootloader entries."},
@@ -45,156 +46,178 @@ export default function StepConfigure({
   const allChecked = PERMS.length > 0 && PERMS.every((_, i) => perms[i]);
 
   return (
-    <div className="w-full h-full flex flex-col items-center mt-10">
-      <div className="glass-card max-w-[850px] p-10 w-full animate-[fadeIn_0.5s_ease-out]">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
-          <span className="text-blue-500 text-sm font-bold uppercase tracking-widest">Step 4 of 7</span>
+    <div className="w-full h-full flex flex-col items-center pt-8 pb-4">
+      <div className="bg-[#111522]/95 border border-white/10 rounded-3xl max-w-[840px] p-8 w-full animate-[fadeIn_0.3s_ease-out] shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
+        
+        {/* Step Counter Badge */}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
+          <span className="text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">Step 4 of 7</span>
         </div>
         
-        <h2 className="text-[32px] font-bold text-slate-900 dark:text-white tracking-tight mb-6">
-          Identity, <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Safety & Configuration</span>
+        <h2 className="text-2xl font-extrabold text-white tracking-tight mb-1">
+          System & Security Configuration
         </h2>
+        <p className="text-slate-400 text-sm mb-6">
+          Set up user credentials, verify pre-flight safety policies, and authorize system permissions.
+        </p>
 
-        {/* 👤 Dynamic User Credentials Section */}
-        <div className="bg-slate-50 dark:bg-slate-900/90 border border-blue-500/30 rounded-2xl p-6 mb-8 shadow-sm dark:shadow-[0_0_25px_rgba(59,130,246,0.15)] backdrop-blur-md">
+        {/* User Account Setup Card */}
+        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 mb-5 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-2xl">👤</span>
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+              <User className="w-4 h-4" />
+            </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">OS User Account Setup (Zero Hardcoding)</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Configure your personalized login credentials for the new Operating System.</p>
+              <h3 className="text-sm font-bold text-white tracking-tight">OS User Account Setup</h3>
+              <p className="text-xs text-slate-400">Configure your primary login credentials for the target Operating System.</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase">Login Username</label>
+              <label className="block text-[11px] font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-slate-400" /> Username
+              </label>
               <input 
                 type="text" 
                 value={userName} 
                 onChange={(e) => setUserName && setUserName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                 placeholder="e.g. archer"
-                className="w-full bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors shadow-sm"
+                className="w-full bg-[#090b10] border border-white/15 rounded-xl px-3.5 py-2 text-white text-xs font-mono focus:outline-none focus:border-blue-500 transition-colors placeholder-slate-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase">Account Password</label>
+              <label className="block text-[11px] font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-slate-400" /> Password
+              </label>
               <div className="relative">
                 <input 
                   type={showPassword ? "text" : "password"} 
                   value={userPassword} 
                   onChange={(e) => setUserPassword && setUserPassword(e.target.value)}
                   placeholder="Set strong password"
-                  className="w-full bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors pr-10 shadow-sm"
+                  className="w-full bg-[#090b10] border border-white/15 rounded-xl px-3.5 py-2 text-white text-xs font-mono focus:outline-none focus:border-blue-500 transition-colors pr-12 placeholder-slate-500"
                 />
                 <button 
                   type="button" 
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 font-mono font-bold"
+                  className="absolute right-2.5 top-2 text-[10px] text-slate-400 hover:text-blue-400 font-mono font-bold uppercase"
                 >
-                  {showPassword ? "HIDE" : "SHOW"}
+                  {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase">Computer Hostname</label>
+              <label className="block text-[11px] font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Monitor className="w-3.5 h-3.5 text-slate-400" /> Hostname
+              </label>
               <input 
                 type="text" 
                 value={hostName} 
                 onChange={(e) => setHostName && setHostName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                 placeholder="e.g. oswitch-pc"
-                className="w-full bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors shadow-sm"
+                className="w-full bg-[#090b10] border border-white/15 rounded-xl px-3.5 py-2 text-white text-xs font-mono focus:outline-none focus:border-blue-500 transition-colors placeholder-slate-500"
               />
             </div>
           </div>
         </div>
 
-        {/* 🛡️ 3-Point Pre-Flight Safety Guard */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-3">
-            <span className="text-emerald-500 dark:text-emerald-400 text-xl">⚡</span>
+        {/* 3-Point Pre-Flight Safety Summary Chips */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+          <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4" />
+            </div>
             <div>
-              <div className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">AC Power Guard</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Prevents mid-install shutdowns</div>
+              <div className="text-white font-bold text-xs">AC Power Guard</div>
+              <div className="text-[11px] text-slate-400">Prevents mid-install shutdowns</div>
             </div>
           </div>
 
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-3">
-            <span className="text-blue-500 dark:text-blue-400 text-xl">🔒</span>
+          <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
             <div>
-              <div className="text-blue-600 dark:text-blue-400 font-bold text-xs">BitLocker Guard</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Auto-pauses TPM locks</div>
+              <div className="text-white font-bold text-xs">BitLocker Guard</div>
+              <div className="text-[11px] text-slate-400">TPM protection auto-verified</div>
             </div>
           </div>
 
-          <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 flex items-center gap-3">
-            <span className="text-purple-500 dark:text-purple-400 text-xl">📁</span>
+          <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+              <Layers className="w-4 h-4" />
+            </div>
             <div>
-              <div className="text-purple-600 dark:text-purple-400 font-bold text-xs">Zero-Touch Safety</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Existing data 100% untouched</div>
+              <div className="text-white font-bold text-xs">Safe Slicing</div>
+              <div className="text-[11px] text-slate-400">Existing partitions 100% intact</div>
             </div>
           </div>
         </div>
         
-        <div className="bg-white dark:bg-white/5 border border-emerald-500/30 rounded-2xl p-5 mb-8 cursor-pointer hover:border-emerald-500 transition-colors shadow-sm" onClick={() => setBackupEnabled(!backupEnabled)}>
-          <label className="flex items-start gap-4 cursor-pointer w-full pointer-events-none">
-            <input 
-              type="checkbox" 
-              className="mt-1 w-5 h-5 rounded bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-white/20 text-emerald-500 focus:ring-emerald-500 cursor-pointer pointer-events-auto"
-              checked={backupEnabled}
-              readOnly
-              onClick={(e) => { e.stopPropagation(); setBackupEnabled(!backupEnabled); }}
-              onChange={() => {}}
-            />
-            <div>
-              <div className="text-emerald-600 dark:text-green-400 font-bold text-base mb-0.5">Enable Pre-Install Backup (Recommended)</div>
-              <div className="text-slate-500 dark:text-slate-400 text-sm">Creates a system restore point and backups your BCD/UEFI bootloader.</div>
+        {/* Pre-Install Backup Row */}
+        <div 
+          className={`border rounded-2xl p-4 mb-4 cursor-pointer transition-all ${
+            backupEnabled ? 'bg-emerald-500/5 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+          }`}
+          onClick={() => setBackupEnabled(!backupEnabled)}
+        >
+          <div className="flex items-start gap-3.5">
+            <div className={`w-5 h-5 rounded-md border mt-0.5 flex items-center justify-center transition-colors shrink-0 ${backupEnabled ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-white/20 bg-black/40'}`}>
+              {backupEnabled && <Check className="w-3.5 h-3.5 stroke-[3]" />}
             </div>
-          </label>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-white font-bold text-xs">Create Pre-Install System Backup</span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Recommended</span>
+              </div>
+              <div className="text-slate-400 text-xs">Creates an automated Windows restore snapshot and backs up UEFI/BCD bootloader records.</div>
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-3 mb-8">
+        {/* Permissions Checklist */}
+        <div className="space-y-2 mb-6">
           {PERMS.map((p, i) => (
             <div 
               key={i} 
-              className={`bg-white dark:bg-white/5 border rounded-2xl p-4 cursor-pointer transition-colors hover:border-blue-400 shadow-sm
-                ${perms[i] ? 'border-blue-500 bg-blue-500/5 dark:bg-blue-500/10' : 'border-slate-200 dark:border-white/10'}`}
+              className={`border rounded-xl p-3 cursor-pointer transition-all ${
+                perms[i] ? 'bg-blue-500/5 border-blue-500/30' : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+              }`}
               onClick={() => togglePerm(i)}
             >
-              <label className="flex items-start gap-4 cursor-pointer w-full pointer-events-none">
-                <input 
-                  type="checkbox" 
-                  className="mt-1 w-5 h-5 rounded bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-white/20 text-blue-500 focus:ring-blue-500 cursor-pointer pointer-events-auto"
-                  checked={perms[i]}
-                  readOnly
-                  onClick={(e) => { e.stopPropagation(); togglePerm(i); }}
-                  onChange={() => {}}
-                />
-                <div>
-                  <div className="text-slate-900 dark:text-white font-bold text-base mb-0.5">{p.title}</div>
-                  <div className="text-slate-500 dark:text-slate-400 text-sm">{p.desc}</div>
+              <div className="flex items-start gap-3">
+                <div className={`w-4.5 h-4.5 rounded-md border mt-0.5 flex items-center justify-center transition-colors shrink-0 ${perms[i] ? 'border-blue-500 bg-blue-500 text-white' : 'border-white/20 bg-black/40'}`}>
+                  {perms[i] && <Check className="w-3 h-3 stroke-[3]" />}
                 </div>
-              </label>
+                <div>
+                  <div className="text-white font-semibold text-xs leading-tight mb-0.5">{p.title}</div>
+                  <div className="text-slate-400 text-[11px] leading-tight">{p.desc}</div>
+                </div>
+              </div>
             </div>
           ))}
         </div>
         
-        <div className="flex justify-start gap-4 pt-4 border-t border-slate-200/50 dark:border-white/5">
+        {/* Navigation Buttons */}
+        <div className="flex justify-between items-center pt-4 border-t border-white/10">
           <button 
-            className="bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-slate-200 dark:border-white/10"
+            className="bg-white/5 hover:bg-white/10 text-white text-xs font-semibold py-2.5 px-5 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
             onClick={onBack}
           >
-            <span>←</span> Back
+            <ArrowLeft className="w-3.5 h-3.5" /> Back
           </button>
+          
           <button 
-            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 text-white
-              ${allChecked ? 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-slate-300 dark:bg-white/10 text-slate-500 cursor-not-allowed'}`}
+            className={`text-xs font-semibold py-2.5 px-6 rounded-xl transition-all flex items-center gap-2 text-white
+              ${allChecked ? 'bg-blue-600 hover:bg-blue-500 shadow-[0_2px_12px_rgba(59,130,246,0.4)]' : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
             onClick={onNext}
             disabled={!allChecked}
           >
-            Unlock Console <span>🔓</span>
+            Authorize & Continue <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
