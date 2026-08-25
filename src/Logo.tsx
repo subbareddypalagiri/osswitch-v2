@@ -102,8 +102,8 @@ export const OSLogo = ({ id, className = "", size = 32 }: { id: string; classNam
     );
   }
 
-  // 6. Fedora
-  if (normId.includes("fedora")) {
+  // 6. Fedora / Kinoite / Silverblue
+  if (normId.includes("fedora") || normId.includes("kinoite") || normId.includes("silverblue")) {
     return (
       <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
         <rect width="100" height="100" rx="22" fill="#294172" />
@@ -170,7 +170,7 @@ export const OSLogo = ({ id, className = "", size = 32 }: { id: string; classNam
   }
 
   // 12. Apple macOS
-  if (normId.includes("mac") || normId.includes("apple") || normId.includes("darwin")) {
+  if (normId.includes("mac") || normId.includes("apple") || normId.includes("darwin") || normId.includes("asahi")) {
     return (
       <svg width={size} height={size} viewBox="0 0 170 170" fill="none" className={className}>
         <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.08-7.77-7.94-12.23-14.58-6.17-9.28-11.02-20.08-14.54-32.39-3.52-12.31-5.28-24.16-5.28-35.54 0-14.28 3.52-26.06 10.56-35.34 7.04-9.28 16.03-14.05 26.96-14.31 4.79 0 10.36 1.34 16.71 4.02 6.35 2.68 10.02 4.08 11.02 4.19 1.23-.23 5.3-1.68 12.21-4.35 6.91-2.68 12.87-3.8 17.88-3.35 13.53 1.12 24.13 6.47 31.8 16.05-11.96 7.26-17.77 17.2-17.43 29.82.34 9.94 4.15 18.23 11.45 24.87 7.3 6.65 15.82 10.45 25.56 11.4-2.23 6.81-4.8 13.35-7.72 19.63zM119.22 33.72c0-7.37 2.62-14.23 7.86-20.59 5.24-6.36 11.66-10.44 19.27-12.23 1.12 7.71-.87 14.88-5.97 21.52-5.1 6.64-11.43 10.82-19.01 12.54-.45-.45-1.12-.84-2.15-1.24z" fill="currentColor" />
@@ -215,8 +215,8 @@ export const OSLogo = ({ id, className = "", size = 32 }: { id: string; classNam
     );
   }
 
-  // 16. FreeBSD
-  if (normId.includes("freebsd") || normId.includes("bsd")) {
+  // 16. FreeBSD / GhostBSD / HardenedBSD
+  if (normId.includes("bsd")) {
     return (
       <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
         <rect width="100" height="100" rx="22" fill="#AB1818" />
@@ -240,14 +240,199 @@ export const OSLogo = ({ id, className = "", size = 32 }: { id: string; classNam
     );
   }
 
-  // Universal Fallback Badge
-  const firstLetter = id.charAt(0).toUpperCase();
+  // 18. Rocky Linux
+  if (normId.includes("rocky")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#10B981" />
+        <path d="M25 75L50 25L75 75H25Z" fill="white" />
+        <path d="M50 25L60 48L40 75H25L50 25Z" fill="#047857" />
+      </svg>
+    );
+  }
+
+  // 19. AlmaLinux
+  if (normId.includes("alma")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#0284C7" />
+        <circle cx="50" cy="50" r="28" stroke="white" strokeWidth="8" strokeDasharray="18 10" fill="none" />
+        <circle cx="50" cy="50" r="10" fill="#38BDF8" />
+      </svg>
+    );
+  }
+
+  // 20. CentOS / RHEL
+  if (normId.includes("centos") || normId.includes("rhel") || normId.includes("redhat")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#9333EA" />
+        <path d="M50 20L76 35V65L50 80L24 65V35L50 20Z" fill="none" stroke="white" strokeWidth="6" />
+        <path d="M50 20V80" stroke="#F59E0B" strokeWidth="4" />
+        <path d="M24 35L76 65" stroke="#10B981" strokeWidth="4" />
+        <path d="M24 65L76 35" stroke="#EF4444" strokeWidth="4" />
+      </svg>
+    );
+  }
+
+  // 21. Garuda Linux
+  if (normId.includes("garuda")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#0F172A" stroke="#EC4899" strokeWidth="3" />
+        <path d="M50 20C65 35 75 55 50 80C25 55 35 35 50 20Z" fill="url(#garudaGrad)" />
+        <circle cx="50" cy="45" r="6" fill="#FFFFFF" />
+        <defs>
+          <linearGradient id="garudaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#F43F5E" />
+            <stop offset="100%" stopColor="#8B5CF6" />
+          </linearGradient>
+        </defs>
+      </svg>
+    );
+  }
+
+  // 22. Bazzite Gaming
+  if (normId.includes("bazzite")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#18181B" stroke="#F97316" strokeWidth="3" />
+        <rect x="25" y="35" width="50" height="30" rx="10" fill="#F97316" />
+        <circle cx="38" cy="50" r="4" fill="white" />
+        <circle cx="62" cy="45" r="3" fill="white" />
+        <circle cx="68" cy="52" r="3" fill="white" />
+      </svg>
+    );
+  }
+
+  // 23. Zorin OS
+  if (normId.includes("zorin")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#0EA5E9" />
+        <path d="M28 32H72L42 68H72" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </svg>
+    );
+  }
+
+  // 24. Solus
+  if (normId.includes("solus")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#1E293B" stroke="#38BDF8" strokeWidth="2" />
+        <path d="M48 22V65L68 65C68 45 58 30 48 22Z" fill="#38BDF8" />
+        <path d="M30 65C35 75 65 75 70 65H30Z" fill="#F43F5E" />
+      </svg>
+    );
+  }
+
+  // 25. Void Linux
+  if (normId.includes("void")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#1E293B" />
+        <circle cx="50" cy="50" r="26" stroke="#10B981" strokeWidth="8" fill="none" />
+        <circle cx="50" cy="50" r="10" fill="#34D399" />
+      </svg>
+    );
+  }
+
+  // 26. Proxmox
+  if (normId.includes("proxmox")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#EA580C" />
+        <path d="M25 50L50 25L75 50L50 75L25 50Z" fill="white" />
+        <circle cx="50" cy="50" r="8" fill="#EA580C" />
+      </svg>
+    );
+  }
+
+  // 27. TrueNAS
+  if (normId.includes("truenas")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#0891B2" />
+        <circle cx="35" cy="50" r="10" fill="white" />
+        <circle cx="65" cy="35" r="10" fill="white" />
+        <circle cx="65" cy="65" r="10" fill="white" />
+        <path d="M35 50L65 35M35 50L65 65" stroke="white" strokeWidth="6" />
+      </svg>
+    );
+  }
+
+  // 28. Haiku OS
+  if (normId.includes("haiku")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#F59E0B" />
+        <path d="M50 20C40 40 30 50 30 65C30 75 40 80 50 80C60 80 70 75 70 65C70 50 60 40 50 20Z" fill="white" />
+        <path d="M50 30V75" stroke="#F59E0B" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  // 29. ReactOS
+  if (normId.includes("react")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#3B82F6" />
+        <ellipse cx="50" cy="50" rx="26" ry="10" stroke="white" strokeWidth="4" transform="rotate(30 50 50)" fill="none" />
+        <ellipse cx="50" cy="50" rx="26" ry="10" stroke="white" strokeWidth="4" transform="rotate(90 50 50)" fill="none" />
+        <ellipse cx="50" cy="50" rx="26" ry="10" stroke="white" strokeWidth="4" transform="rotate(150 50 50)" fill="none" />
+        <circle cx="50" cy="50" r="6" fill="#FACC15" />
+      </svg>
+    );
+  }
+
+  // 30. FreeDOS
+  if (normId.includes("freedos") || normId.includes("dos")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#1D4ED8" />
+        <text x="50" y="62" fill="white" fontSize="28" fontWeight="bold" fontFamily="monospace" textAnchor="middle">DOS</text>
+      </svg>
+    );
+  }
+
+  // 31. EndeavourOS
+  if (normId.includes("endeavour")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#4F46E5" />
+        <path d="M50 20L75 75L50 62L25 75L50 20Z" fill="#EC4899" />
+        <path d="M50 35L65 70L50 62L35 70L50 35Z" fill="#F43F5E" />
+      </svg>
+    );
+  }
+
+  // 32. Clonezilla / GParted / Recovery Tools
+  if (normId.includes("clone") || normId.includes("gparted") || normId.includes("rescue")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#DC2626" />
+        <rect x="42" y="24" width="16" height="52" rx="4" fill="white" />
+        <rect x="24" y="42" width="52" height="16" rx="4" fill="white" />
+      </svg>
+    );
+  }
+
+  // Dynamic Apple-Grade Deterministic Color Gradient Pill for all other OSes
+  const charSum = normId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hue1 = charSum % 360;
+  const hue2 = (hue1 + 45) % 360;
+  const firstLetters = id.slice(0, 2).toUpperCase();
+
   return (
     <div
-      style={{ width: size, height: size }}
-      className={`rounded-xl flex items-center justify-center font-bold text-xs shadow-md bg-gradient-to-tr from-slate-800 to-indigo-600 border border-white/20 text-white select-none ${className}`}
+      style={{
+        width: size,
+        height: size,
+        background: `linear-gradient(135deg, hsl(${hue1}, 75%, 50%), hsl(${hue2}, 85%, 40%))`
+      }}
+      className={`rounded-2xl flex items-center justify-center font-extrabold text-[11px] shadow-[0_4px_12px_rgba(0,0,0,0.3)] border border-white/25 text-white tracking-wider select-none ${className}`}
     >
-      {firstLetter}
+      {firstLetters}
     </div>
   );
 };
