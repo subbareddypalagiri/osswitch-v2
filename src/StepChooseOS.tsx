@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { OSLogo } from "./Logo";
 
 export const OS_LIST = [
   {id:"windows", name:"Windows 11", sub:"Currently installed Microsoft OS", glyph:"🪟", locked:true},
@@ -198,10 +199,10 @@ export default function StepChooseOS({
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-4">
-                        <span className="text-4xl drop-shadow-md">{os.glyph}</span>
+                        <OSLogo id={os.id} size={40} className="flex-shrink-0 drop-shadow-md" />
                         <div>
-                          <h3 className="text-xl font-bold text-white">{os.name}</h3>
-                          <p className="text-xs text-slate-400 font-mono mt-0.5">{os.type}</p>
+                          <h3 className="text-xl font-bold text-slate-900 dark:text-white">{os.name}</h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{os.type}</p>
                         </div>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono border ${os.isHost ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-blue-500/10 text-blue-400 border-blue-500/30"}`}>
@@ -285,24 +286,24 @@ export default function StepChooseOS({
                     <div className="absolute top-4 right-4 w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] z-10"></div>
                   )}
                   <div className="flex items-center gap-4 mb-3 min-w-0 pr-6">
-                    <span className="text-4xl drop-shadow-md flex-shrink-0">{os.glyph}</span>
+                    <OSLogo id={os.id} size={38} className="flex-shrink-0 drop-shadow-md" />
                     <div className="min-w-0 flex-1">
                       <div className="text-slate-900 dark:text-white font-bold text-lg truncate">{os.name}</div>
-                      <div className="text-slate-400 text-xs leading-tight line-clamp-2">{os.sub}</div>
+                      <div className="text-slate-500 dark:text-slate-400 text-xs leading-tight line-clamp-2">{os.sub}</div>
                     </div>
                   </div>
                   
                   {isSelected && !os.locked && (
-                    <div className="mt-3 pt-3 border-t border-black/10 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
-                      <label className="text-xs text-slate-400 block mb-1">Install Method:</label>
+                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
+                      <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1 font-medium">Install Method:</label>
                       <select 
-                        className="bg-black/60 border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white w-full text-xs font-semibold focus:outline-none focus:border-cyan-500"
+                        className="bg-slate-100 dark:bg-black/80 border border-slate-300 dark:border-white/10 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white w-full text-xs font-semibold focus:outline-none focus:border-blue-500"
                         value={intent}
                         onChange={(e) => handleIntentChange(os.id, e.target.value)}
                       >
-                        <option value="vbox_vm">💻 VirtualBox VM (Safe Sandbox in Windows)</option>
-                        <option value="baremetal_grub">🚀 Native Bare-Metal (No USB Needed — 100% Hardware Speed)</option>
-                        <option value="usb_flash">🔌 Physical USB Flash Drive (Rufus Flasher)</option>
+                        <option value="vbox_vm">💻 VirtualBox VM (Safe Sandbox)</option>
+                        <option value="baremetal_grub">🚀 Native Bare-Metal (100% Hardware Speed)</option>
+                        <option value="usb_flash">🔌 Physical USB Flash Drive</option>
                         <option value="vmware_vm">⚡ VMware Workstation Pro VM</option>
                       </select>
                     </div>
@@ -315,16 +316,16 @@ export default function StepChooseOS({
       </>
     )}
         
-        <div className="flex justify-start gap-4 mt-auto">
+        <div className="flex justify-start gap-4 mt-auto pt-4 border-t border-slate-200/50 dark:border-white/5">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
+            className="bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-slate-200 dark:border-white/10"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           <button 
-            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2
-              ${hasSelection ? 'bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
+            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 text-white
+              ${hasSelection ? 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-slate-300 dark:bg-white/10 text-slate-500 cursor-not-allowed'}`}
             onClick={onNext}
             disabled={!hasSelection}
           >

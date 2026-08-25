@@ -1,5 +1,6 @@
 import { useState, useEffect, memo, useRef } from "react";
 import { OS_LIST } from "./StepChooseOS";
+import { OSLogo } from "./Logo";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn, Event } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -486,7 +487,7 @@ export default function StepInstall({
         
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scrollbar">
           {activeTab === "tools_only" && (
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap bg-blue-600 text-slate-900 dark:text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]"><span>📦</span> App Store Execution</button>
+            <button className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors whitespace-nowrap bg-blue-600 text-white shadow-md"><span>📦</span> App Store Execution</button>
           )}
           {targets.map(id => {
             const os = getOSDetails(id);
@@ -495,12 +496,12 @@ export default function StepInstall({
               <button
                 key={id}
                 disabled={isInstalling}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap
-                  ${activeTab === id ? 'bg-blue-600 text-slate-900 dark:text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-900 dark:text-white'}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all whitespace-nowrap
+                  ${activeTab === id ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}
                   ${isInstalling ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => setActiveTab(id)}
               >
-                <span>{os.glyph}</span> {os.name}
+                <OSLogo id={os.id} size={20} /> {os.name}
               </button>
             );
           })}
@@ -527,7 +528,7 @@ export default function StepInstall({
             <button 
               onClick={fetchAiModels}
               disabled={isInstalling || fetchingModels || !apiKey.trim()}
-              className="bg-purple-600/80 hover:bg-purple-500 text-slate-900 dark:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {fetchingModels ? "Fetching..." : "Connect"}
             </button>
@@ -536,7 +537,7 @@ export default function StepInstall({
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
                 disabled={isInstalling}
-                className="bg-slate-100 dark:bg-black/40 border border-purple-500/50 rounded-lg px-3 py-2 text-sm text-purple-300 focus:outline-none focus:border-purple-500 max-w-[200px]"
+                className="bg-white dark:bg-black/60 border border-purple-500/50 rounded-lg px-3 py-2 text-sm text-purple-600 dark:text-purple-300 focus:outline-none focus:border-purple-500 max-w-[200px]"
               >
                 {modelsList.map(m => (
                   <option key={m} value={m}>{m.replace('models/', '')}</option>
@@ -547,14 +548,15 @@ export default function StepInstall({
           {aiError && <div className="text-xs text-red-400 mt-2">{aiError}</div>}
         </div>
 
-        <div className="bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-2xl flex flex-col flex-grow overflow-hidden mb-6">
-          <div className="bg-white/5 px-4 py-2 border-b border-black/10 dark:border-white/10 flex items-center gap-2 text-xs font-mono text-slate-400">
+        {/* Sleek macOS Terminal */}
+        <div className="bg-[#0c1017] border border-slate-800 rounded-2xl flex flex-col flex-grow overflow-hidden mb-6 shadow-xl">
+          <div className="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 flex items-center gap-2 text-xs font-mono text-slate-400">
             <div className="flex gap-1.5 mr-4">
-              <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-              <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-              <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+              <div className="w-3 h-3 rounded-full bg-red-500/90 shadow-sm"></div>
+              <div className="w-3 h-3 rounded-full bg-yellow-500/90 shadow-sm"></div>
+              <div className="w-3 h-3 rounded-full bg-green-500/90 shadow-sm"></div>
             </div>
-            Terminal - {activeTab === "tools_only" ? "Package Manager" : activeOSDetails?.name}
+            Terminal — {activeTab === "tools_only" ? "Package Provisioner" : activeOSDetails?.name}
           </div>
           
           <div className="p-4 font-mono text-sm overflow-y-auto flex-grow custom-scrollbar">
@@ -736,9 +738,9 @@ export default function StepInstall({
           </div>
         </div>
 
-        <div className="flex justify-between mt-auto">
+        <div className="flex justify-between mt-auto pt-4 border-t border-slate-200/50 dark:border-white/5">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
+            className="bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-slate-200 dark:border-white/10"
             onClick={onBack}
             disabled={isInstalling}
           >
@@ -746,7 +748,7 @@ export default function StepInstall({
           </button>
           
           <button 
-            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 ${isInstalling ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(34,197,94,0.4)]'}`}
+            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 text-white ${isInstalling ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]'}`}
             onClick={() => setShowSuccessModal(true)}
             disabled={isInstalling}
           >

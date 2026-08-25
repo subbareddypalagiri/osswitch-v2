@@ -57,41 +57,41 @@ export default function StepConfigure({
         </h2>
 
         {/* 👤 Dynamic User Credentials Section */}
-        <div className="bg-slate-900/90 border border-blue-500/30 rounded-2xl p-6 mb-8 shadow-[0_0_25px_rgba(59,130,246,0.15)] backdrop-blur-md">
+        <div className="bg-slate-50 dark:bg-slate-900/90 border border-blue-500/30 rounded-2xl p-6 mb-8 shadow-sm dark:shadow-[0_0_25px_rgba(59,130,246,0.15)] backdrop-blur-md">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-2xl">👤</span>
             <div>
-              <h3 className="text-lg font-bold text-white tracking-tight">OS User Account Setup (Zero Hardcoding)</h3>
-              <p className="text-xs text-slate-400">Configure your personalized login credentials for the new Operating System.</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">OS User Account Setup (Zero Hardcoding)</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Configure your personalized login credentials for the new Operating System.</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-300 mb-1.5 uppercase">Login Username</label>
+              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase">Login Username</label>
               <input 
                 type="text" 
                 value={userName} 
                 onChange={(e) => setUserName && setUserName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                 placeholder="e.g. archer"
-                className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-4 py-2.5 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors shadow-sm"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-300 mb-1.5 uppercase">Account Password</label>
+              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase">Account Password</label>
               <div className="relative">
                 <input 
                   type={showPassword ? "text" : "password"} 
                   value={userPassword} 
                   onChange={(e) => setUserPassword && setUserPassword(e.target.value)}
                   placeholder="Set strong password"
-                  className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-4 py-2.5 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors pr-10"
+                  className="w-full bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors pr-10 shadow-sm"
                 />
                 <button 
                   type="button" 
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-white font-mono"
+                  className="absolute right-3 top-2.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 font-mono font-bold"
                 >
                   {showPassword ? "HIDE" : "SHOW"}
                 </button>
@@ -99,13 +99,13 @@ export default function StepConfigure({
             </div>
 
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-300 mb-1.5 uppercase">Computer Hostname</label>
+              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase">Computer Hostname</label>
               <input 
                 type="text" 
                 value={hostName} 
                 onChange={(e) => setHostName && setHostName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                 placeholder="e.g. oswitch-pc"
-                className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-4 py-2.5 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors shadow-sm"
               />
             </div>
           </div>
@@ -114,87 +114,87 @@ export default function StepConfigure({
         {/* 🛡️ 3-Point Pre-Flight Safety Guard */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
           <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-3">
-            <span className="text-emerald-400 text-xl">⚡</span>
+            <span className="text-emerald-500 dark:text-emerald-400 text-xl">⚡</span>
             <div>
-              <div className="text-emerald-400 font-bold text-xs">AC Power Guard</div>
-              <div className="text-[11px] text-slate-400">Prevents mid-install shutdowns</div>
+              <div className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">AC Power Guard</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Prevents mid-install shutdowns</div>
             </div>
           </div>
 
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-3">
-            <span className="text-blue-400 text-xl">🔒</span>
+            <span className="text-blue-500 dark:text-blue-400 text-xl">🔒</span>
             <div>
-              <div className="text-blue-400 font-bold text-xs">BitLocker Guard</div>
-              <div className="text-[11px] text-slate-400">Auto-pauses TPM locks</div>
+              <div className="text-blue-600 dark:text-blue-400 font-bold text-xs">BitLocker Guard</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Auto-pauses TPM locks</div>
             </div>
           </div>
 
           <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 flex items-center gap-3">
-            <span className="text-purple-400 text-xl">📁</span>
+            <span className="text-purple-500 dark:text-purple-400 text-xl">📁</span>
             <div>
-              <div className="text-purple-400 font-bold text-xs">Zero-Touch Safety</div>
-              <div className="text-[11px] text-slate-400">Existing data 100% untouched</div>
+              <div className="text-purple-600 dark:text-purple-400 font-bold text-xs">Zero-Touch Safety</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Existing data 100% untouched</div>
             </div>
           </div>
         </div>
         
-        <div className="bg-white/5 border border-green-500/30 rounded-2xl p-6 mb-8 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setBackupEnabled(!backupEnabled)}>
+        <div className="bg-white dark:bg-white/5 border border-emerald-500/30 rounded-2xl p-5 mb-8 cursor-pointer hover:border-emerald-500 transition-colors shadow-sm" onClick={() => setBackupEnabled(!backupEnabled)}>
           <label className="flex items-start gap-4 cursor-pointer w-full pointer-events-none">
             <input 
               type="checkbox" 
-              className="mt-1 w-5 h-5 rounded bg-slate-100 dark:bg-black/40 border-white/20 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900 cursor-pointer pointer-events-auto"
+              className="mt-1 w-5 h-5 rounded bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-white/20 text-emerald-500 focus:ring-emerald-500 cursor-pointer pointer-events-auto"
               checked={backupEnabled}
               readOnly
               onClick={(e) => { e.stopPropagation(); setBackupEnabled(!backupEnabled); }}
               onChange={() => {}}
             />
             <div>
-              <div className="text-green-400 font-bold text-lg mb-1">Enable Pre-Install Backup (Recommended)</div>
-              <div className="text-slate-400">Creates a system restore point and backups your BCD/UEFI bootloader.</div>
+              <div className="text-emerald-600 dark:text-green-400 font-bold text-base mb-0.5">Enable Pre-Install Backup (Recommended)</div>
+              <div className="text-slate-500 dark:text-slate-400 text-sm">Creates a system restore point and backups your BCD/UEFI bootloader.</div>
             </div>
           </label>
         </div>
 
-        <div className="space-y-4 mb-8">
+        <div className="space-y-3 mb-8">
           {PERMS.map((p, i) => (
             <div 
               key={i} 
-              className={`bg-white/5 border rounded-2xl p-5 cursor-pointer transition-colors hover:bg-white/10
-                ${perms[i] ? 'border-blue-500 bg-blue-500/5' : 'border-black/10 dark:border-white/10'}`}
+              className={`bg-white dark:bg-white/5 border rounded-2xl p-4 cursor-pointer transition-colors hover:border-blue-400 shadow-sm
+                ${perms[i] ? 'border-blue-500 bg-blue-500/5 dark:bg-blue-500/10' : 'border-slate-200 dark:border-white/10'}`}
               onClick={() => togglePerm(i)}
             >
               <label className="flex items-start gap-4 cursor-pointer w-full pointer-events-none">
                 <input 
                   type="checkbox" 
-                  className="mt-1 w-5 h-5 rounded bg-slate-100 dark:bg-black/40 border-white/20 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer pointer-events-auto"
+                  className="mt-1 w-5 h-5 rounded bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-white/20 text-blue-500 focus:ring-blue-500 cursor-pointer pointer-events-auto"
                   checked={perms[i]}
                   readOnly
                   onClick={(e) => { e.stopPropagation(); togglePerm(i); }}
                   onChange={() => {}}
                 />
                 <div>
-                  <div className="text-slate-900 dark:text-white font-bold text-lg mb-1">{p.title}</div>
-                  <div className="text-slate-400">{p.desc}</div>
+                  <div className="text-slate-900 dark:text-white font-bold text-base mb-0.5">{p.title}</div>
+                  <div className="text-slate-500 dark:text-slate-400 text-sm">{p.desc}</div>
                 </div>
               </label>
             </div>
           ))}
         </div>
         
-        <div className="flex justify-start gap-4">
+        <div className="flex justify-start gap-4 pt-4 border-t border-slate-200/50 dark:border-white/5">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
+            className="bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-slate-200 dark:border-white/10"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           <button 
-            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2
-              ${allChecked ? 'bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
+            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 text-white
+              ${allChecked ? 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-slate-300 dark:bg-white/10 text-slate-500 cursor-not-allowed'}`}
             onClick={onNext}
             disabled={!allChecked}
           >
-            Unlock Console <span className="text-lg">🔓</span>
+            Unlock Console <span>🔓</span>
           </button>
         </div>
       </div>

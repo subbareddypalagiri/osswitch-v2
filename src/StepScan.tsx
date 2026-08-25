@@ -59,30 +59,30 @@ export default function StepScan({
             </div>
           ) : sysInfo ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
-                <span className="text-slate-400 text-sm uppercase tracking-[1.5px] mb-2 font-medium">CPU</span>
+              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl flex flex-col shadow-sm hover:border-slate-300 dark:hover:bg-white/10 transition-colors">
+                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-[1.5px] mb-2 font-bold">CPU</span>
                 <span className="text-xl text-slate-900 dark:text-white font-semibold">{sysInfo.cpu}</span>
               </div>
               
-              <div className="bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
-                <span className="text-slate-400 text-sm uppercase tracking-[1.5px] mb-2 font-medium">RAM</span>
+              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl flex flex-col shadow-sm hover:border-slate-300 dark:hover:bg-white/10 transition-colors">
+                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-[1.5px] mb-2 font-bold">RAM</span>
                 <span className="text-xl text-slate-900 dark:text-white font-semibold">{formatBytes(sysInfo.ram_gb * 1024 * 1024 * 1024)}</span>
               </div>
 
-              <div className="bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
-                <span className="text-slate-400 text-sm uppercase tracking-[1.5px] mb-2 font-medium">Disk Space</span>
+              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl flex flex-col shadow-sm hover:border-slate-300 dark:hover:bg-white/10 transition-colors">
+                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-[1.5px] mb-2 font-bold">Disk Space</span>
                 <span className="text-xl text-slate-900 dark:text-white font-semibold">{formatBytes(sysInfo.disk_free_gb * 1024 * 1024 * 1024)} free</span>
               </div>
 
-              <div className="bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-2xl flex flex-col hover:bg-white/10 transition-colors">
-                <span className="text-slate-400 text-sm uppercase tracking-[1.5px] mb-2 font-medium">Virtualization</span>
+              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl flex flex-col shadow-sm hover:border-slate-300 dark:hover:bg-white/10 transition-colors">
+                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-[1.5px] mb-2 font-bold">Virtualization</span>
                 <span className="text-xl font-semibold">
                   {sysInfo.virtualization ? (
-                    <span className="text-blue-400 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-400"></div> Enabled
+                    <span className="text-blue-500 dark:text-blue-400 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div> Enabled
                     </span>
                   ) : (
-                    <span className="text-slate-400 flex items-center gap-2">
+                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-slate-400"></div> Disabled
                     </span>
                   )}
@@ -97,16 +97,16 @@ export default function StepScan({
           )}
         </div>
 
-        <div className="flex justify-start gap-4 mt-10">
+        <div className="flex justify-start gap-4 mt-10 pt-4 border-t border-slate-200/50 dark:border-white/5">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
+            className="bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-slate-200 dark:border-white/10"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           <button 
-            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2
-              ${sysInfo ? 'bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
+            className={`font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 text-white
+              ${sysInfo ? 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-slate-300 dark:bg-white/10 text-slate-500 cursor-not-allowed'}`}
             onClick={onNext}
             disabled={!sysInfo}
           >

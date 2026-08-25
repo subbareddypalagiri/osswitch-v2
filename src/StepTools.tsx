@@ -131,59 +131,59 @@ export default function StepTools({
       </div>
 
       <div className="w-full flex-grow flex flex-col max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <h2 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500 mb-2">
+            <h2 className="text-3xl md:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-cyan-400 dark:to-purple-500 mb-1">
               Software Arsenal
             </h2>
-            <p className="text-slate-400 text-sm">Discover over <strong className="text-cyan-400">{catalog ? catalog.tools.length.toLocaleString() : '10,500'}</strong> tools. <span className="text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 text-xs">⚡ 96% Direct-Fetch Enabled</span></p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Discover over <strong className="text-blue-600 dark:text-cyan-400">{catalog ? catalog.tools.length.toLocaleString() : '10,500'}</strong> tools. <span className="text-emerald-600 dark:text-green-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 text-xs">⚡ 96% Direct-Fetch Enabled</span></p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button 
               onClick={onBack}
-              className="px-6 py-2 rounded-full border border-black/10 dark:border-white/10 hover:bg-white/5 transition-colors"
+              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 font-medium transition-colors"
             >
               Back
             </button>
             <button 
               onClick={onNext}
-              className="px-8 py-2 rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 font-bold shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+              className="px-7 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all"
             >
               Next ({selectedTools.length} Selected)
             </button>
           </div>
         </div>
 
-        <div className="flex flex-col xl:flex-row gap-4 mb-8 w-full">
+        <div className="flex flex-col xl:flex-row gap-3 mb-6 w-full">
           <div className="flex-grow relative flex gap-2 w-full xl:max-w-2xl">
             <input 
               type="text" 
               placeholder="Search 10,500+ tools by name, category or Winget ID..." 
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="flex-grow bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-base focus:outline-none focus:border-cyan-500 transition-colors backdrop-blur-md min-w-0"
+              className="flex-grow bg-white dark:bg-black/40 border border-slate-300 dark:border-white/10 rounded-xl px-5 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors shadow-sm min-w-0"
             />
             <button
               onClick={handleLiveSearch}
               disabled={isSearchingLive || !search.trim()}
-              className="px-5 py-4 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 hover:bg-cyan-500/30 font-bold transition-all disabled:opacity-50 text-sm whitespace-nowrap flex items-center gap-2"
+              className="px-4 py-3 rounded-xl bg-blue-500/10 dark:bg-cyan-500/20 text-blue-600 dark:text-cyan-400 border border-blue-500/30 dark:border-cyan-500/40 hover:bg-blue-500/20 font-bold transition-all disabled:opacity-50 text-xs whitespace-nowrap flex items-center gap-1.5"
             >
               {isSearchingLive ? (
                 <>
-                  <span className="w-4 h-4 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin"></span>
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin"></span>
                   Searching...
                 </>
               ) : (
                 <>
-                  ⚡ Live Cloud Search
+                  ⚡ Cloud Search
                 </>
               )}
             </button>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-4 flex-grow w-full xl:w-auto">
+          <div className="flex flex-col sm:flex-row gap-3 flex-grow w-full xl:w-auto">
             <select 
-              className="flex-grow xl:w-64 bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-base focus:outline-none focus:border-cyan-500 backdrop-blur-md cursor-pointer min-w-0"
+              className="flex-grow xl:w-64 bg-white dark:bg-black/40 border border-slate-300 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-sm cursor-pointer min-w-0"
               value={filterDept || ""}
               onChange={(e) => { setFilterDept(e.target.value || null); setPage(1); }}
             >
@@ -192,7 +192,7 @@ export default function StepTools({
             </select>
 
             <select 
-              className="flex-grow xl:w-64 bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-6 py-4 text-base focus:outline-none focus:border-cyan-500 backdrop-blur-md cursor-pointer min-w-0"
+              className="flex-grow xl:w-64 bg-white dark:bg-black/40 border border-slate-300 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-sm cursor-pointer min-w-0"
               value={filterRole || ""}
               onChange={(e) => { setFilterRole(e.target.value || null); setPage(1); }}
             >
@@ -202,26 +202,26 @@ export default function StepTools({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pr-2 custom-scrollbar pb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-grow overflow-y-auto pr-2 custom-scrollbar pb-8">
           {paginatedTools.length === 0 ? (
-            <div className="col-span-full flex items-center justify-center text-gray-400 py-20">
+            <div className="col-span-full flex items-center justify-center text-slate-400 py-20">
               No tools found matching your criteria.
             </div>
           ) : (
             paginatedTools.map(tool => (
               <div 
                 key={tool.id} 
-                className={`relative group bg-white/5 border ${selectedTools.includes(tool.wingetId) ? 'border-cyan-500 bg-cyan-500/10' : 'border-black/10 dark:border-white/10'} rounded-2xl p-6 transition-all hover:bg-white/10 flex flex-col`}
+                className={`relative group bg-white dark:bg-white/5 border ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:bg-white/10'} rounded-2xl p-5 transition-all flex flex-col`}
               >
-                <div className="flex items-start gap-4 mb-4 cursor-pointer" onClick={() => toggleTool(tool.id, tool.wingetId)}>
-                  <img src={tool.icon} alt={tool.name} className="w-12 h-12 rounded-xl object-cover" />
-                  <div className="flex-grow">
-                    <h3 className="text-xl font-bold">{tool.name}</h3>
-                    <p className="text-xs text-cyan-400 font-mono mt-1">{tool.department} | {tool.role}</p>
+                <div className="flex items-start gap-3.5 mb-3 cursor-pointer" onClick={() => toggleTool(tool.id, tool.wingetId)}>
+                  <img src={tool.icon} alt={tool.name} className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-white/10" />
+                  <div className="flex-grow min-w-0">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{tool.name}</h3>
+                    <p className="text-xs text-blue-600 dark:text-cyan-400 font-mono mt-0.5 truncate">{tool.department} | {tool.role}</p>
                   </div>
-                  <div className={`w-6 h-6 rounded-md border flex items-center justify-center transition-colors ${selectedTools.includes(tool.wingetId) ? 'border-cyan-500 bg-cyan-500 text-black' : 'border-gray-500'}`}>
+                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 dark:border-slate-600'}`}>
                     {selectedTools.includes(tool.wingetId) && (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                     )}
                   </div>
                 </div>

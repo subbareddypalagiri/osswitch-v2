@@ -39,7 +39,7 @@ export default function StepWelcome({ onNext }: { onNext: () => void }) {
 
         <div className="flex justify-start">
           <button 
-            className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.4)] flex items-center gap-3"
+            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.4)] flex items-center gap-3"
             onClick={onNext}
           >
             Get Started <span>→</span>

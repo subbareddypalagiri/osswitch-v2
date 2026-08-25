@@ -157,18 +157,18 @@ export default function StepDiskSpace({
           </div>
         </div>
         
-        <div className="flex justify-start gap-4">
+        <div className="flex justify-start gap-4 pt-4 border-t border-slate-200/50 dark:border-white/5">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-slate-900 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-black/10 dark:border-white/10"
+            className="bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2 border border-slate-200 dark:border-white/10"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           <button 
-            className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2"
             onClick={onNext}
           >
-            Confirm Partition <span className="text-lg">🔪</span>
+            Confirm Partition <span>→</span>
           </button>
         </div>
       </div>
