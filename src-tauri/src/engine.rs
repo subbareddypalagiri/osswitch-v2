@@ -755,36 +755,72 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
                 let _ = Command::new("cp").args(["/mnt/iso/blackarch/boot/x86_64/initramfs-linux.img", "/boot/blackarch/"]).output().await;
                 let _ = Command::new("umount").arg("/mnt/iso").output().await;
 
-                // Write automated first-boot user creation & zero-lock hook
-                let init_script = format!(
+                // 🌟 Create Early CPIO Initrd Overlay for 100% Zero-Touch Auto-Login
+                let overlay_dir = PathBuf::from("/tmp/oswitch-overlay");
+                let _ = tokio::fs::remove_dir_all(&overlay_dir).await;
+                let _ = tokio::fs::create_dir_all(overlay_dir.join("usr/bin")).await;
+                let _ = tokio::fs::create_dir_all(overlay_dir.join("etc/systemd/system/multi-user.target.wants")).await;
+
+                let autouser_script = format!(
                     "#!/bin/bash\n\
-                    user='{}'\n\
-                    pass='{}'\n\
-                    host='{}'\n\
+                    user=\"{}\"\n\
+                    pass=\"{}\"\n\
+                    host=\"{}\"\n\
+                    \n\
+                    # 1. Create User & set passwords\n\
                     useradd -m -G wheel,audio,video,storage,network,power -s /bin/zsh \"$user\" 2>/dev/null || true\n\
                     echo \"$user:$pass\" | chpasswd\n\
                     echo \"root:$pass\" | chpasswd\n\
+                    \n\
+                    # 2. Grant passwordless sudo to wheel group\n\
                     mkdir -p /etc/sudoers.d\n\
                     echo '%wheel ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/99-oswitch\n\
+                    chmod 0440 /etc/sudoers.d/99-oswitch\n\
+                    \n\
+                    # 3. Setup Desktop Environment & Unlock all icons\n\
                     mkdir -p \"/home/$user/Desktop\"\n\
-                    cp -r /etc/skel/Desktop/* \"/home/$user/Desktop/\" 2>/dev/null || true\n\
+                    cp -r /etc/skel/. \"/home/$user/\" 2>/dev/null || true\n\
                     cp -r /home/liveuser/Desktop/* \"/home/$user/Desktop/\" 2>/dev/null || true\n\
                     chmod +x /home/$user/Desktop/*.desktop 2>/dev/null || true\n\
                     chmod 777 /home/*/Desktop/*.desktop 2>/dev/null || true\n\
                     chown -R \"$user:$user\" \"/home/$user\"\n\
+                    \n\
+                    # 4. Set LightDM Display Manager Autologin\n\
                     if [ -f /etc/lightdm/lightdm.conf ]; then\n\
-                        sed -i \"s/autologin-user=.*/autologin-user=$user/\" /etc/lightdm/lightdm.conf\n\
+                        sed -i \"s/^[# ]*autologin-user=.*/autologin-user=$user/\" /etc/lightdm/lightdm.conf\n\
+                        sed -i \"s/^[# ]*autologin-user-timeout=.*/autologin-user-timeout=0/\" /etc/lightdm/lightdm.conf\n\
                     fi\n",
                     user, _pass, host
                 );
-                let _ = tokio::fs::write("/boot/blackarch/oswitch-init.sh", &init_script).await;
-                let _ = Command::new("chmod").args(["+x", "/boot/blackarch/oswitch-init.sh"]).output().await;
+                let _ = tokio::fs::write(overlay_dir.join("usr/bin/oswitch-autouser.sh"), &autouser_script).await;
+                let _ = Command::new("chmod").args(["+x", "/tmp/oswitch-overlay/usr/bin/oswitch-autouser.sh"]).output().await;
+
+                let service_content = "[Unit]\n\
+Description=OSwitch Auto User Account & Desktop Provisioning\n\
+DefaultDependencies=no\n\
+After=local-fs.target systemd-sysusers.service\n\
+Before=display-manager.service multi-user.target\n\
+\n\
+[Service]\n\
+Type=oneshot\n\
+ExecStart=/usr/bin/bash /usr/bin/oswitch-autouser.sh\n\
+RemainAfterExit=yes\n\
+\n\
+[Install]\n\
+WantedBy=multi-user.target\n";
+
+                let _ = tokio::fs::write(overlay_dir.join("etc/systemd/system/oswitch-autouser.service"), service_content).await;
+                let _ = tokio::fs::write(overlay_dir.join("etc/systemd/system/multi-user.target.wants/oswitch-autouser.service"), service_content).await;
+
+                // Pack into /boot/blackarch/oswitch-overlay.img using cpio
+                let _ = Command::new("bash").args(["-c", "cd /tmp/oswitch-overlay && find . | cpio -o -H newc > /boot/blackarch/oswitch-overlay.img 2>/dev/null"]).output().await;
 
                 let entry_content = format!(
                     "title   {} ({}GB - {})\n\
                     linux   /blackarch/vmlinuz-linux\n\
+                    initrd  /blackarch/oswitch-overlay.img\n\
                     initrd  /blackarch/initramfs-linux.img\n\
-                    options archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={} script=/boot/blackarch/oswitch-init.sh\n",
+                    options archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={}\n",
                     display_name, allocated_space, user, target_iso.display(), allocated_space, host
                 );
                 let _ = tokio::fs::write("/boot/loader/entries/blackarch.conf", entry_content).await;
@@ -796,8 +832,8 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
                     "\nmenuentry 'OSwitch - {} ({}GB - {})' {{\n\
                         search --no-floppy --file --set=root {}\n\
                         loopback loop {}\n\
-                        linux (loop)/blackarch/boot/x86_64/vmlinuz-linux archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={} script=/boot/blackarch/oswitch-init.sh\n\
-                        initrd (loop)/blackarch/boot/x86_64/initramfs-linux.img\n\
+                        linux (loop)/blackarch/boot/x86_64/vmlinuz-linux archisobasedir=blackarch img_dev=/dev/sda2 img_loop={} earlymodules=loop cow_spacesize={}G hostname={}\n\
+                        initrd /boot/blackarch/oswitch-overlay.img (loop)/blackarch/boot/x86_64/initramfs-linux.img\n\
                     }}\n",
                     display_name, allocated_space, user, target_iso.display(), target_iso.display(), target_iso.display(), allocated_space, host
                 );
