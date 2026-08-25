@@ -1,3 +1,12 @@
+export interface OSEdition {
+  id: string;
+  name: string;
+  size: string;
+  desc?: string;
+  isoUrl: string;
+  recommended?: boolean;
+}
+
 export interface OSConfig {
   id: string;
   name: string;
@@ -8,37 +17,230 @@ export interface OSConfig {
   frugalKernel?: string;
   frugalInitrd?: string;
   frugalAppend?: string;
+  editions?: OSEdition[];
 }
 
 export const OS_CATALOG: OSConfig[] = [
-  { id: "ubuntu", name: "Ubuntu 24.04 LTS", category: "Linux", isoUrl: "https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso", officialSite: "https://ubuntu.com/download/desktop", frugalKernel: "/casper/vmlinuz", frugalInitrd: "/casper/initrd", frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject" },
-  { id: "kali", name: "Kali Linux 2024.2", category: "Security", isoUrl: "https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso", officialSite: "https://www.kali.org/get-kali/#kali-installer-images", frugalKernel: "/install.amd/vmlinuz", frugalInitrd: "/install.amd/initrd.gz", frugalAppend: "iso-scan/filename=__ISO_PATH__" },
-  { id: "win11", name: "Windows 11 Pro", category: "Windows", isoUrl: "https://software.download.prss.microsoft.com/db/Win11_English_x64v2.iso", officialSite: "https://www.microsoft.com/software-download/windows11", locked: true },
-  { id: "fedora", name: "Fedora Workstation 41", category: "Linux", isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-41-1.4.iso", officialSite: "https://fedoraproject.org/workstation/download", frugalKernel: "/images/pxeboot/vmlinuz", frugalInitrd: "/images/pxeboot/initrd.img", frugalAppend: "root=live:CDLABEL=Fedora iso-scan/filename=__ISO_PATH__" },
-  { id: "pop", name: "Pop!_OS 22.04", category: "Linux", isoUrl: "https://iso.pop-os.org/22.04/amd64/intel/36/pop-os_22.04_amd64_intel_36.iso", officialSite: "https://pop.system76.com/", frugalKernel: "/casper/vmlinuz.efi", frugalInitrd: "/casper/initrd.gz", frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject" },
-  { id: "debian", name: "Debian 12", category: "Linux", isoUrl: "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso", officialSite: "https://www.debian.org/distrib/", frugalKernel: "/install.amd/vmlinuz", frugalInitrd: "/install.amd/initrd.gz", frugalAppend: "iso-scan/filename=__ISO_PATH__" },
-  { id: "arch", name: "Arch Linux", category: "Linux", isoUrl: "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso", officialSite: "https://archlinux.org/download/", frugalKernel: "/arch/boot/x86_64/vmlinuz-linux", frugalInitrd: "/arch/boot/x86_64/initramfs-linux.img", frugalAppend: "archisobasedir=arch img_loop=__ISO_PATH__" },
-  { id: "mint", name: "Linux Mint 22", category: "Linux", isoUrl: "https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-cinnamon-64bit.iso", officialSite: "https://linuxmint.com/download.php", frugalKernel: "/casper/vmlinuz", frugalInitrd: "/casper/initrd.lz", frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject" },
-  { id: "manjaro", name: "Manjaro KDE", category: "Linux", isoUrl: "https://download.manjaro.org/kde/24.0.2/manjaro-kde-24.0.2-240618-linux69.iso", officialSite: "https://manjaro.org/download/" },
+  { 
+    id: "ubuntu", 
+    name: "Ubuntu 24.04 LTS", 
+    category: "Linux", 
+    isoUrl: "https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso", 
+    officialSite: "https://ubuntu.com/download/desktop", 
+    frugalKernel: "/casper/vmlinuz", 
+    frugalInitrd: "/casper/initrd", 
+    frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject",
+    editions: [
+      { id: "desktop", name: "Desktop (GNOME GUI)", size: "5.8 GB", desc: "Recommended • Full Official Ubuntu Desktop Experience", isoUrl: "https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso", recommended: true },
+      { id: "server", name: "Server Edition (CLI)", size: "2.6 GB", desc: "Headless High-Performance Server OS", isoUrl: "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-live-server-amd64.iso" },
+      { id: "minimal", name: "Minimal Netboot", size: "150 MB", desc: "Ultra-Lightweight Core Base", isoUrl: "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-live-server-amd64.iso" }
+    ]
+  },
+  { 
+    id: "kali", 
+    name: "Kali Linux 2024.2", 
+    category: "Security", 
+    isoUrl: "https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso", 
+    officialSite: "https://www.kali.org/get-kali/#kali-installer-images", 
+    frugalKernel: "/install.amd/vmlinuz", 
+    frugalInitrd: "/install.amd/initrd.gz", 
+    frugalAppend: "iso-scan/filename=__ISO_PATH__",
+    editions: [
+      { id: "installer", name: "Installer XFCE", size: "3.9 GB", desc: "Recommended • Standard Penetration Testing Environment", isoUrl: "https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso", recommended: true },
+      { id: "everything", name: "Everything Live", size: "9.8 GB", desc: "Complete Pre-Packaged Offline Security Tools", isoUrl: "https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-live-everything-amd64.iso" },
+      { id: "netinst", name: "Netinstaller", size: "500 MB", desc: "Minimal Network Boot Installer", isoUrl: "https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-netinst-amd64.iso" }
+    ]
+  },
+  { 
+    id: "win11", 
+    name: "Windows 11 Pro", 
+    category: "Windows", 
+    isoUrl: "https://software.download.prss.microsoft.com/db/Win11_English_x64v2.iso", 
+    officialSite: "https://www.microsoft.com/software-download/windows11", 
+    locked: true,
+    editions: [
+      { id: "pro", name: "Windows 11 Pro 64-bit", size: "6.2 GB", desc: "Official Multi-Edition ISO (Pro / Home / Ent)", isoUrl: "https://software.download.prss.microsoft.com/db/Win11_English_x64v2.iso", recommended: true }
+    ]
+  },
+  { 
+    id: "fedora", 
+    name: "Fedora Workstation 41", 
+    category: "Linux", 
+    isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-41-1.4.iso", 
+    officialSite: "https://fedoraproject.org/workstation/download", 
+    frugalKernel: "/images/pxeboot/vmlinuz", 
+    frugalInitrd: "/images/pxeboot/initrd.img", 
+    frugalAppend: "root=live:CDLABEL=Fedora iso-scan/filename=__ISO_PATH__",
+    editions: [
+      { id: "workstation", name: "Workstation (GNOME)", size: "2.2 GB", desc: "Official Flagship Fedora Desktop", isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-41-1.4.iso", recommended: true },
+      { id: "kde", name: "KDE Plasma Spin", size: "2.4 GB", desc: "Modern Wayland Plasma Desktop", isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Spins/x86_64/iso/Fedora-KDE-Live-x86_64-41-1.4.iso" },
+      { id: "server", name: "Server Edition", size: "2.5 GB", desc: "Enterprise Server Infrastructure", isoUrl: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/iso/Fedora-Server-dvd-x86_64-41-1.4.iso" }
+    ]
+  },
+  { 
+    id: "pop", 
+    name: "Pop!_OS 22.04", 
+    category: "Linux", 
+    isoUrl: "https://iso.pop-os.org/22.04/amd64/intel/36/pop-os_22.04_amd64_intel_36.iso", 
+    officialSite: "https://pop.system76.com/", 
+    frugalKernel: "/casper/vmlinuz.efi", 
+    frugalInitrd: "/casper/initrd.gz", 
+    frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject",
+    editions: [
+      { id: "standard", name: "Intel / AMD Edition", size: "3.2 GB", desc: "For systems with Intel or AMD Graphics", isoUrl: "https://iso.pop-os.org/22.04/amd64/intel/36/pop-os_22.04_amd64_intel_36.iso", recommended: true },
+      { id: "nvidia", name: "NVIDIA Dedicated Edition", size: "3.5 GB", desc: "Pre-packaged with Proprietary NVIDIA Drivers", isoUrl: "https://iso.pop-os.org/22.04/amd64/nvidia/36/pop-os_22.04_amd64_nvidia_36.iso" }
+    ]
+  },
+  { 
+    id: "debian", 
+    name: "Debian 12", 
+    category: "Linux", 
+    isoUrl: "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso", 
+    officialSite: "https://www.debian.org/distrib/", 
+    frugalKernel: "/install.amd/vmlinuz", 
+    frugalInitrd: "/install.amd/initrd.gz", 
+    frugalAppend: "iso-scan/filename=__ISO_PATH__",
+    editions: [
+      { id: "netinst", name: "Netinst Minimal", size: "620 MB", desc: "Recommended Standard Rock-Solid Installer", isoUrl: "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso", recommended: true },
+      { id: "gnome_live", name: "Live GNOME Desktop", size: "3.2 GB", desc: "Full Live Graphical Desktop", isoUrl: "https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-12.6.0-amd64-gnome.iso" },
+      { id: "kde_live", name: "Live KDE Plasma", size: "3.4 GB", desc: "Feature-rich Plasma Desktop", isoUrl: "https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-12.6.0-amd64-kde.iso" }
+    ]
+  },
+  { 
+    id: "arch", 
+    name: "Arch Linux", 
+    category: "Linux", 
+    isoUrl: "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso", 
+    officialSite: "https://archlinux.org/download/", 
+    frugalKernel: "/arch/boot/x86_64/vmlinuz-linux", 
+    frugalInitrd: "/arch/boot/x86_64/initramfs-linux.img", 
+    frugalAppend: "archisobasedir=arch img_loop=__ISO_PATH__",
+    editions: [
+      { id: "standard", name: "Official Standard Live", size: "1.1 GB", desc: "Latest Rolling Release with archinstall automated installer", isoUrl: "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso", recommended: true },
+      { id: "bootstrap", name: "Arch Bootstrap Core", size: "250 MB", desc: "Minimal RootFS Container Image", isoUrl: "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-bootstrap-x86_64.tar.gz" }
+    ]
+  },
+  { 
+    id: "mint", 
+    name: "Linux Mint 22", 
+    category: "Linux", 
+    isoUrl: "https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-cinnamon-64bit.iso", 
+    officialSite: "https://linuxmint.com/download.php", 
+    frugalKernel: "/casper/vmlinuz", 
+    frugalInitrd: "/casper/initrd.lz", 
+    frugalAppend: "boot=casper iso-scan/filename=__ISO_PATH__ noprompt noeject",
+    editions: [
+      { id: "cinnamon", name: "Cinnamon Edition", size: "2.9 GB", desc: "Flagship Modern Desktop (Recommended)", isoUrl: "https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-cinnamon-64bit.iso", recommended: true },
+      { id: "mate", name: "MATE Edition", size: "2.8 GB", desc: "Classic Traditional Lightweight Desktop", isoUrl: "https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-mate-64bit.iso" },
+      { id: "xfce", name: "XFCE Edition", size: "2.7 GB", desc: "Ultra-Lightweight Resource Saver", isoUrl: "https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-xfce-64bit.iso" }
+    ]
+  },
+  { 
+    id: "manjaro", 
+    name: "Manjaro KDE", 
+    category: "Linux", 
+    isoUrl: "https://download.manjaro.org/kde/24.0.2/manjaro-kde-24.0.2-240618-linux69.iso", 
+    officialSite: "https://manjaro.org/download/",
+    editions: [
+      { id: "kde", name: "KDE Plasma Edition", size: "3.6 GB", desc: "Modern Wayland Experience (Recommended)", isoUrl: "https://download.manjaro.org/kde/24.0.2/manjaro-kde-24.0.2-240618-linux69.iso", recommended: true },
+      { id: "xfce", name: "XFCE Edition", size: "3.4 GB", desc: "Lightweight Flagship Edition", isoUrl: "https://download.manjaro.org/xfce/24.0.2/manjaro-xfce-24.0.2-240618-linux69.iso" },
+      { id: "gnome", name: "GNOME Edition", size: "3.5 GB", desc: "Gesture-Driven Clean Desktop", isoUrl: "https://download.manjaro.org/gnome/24.0.2/manjaro-gnome-24.0.2-240618-linux69.iso" }
+    ]
+  },
   { id: "centos", name: "CentOS Stream 9", category: "Server", isoUrl: "https://mirrors.centos.org/mirrorlist?path=9-stream/BaseOS/x86_64/iso/CentOS-Stream-9-latest-x86_64-dvd1.iso", officialSite: "https://www.centos.org/download/" },
   { id: "rocky", name: "Rocky Linux 9", category: "Server", isoUrl: "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.3-x86_64-dvd.iso", officialSite: "https://rockylinux.org/download" },
   { id: "almalinux", name: "AlmaLinux 9", category: "Server", isoUrl: "https://repo.almalinux.org/almalinux/9/isos/x86_64/AlmaLinux-9.3-x86_64-dvd.iso", officialSite: "https://almalinux.org/get-almalinux/" },
-  { id: "opensuse", name: "openSUSE Tumbleweed", category: "Linux", isoUrl: "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-DVD-x86_64-Current.iso", officialSite: "https://get.opensuse.org/tumbleweed/" },
+  { 
+    id: "opensuse", 
+    name: "openSUSE Tumbleweed", 
+    category: "Linux", 
+    isoUrl: "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-DVD-x86_64-Current.iso", 
+    officialSite: "https://get.opensuse.org/tumbleweed/",
+    editions: [
+      { id: "tumbleweed", name: "Tumbleweed (Rolling)", size: "4.4 GB", desc: "Latest Bleeding-Edge Rolling Release", isoUrl: "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-DVD-x86_64-Current.iso", recommended: true },
+      { id: "leap", name: "Leap 15.6 (Enterprise LTS)", size: "4.0 GB", desc: "Rock-Solid Long Term Stability", isoUrl: "https://download.opensuse.org/distribution/leap/15.6/iso/openSUSE-Leap-15.6-DVD-x86_64-Media.iso" }
+    ]
+  },
   { id: "chromeos", name: "ChromeOS Flex", category: "Linux", isoUrl: "https://dl.google.com/chromeos-flex/images/latest.bin.zip", officialSite: "https://chromeenterprise.google/os/chromeosflex/" },
   { id: "oracle", name: "Oracle Linux", category: "Server", isoUrl: "https://yum.oracle.com/ISOS/OracleLinux/OL9/u3/x86_64/OracleLinux-R9-U3-x86_64-dvd.iso", officialSite: "https://www.oracle.com/linux/" },
   { id: "sles", name: "SUSE Linux Enterprise", category: "Server", isoUrl: "https://www.suse.com/download/sles/" },
   { id: "tails", name: "Tails 6.5", category: "Security", isoUrl: "https://mirrors.wikimedia.org/tails/stable/tails-amd64-6.5/tails-amd64-6.5.iso" },
-  { id: "parrot", name: "Parrot Security 6.1", category: "Security", isoUrl: "https://deb.parrot.sh/parrot/iso/6.1/Parrot-security-6.1_amd64.iso" },
-  { id: "blackarch", name: "BlackArch Linux", category: "Security", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso" },
-  { id: "win10", name: "Windows 10 Pro", category: "Windows", isoUrl: "https://software.download.prss.microsoft.com/db/Win10_English_x64.iso", locked: true },
+  { 
+    id: "parrot", 
+    name: "Parrot Security 6.1", 
+    category: "Security", 
+    isoUrl: "https://deb.parrot.sh/parrot/iso/6.1/Parrot-security-6.1_amd64.iso",
+    editions: [
+      { id: "security", name: "Security Edition (Pentest)", size: "4.8 GB", desc: "Full Pentest & Vulnerability Assessment Suite", isoUrl: "https://deb.parrot.sh/parrot/iso/6.1/Parrot-security-6.1_amd64.iso", recommended: true },
+      { id: "home", name: "Home Edition (Workstation)", size: "2.4 GB", desc: "Lightweight Privacy & Daily Development Desktop", isoUrl: "https://deb.parrot.sh/parrot/iso/6.1/Parrot-home-6.1_amd64.iso" }
+    ]
+  },
+  { 
+    id: "blackarch", 
+    name: "BlackArch Linux", 
+    category: "Security", 
+    isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso",
+    editions: [
+      { id: "slim", name: "Slim Edition (XFCE GUI)", size: "5.2 GB", desc: "Recommended • Fast Download & Top Pentesting Tools", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso", recommended: true },
+      { id: "full", name: "Full ISO (Complete Suite)", size: "22.0 GB", desc: "All 2,800+ Offensive Tools Offline Pre-installed", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-full-2023.05.01-x86_64.iso" },
+      { id: "netinst", name: "Netinstaller (Minimal)", size: "850 MB", desc: "Lightweight Base Network Installer", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-netinst-2023.05.01-x86_64.iso" }
+    ]
+  },
+  { 
+    id: "win10", 
+    name: "Windows 10 Pro", 
+    category: "Windows", 
+    isoUrl: "https://software.download.prss.microsoft.com/db/Win10_English_x64.iso", 
+    locked: true,
+    editions: [
+      { id: "pro", name: "Windows 10 Pro 64-bit", size: "5.8 GB", desc: "Official Multi-Edition ISO (Pro / Home / Ent)", isoUrl: "https://software.download.prss.microsoft.com/db/Win10_English_x64.iso", recommended: true }
+    ]
+  },
   { id: "winserver", name: "Windows Server 2022", category: "Server", isoUrl: "https://go.microsoft.com/fwlink/p/?LinkID=2164993", locked: true },
   { id: "ubuntu-server", name: "Ubuntu Server 24.04", category: "Server", isoUrl: "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-live-server-amd64.iso" },
-  { id: "alpine", name: "Alpine Linux", category: "Linux", isoUrl: "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso" },
-  { id: "nixos", name: "NixOS 24.05", category: "Linux", isoUrl: "https://channels.nixos.org/nixos-24.05/latest-nixos-gnome-x86_64-linux.iso" },
+  { 
+    id: "alpine", 
+    name: "Alpine Linux", 
+    category: "Linux", 
+    isoUrl: "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso",
+    editions: [
+      { id: "standard", name: "Alpine Standard", size: "200 MB", desc: "Minimal General Purpose Linux Core", isoUrl: "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso", recommended: true },
+      { id: "extended", name: "Alpine Extended", size: "800 MB", desc: "Includes Extra Firmware & Drivers", isoUrl: "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-extended-3.19.1-x86_64.iso" }
+    ]
+  },
+  { 
+    id: "nixos", 
+    name: "NixOS 24.05", 
+    category: "Linux", 
+    isoUrl: "https://channels.nixos.org/nixos-24.05/latest-nixos-gnome-x86_64-linux.iso",
+    editions: [
+      { id: "gnome", name: "NixOS GNOME Graphical", size: "2.6 GB", desc: "Reproducible Desktop with GNOME", isoUrl: "https://channels.nixos.org/nixos-24.05/latest-nixos-gnome-x86_64-linux.iso", recommended: true },
+      { id: "plasma", name: "NixOS Plasma Graphical", size: "2.7 GB", desc: "Reproducible Desktop with KDE Plasma", isoUrl: "https://channels.nixos.org/nixos-24.05/latest-nixos-plasma5-x86_64-linux.iso" },
+      { id: "minimal", name: "NixOS Minimal (CLI)", size: "1.0 GB", desc: "Minimal Headless Command Line", isoUrl: "https://channels.nixos.org/nixos-24.05/latest-nixos-minimal-x86_64-linux.iso" }
+    ]
+  },
   { id: "elementary", name: "elementary OS 7.1", category: "Linux", isoUrl: "https://ams3.dl.elementary.io/elementaryos-7.1-stable.20230926rc.iso" },
-  { id: "zorin", name: "Zorin OS 17.1", category: "Linux", isoUrl: "https://mirrors.edge.kernel.org/zorinos/17/Zorin-OS-17.1-Core-64-bit.iso" },
+  { 
+    id: "zorin", 
+    name: "Zorin OS 17.1", 
+    category: "Linux", 
+    isoUrl: "https://mirrors.edge.kernel.org/zorinos/17/Zorin-OS-17.1-Core-64-bit.iso",
+    editions: [
+      { id: "core", name: "Zorin OS 17.1 Core", size: "3.2 GB", desc: "Full Windows-like Desktop", isoUrl: "https://mirrors.edge.kernel.org/zorinos/17/Zorin-OS-17.1-Core-64-bit.iso", recommended: true },
+      { id: "lite", name: "Zorin OS 17.1 Lite", size: "2.6 GB", desc: "For Lower Spec / Older Hardware", isoUrl: "https://mirrors.edge.kernel.org/zorinos/17/Zorin-OS-17.1-Lite-64-bit.iso" }
+    ]
+  },
   { id: "deepin", name: "Deepin 20.9", category: "Linux", isoUrl: "https://cdimage.deepin.com/releases/20.9/deepin-desktop-community-20.9-amd64.iso" },
-  { id: "garuda", name: "Garuda Linux Dr460nized", category: "Linux", isoUrl: "https://iso.builds.garudalinux.org/iso/garuda/dr460nized/231029/garuda-dr460nized-linux-zen-231029.iso" },
+  { 
+    id: "garuda", 
+    name: "Garuda Linux Dr460nized", 
+    category: "Linux", 
+    isoUrl: "https://iso.builds.garudalinux.org/iso/garuda/dr460nized/231029/garuda-dr460nized-linux-zen-231029.iso",
+    editions: [
+      { id: "dr460nized", name: "Garuda Dr460nized", size: "3.2 GB", desc: "Ultimate Neon Gaming & Performance UI", isoUrl: "https://iso.builds.garudalinux.org/iso/garuda/dr460nized/231029/garuda-dr460nized-linux-zen-231029.iso", recommended: true },
+      { id: "kde_lite", name: "Garuda KDE Lite", size: "2.4 GB", desc: "Clean Lightweight Performance Arch", isoUrl: "https://iso.builds.garudalinux.org/iso/garuda/kde-lite/240501/garuda-kde-lite-linux-zen-240501.iso" }
+    ]
+  },
   { id: "endeavouros", name: "EndeavourOS", category: "Linux", isoUrl: "https://mirrors.kernel.org/endeavouros/iso/EndeavourOS_Galileo-Neo-2024.01.25.iso" },
   { id: "mxlinux", name: "MX Linux 23.2", category: "Linux", isoUrl: "https://sourceforge.net/projects/mx-linux/files/Final/MX-23.2_x64.iso/download" },
   { id: "linuxlite", name: "Linux Lite 6.8", category: "Linux", isoUrl: "https://osdn.net/dl/linuxlite/linux-lite-6.8-64bit.iso" },

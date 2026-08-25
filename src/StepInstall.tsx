@@ -107,6 +107,7 @@ export default function StepInstall({
   onBack,
   selectedOS,
   selectedIntents,
+  selectedEditions = {},
   selectedBundles,
   selectedTools = [],
   backupEnabled,
@@ -122,10 +123,11 @@ export default function StepInstall({
   onBack: () => void,
   selectedOS: string[],
   selectedIntents: Record<string, string>,
+  selectedEditions?: Record<string, string>,
   selectedBundles: string[],
   selectedTools?: string[],
   backupEnabled: boolean,
-  catalog: { id: string, name: string, isoUrl?: string, officialSite?: string, frugalKernel?: string, frugalInitrd?: string, frugalAppend?: string }[],
+  catalog: any[],
   isInstalling: boolean,
   setIsInstalling: (b: boolean) => void,
   osSpace: number,
@@ -270,7 +272,9 @@ export default function StepInstall({
 
       const intent = selectedIntents[id] || "vbox_vm";
       const catalogEntry = catalog.find(o => o.id === id);
-      const iso_url = localIsoPath || catalogEntry?.isoUrl || "";
+      const selectedEditionId = selectedEditions?.[id];
+      const editionObj = catalogEntry?.editions?.find((e: any) => e.id === selectedEditionId) || (catalogEntry?.editions && catalogEntry.editions.length > 0 ? catalogEntry.editions[0] : null);
+      const iso_url = localIsoPath || editionObj?.isoUrl || catalogEntry?.isoUrl || "";
       
       // Step 1: Install OS (Skip if tools_only)
       if (id !== "tools_only") {
@@ -405,12 +409,17 @@ export default function StepInstall({
     const staticMeta = OS_LIST.find(o => o.id === osId);
     const catalogMeta = catalog.find((o: any) => o.id === osId);
     if (!staticMeta && !catalogMeta) return null;
+    const editions = (catalogMeta as any)?.editions;
+    const selectedEditionId = selectedEditions?.[osId];
+    const activeEdition = editions?.find((e: any) => e.id === selectedEditionId) || (editions && editions.length > 0 ? editions[0] : null);
     return {
       id: osId,
       name: catalogMeta?.name || staticMeta?.name || osId,
       sub: staticMeta?.sub || (catalogMeta as any)?.category || "",
       glyph: staticMeta?.glyph || "📦",
-      locked: staticMeta?.locked || false
+      locked: staticMeta?.locked || false,
+      editions: editions,
+      activeEdition: activeEdition
     };
   };
 
@@ -560,8 +569,11 @@ export default function StepInstall({
           </div>
           
           <div className="p-4 font-mono text-sm overflow-y-auto flex-grow custom-scrollbar">
-            <div className="text-slate-500 mb-1"># Universal Provisioning Engine</div>
-            {activeTab !== "tools_only" && <div className="text-green-400 mb-1">$ Target OS: {activeOSDetails?.name}</div>}
+            {activeTab !== "tools_only" && (
+              <div className="text-green-400 mb-1">
+                $ Target OS: {activeOSDetails?.name} {activeOSDetails?.activeEdition ? `[${activeOSDetails.activeEdition.name} • ${activeOSDetails.activeEdition.size}]` : ""}
+              </div>
+            )}
             {activeTab !== "tools_only" && <div className="text-green-400 mb-1">$ Intent: {selectedIntents[activeTab || ""] || "vbox_vm"}</div>}
             {selectedBundles.length > 0 && (
                <div className="text-yellow-400 mb-1">$ Bundles: {selectedBundles.length} selected for post-install</div>

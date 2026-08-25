@@ -82,6 +82,8 @@ export default function StepChooseOS({
   setSelectedOS,
   selectedIntents,
   setSelectedIntents,
+  selectedEditions = {},
+  setSelectedEditions,
   catalog
 }: { 
   onNext: () => void, 
@@ -90,7 +92,9 @@ export default function StepChooseOS({
   setSelectedOS: (osList: string[]) => void,
   selectedIntents: Record<string, string>,
   setSelectedIntents: (intents: Record<string, string>) => void,
-  catalog: { id: string, name: string, category: string, locked?: boolean }[]
+  selectedEditions?: Record<string, string>,
+  setSelectedEditions?: (editions: Record<string, string>) => void,
+  catalog: any[]
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"install" | "manage">("install");
@@ -113,7 +117,8 @@ export default function StepChooseOS({
         name: catEntry.name,
         sub: staticMeta?.sub || catEntry.category,
         glyph: staticMeta?.glyph || "📦",
-        locked: staticMeta?.locked || catEntry.locked || false
+        locked: staticMeta?.locked || catEntry.locked || false,
+        editions: catEntry.editions
       };
     });
 
@@ -137,6 +142,15 @@ export default function StepChooseOS({
       ...selectedIntents,
       [id]: intent
     });
+  };
+
+  const handleEditionChange = (id: string, editionId: string) => {
+    if (setSelectedEditions) {
+      setSelectedEditions({
+        ...selectedEditions,
+        [id]: editionId
+      });
+    }
   };
 
   const handleBootOS = (osId: string) => {
@@ -263,6 +277,9 @@ export default function StepChooseOS({
             {filteredOS.map((os: any) => {
               const isSelected = selectedOSSet.has(os.id);
               const intent = selectedIntents[os.id] || 'vbox_vm';
+              const editions = os.editions as any[] | undefined;
+              const currentEditionId = selectedEditions[os.id] || (editions && editions.length > 0 ? editions[0].id : undefined);
+              const activeEdition = editions?.find((e: any) => e.id === currentEditionId) || (editions && editions.length > 0 ? editions[0] : null);
               
               return (
                 <div 
@@ -288,24 +305,62 @@ export default function StepChooseOS({
                   <div className="flex items-center gap-4 mb-3 min-w-0 pr-6">
                     <OSLogo id={os.id} size={38} className="flex-shrink-0 drop-shadow-md" />
                     <div className="min-w-0 flex-1">
-                      <div className="text-slate-900 dark:text-white font-bold text-lg truncate">{os.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-900 dark:text-white font-bold text-lg truncate">{os.name}</span>
+                        {activeEdition && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 shrink-0">
+                            📦 {activeEdition.size}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-slate-500 dark:text-slate-400 text-xs leading-tight line-clamp-2">{os.sub}</div>
                     </div>
                   </div>
                   
                   {isSelected && !os.locked && (
-                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
-                      <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1 font-medium">Install Method:</label>
-                      <select 
-                        className="bg-slate-100 dark:bg-black/80 border border-slate-300 dark:border-white/10 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white w-full text-xs font-semibold focus:outline-none focus:border-blue-500"
-                        value={intent}
-                        onChange={(e) => handleIntentChange(os.id, e.target.value)}
-                      >
-                        <option value="vbox_vm">💻 VirtualBox VM (Safe Sandbox)</option>
-                        <option value="baremetal_grub">🚀 Native Bare-Metal (100% Hardware Speed)</option>
-                        <option value="usb_flash">🔌 Physical USB Flash Drive</option>
-                        <option value="vmware_vm">⚡ VMware Workstation Pro VM</option>
-                      </select>
+                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-white/10 flex flex-col gap-2.5" onClick={(e) => e.stopPropagation()}>
+                      <div>
+                        <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1 font-medium">Install Method:</label>
+                        <select 
+                          className="bg-slate-100 dark:bg-black/80 border border-slate-300 dark:border-white/10 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white w-full text-xs font-semibold focus:outline-none focus:border-blue-500"
+                          value={intent}
+                          onChange={(e) => handleIntentChange(os.id, e.target.value)}
+                        >
+                          <option value="vbox_vm">💻 VirtualBox VM (Safe Sandbox)</option>
+                          <option value="baremetal_grub">🚀 Native Bare-Metal (100% Hardware Speed)</option>
+                          <option value="usb_flash">🔌 Physical USB Flash Drive</option>
+                          <option value="vmware_vm">⚡ VMware Workstation Pro VM</option>
+                        </select>
+                      </div>
+
+                      {editions && editions.length > 1 && (
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Edition / Flavor:</label>
+                            {activeEdition && (
+                              <span className="text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                                ⚡ {activeEdition.size}
+                              </span>
+                            )}
+                          </div>
+                          <select 
+                            className="bg-slate-100 dark:bg-black/80 border border-slate-300 dark:border-white/10 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white w-full text-xs font-semibold focus:outline-none focus:border-cyan-500"
+                            value={currentEditionId}
+                            onChange={(e) => handleEditionChange(os.id, e.target.value)}
+                          >
+                            {editions.map((ed: any) => (
+                              <option key={ed.id} value={ed.id}>
+                                {ed.name} ({ed.size})
+                              </option>
+                            ))}
+                          </select>
+                          {activeEdition?.desc && (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-mono leading-tight">
+                              {activeEdition.desc}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

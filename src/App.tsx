@@ -74,6 +74,7 @@ function App() {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedOS, setSelectedOS] = useState<string[]>([]);
   const [selectedIntents, setSelectedIntents] = useState<Record<string, string>>({});
+  const [selectedEditions, setSelectedEditions] = useState<Record<string, string>>({});
   const [selectedBundles, setSelectedBundles] = useState<string[]>([]);
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [backupEnabled, setBackupEnabled] = useState(true);
@@ -171,6 +172,7 @@ function App() {
                 onNext={goNext} onBack={goBack} 
                 selectedOS={selectedOS} setSelectedOS={setSelectedOS}
                 selectedIntents={selectedIntents} setSelectedIntents={setSelectedIntents}
+                selectedEditions={selectedEditions} setSelectedEditions={setSelectedEditions}
                 catalog={catalog} />;
       case 3: return <StepDiskSpace
                 onNext={goNext} onBack={goBack}
@@ -193,6 +195,7 @@ function App() {
       case 8: return <StepInstall 
                 onNext={goNext} onBack={goBack}
                 selectedOS={selectedOS} selectedIntents={selectedIntents}
+                selectedEditions={selectedEditions}
                 selectedBundles={selectedBundles} selectedTools={selectedTools}
                 osSpace={osSpace}
                 backupEnabled={backupEnabled} catalog={catalog}
