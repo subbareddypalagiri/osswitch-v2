@@ -62,16 +62,29 @@ export default function StepTools({
 
   const isToolInstalled = (t: Tool) => {
     if (!installedApps || installedApps.length === 0) return false;
-    const tName = t.name.toLowerCase();
-    const wId = (t.wingetId || '').toLowerCase();
-    const idLast = (t.wingetId || '').split('.').pop()?.toLowerCase() || '';
-    return installedApps.some(app => 
-      app === tName || 
-      app.includes(tName) || 
-      tName.includes(app) ||
-      (wId && app.includes(wId)) ||
-      (idLast && idLast.length >= 4 && (app.includes(idLast) || idLast.includes(app)))
-    );
+    const tName = t.name.toLowerCase().trim();
+    const cleanT = tName.replace(/[^a-z0-9]/g, '');
+    if (!cleanT || cleanT.length < 2) return false;
+    const wId = (t.wingetId || '').toLowerCase().trim();
+
+    return installedApps.some(app => {
+      const rawApp = app.toLowerCase().trim();
+      const cleanApp = rawApp.replace(/[^a-z0-9]/g, '');
+      if (!cleanApp) return false;
+
+      // 1. Exact equality (e.g. "git" === "git", "docker desktop" === "docker desktop")
+      if (cleanApp === cleanT) return true;
+
+      // 2. Prefix match for versioned apps (e.g. "autopsy 4.23.1" starts with "autopsy", "pycharm community edition 2025" starts with "pycharm community")
+      if (cleanT.length >= 4 && cleanApp.startsWith(cleanT)) return true;
+
+      // 3. Exact Winget ID matching (e.g. "SleuthKit.Autopsy", "Microsoft.VisualStudioCode")
+      if (wId && (rawApp === wId || (wId.length >= 8 && rawApp.includes(wId)))) {
+        return true;
+      }
+
+      return false;
+    });
   };
 
   const handleLaunchApp = async (tool: Tool) => {

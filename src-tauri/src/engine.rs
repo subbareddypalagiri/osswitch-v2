@@ -1680,6 +1680,12 @@ pub async fn get_installed_tools() -> Result<Vec<String>, String> {
 
     #[cfg(target_os = "windows")]
     {
+        let ignored_noise = [
+            "help", "documentation", "windows tools", "run", "settings", "feedback hub", "get help",
+            "get started", "documentation for desktop apps", "tools for desktop apps", "tools for uwp apps",
+            "sample desktop apps", "sample uwp apps", "release notes", "migration guide", "reference documentation"
+        ];
+
         // 1. Scan Get-StartApps
         if let Ok(out) = Command::new("powershell")
             .args(["-NoProfile", "-Command", "Get-StartApps | Select-Object -ExpandProperty Name"])
@@ -1687,9 +1693,9 @@ pub async fn get_installed_tools() -> Result<Vec<String>, String> {
         {
             let s = String::from_utf8_lossy(&out.stdout);
             for line in s.lines() {
-                let trimmed = line.trim();
-                if !trimmed.is_empty() {
-                    installed.insert(trimmed.to_lowercase());
+                let trimmed = line.trim().to_lowercase();
+                if trimmed.len() >= 2 && !ignored_noise.contains(&trimmed.as_str()) {
+                    installed.insert(trimmed);
                 }
             }
         }
@@ -1702,9 +1708,9 @@ pub async fn get_installed_tools() -> Result<Vec<String>, String> {
         {
             let s = String::from_utf8_lossy(&out.stdout);
             for line in s.lines() {
-                let trimmed = line.trim();
-                if !trimmed.is_empty() {
-                    installed.insert(trimmed.to_lowercase());
+                let trimmed = line.trim().to_lowercase();
+                if trimmed.len() >= 2 && !ignored_noise.contains(&trimmed.as_str()) {
+                    installed.insert(trimmed);
                 }
             }
         }
