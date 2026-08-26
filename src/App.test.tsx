@@ -41,7 +41,7 @@ describe("App Component", () => {
       vi.advanceTimersByTime(3000);
     });
     
-    const skipBtn = screen.getByText(/Skip Tour/i);
+    const skipBtn = screen.getByText(/Skip/i);
     fireEvent.click(skipBtn);
 
     expect(screen.getByText("Welcome")).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe("App Component", () => {
       vi.advanceTimersByTime(3000);
     });
     
-    const skipBtn = screen.getByText(/Skip Tour/i);
+    const skipBtn = screen.getByText(/Skip/i);
     fireEvent.click(skipBtn);
 
     const btn = screen.getByText(/Get Started/i);

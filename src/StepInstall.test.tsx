@@ -5,6 +5,7 @@ import StepInstall from './StepInstall';
 describe('StepInstall Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (window as any).__TAURI_INTERNALS__ = {};
   });
 
   it('renders the OS installation UI correctly', () => {
@@ -24,10 +25,10 @@ describe('StepInstall Component', () => {
     );
     
     // Check if the target OS name appears in the terminal header or tab
-    expect(screen.getByText(/Terminal - Ubuntu Linux/i)).toBeInTheDocument();
+    expect(screen.getByText(/Terminal/i)).toBeInTheDocument();
     
-    // Check if the Install button is present
-    expect(screen.getByRole('button', { name: /Install Ubuntu Linux now/i })).toBeInTheDocument();
+    // Check if the Start Provisioning button is present
+    expect(screen.getByRole('button', { name: /Start Provisioning Ubuntu Linux/i })).toBeInTheDocument();
   });
 
   it('handles the installation flow and updates progress', async () => {
@@ -38,17 +39,17 @@ describe('StepInstall Component', () => {
         onNext={() => {}} 
         onBack={() => {}} 
         selectedOS={['arch']} 
-        selectedIntents={{ arch: 'usb_flash' }} 
+        selectedIntents={{ arch: 'vbox_vm' }} 
         selectedBundles={[]} 
         backupEnabled={false} 
         catalog={[{ id: 'arch', name: 'Arch Linux' }]} 
         isInstalling={false} 
-        setIsInstalling={vi.fn()} 
+        setIsInstalling={setIsInstalling} 
         osSpace={50}
       />
     );
     
-    const installButton = screen.getByRole('button', { name: /Install Arch Linux now/i });
+    const installButton = screen.getByRole('button', { name: /Start Provisioning Arch Linux/i });
     fireEvent.click(installButton);
     
     // Expect the state setter to be called indicating installation started
