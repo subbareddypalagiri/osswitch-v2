@@ -1277,10 +1277,15 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
                         let _ = std::process::Command::new("powershell").args(["-Command", &ps_shortcut_script]).output();
 
                         let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
-                        let _ = app.emit("install-progress", InstallProgress { i: idx + 1, text: format!("Completed {}", id), total: total_packages, done: (idx + 1 == total_packages) });
                     } else {
                         overall_success = false;
-                        let clean_err = if full_output.trim().is_empty() { "Installation exited with error code".to_string() } else { full_output.trim().to_string() };
+                        let clean_err = if full_output.contains("0x80072ee7") || full_output.contains("InternetOpenUrl") {
+                            "Network Connection Error (0x80072ee7: Server or DNS address unreachable). Please check your internet connection or try again.".to_string()
+                        } else if full_output.trim().is_empty() {
+                            "Installation exited with error code".to_string()
+                        } else {
+                            full_output.trim().to_string()
+                        };
                         error_msg.push_str(&format!("{}: {}. ", id, clean_err));
                         let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
                     }

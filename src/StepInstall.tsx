@@ -329,7 +329,8 @@ export default function StepInstall({
         return;
       }
       
-      setInstallStatus(prev => ({ ...prev, [id]: { status: "error", message: "Failed to install OS " + id + ": " + errMsg } }));
+      const prefix = id === "tools_only" ? "Package Provisioning: " : "Failed to install OS " + id + ": ";
+      setInstallStatus(prev => ({ ...prev, [id]: { status: "error", message: prefix + errMsg } }));
       checkAiForError(errMsg);
       setIsInstalling(false);
       return;
