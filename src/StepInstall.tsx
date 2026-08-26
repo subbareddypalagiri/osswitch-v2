@@ -296,41 +296,9 @@ export default function StepInstall({
       // Step 2: Install Packages (Bundles + Tools)
       const packagesToInstallIds = [...selectedBundles, ...(selectedTools || [])];
       if (packagesToInstallIds.length > 0) {
-          setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "Fetching tool catalog for provisioning engine..." } }));
-          
-          let toolsCatalog: { tools: any[] } = { tools: [] };
-          try {
-            const res = await fetch('/tools-catalog.json');
-            toolsCatalog = await res.json();
-          } catch(err) {
-            console.error("Failed to fetch tool catalog:", err);
-          }
-          
-          const packagesToInstall = packagesToInstallIds.map(pkgId => {
-            const tool = toolsCatalog.tools.find((t: any) => t.wingetId === pkgId);
-            if (tool) {
-               return {
-                 id: tool.id,
-                 name: tool.name,
-                 wingetId: tool.wingetId,
-                 directDownloadUrl: tool.directDownloadUrl || null,
-                 installerType: tool.installerType || null,
-                 silentArgs: tool.silentArgs || null
-               };
-            }
-            return {
-               id: pkgId,
-               name: pkgId,
-               wingetId: pkgId,
-               directDownloadUrl: null,
-               installerType: null,
-               silentArgs: null
-            };
-          });
-
           setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "Universal Provisioning: Installing tools..." } }));
           const res = await invoke("install_packages", { 
-            packages: packagesToInstall, 
+            packages: packagesToInstallIds, 
             targetOs: id === "tools_only" ? null : id, 
             intent: id === "tools_only" ? null : intent, 
             apiKey: apiKey, 

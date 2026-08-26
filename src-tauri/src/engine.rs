@@ -1,9 +1,8 @@
 use tauri::{AppHandle, Emitter};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
-use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use sysinfo::System;
 use futures_util::StreamExt;
 
@@ -1146,28 +1145,61 @@ struct BundleProgress {
     status: String,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(untagged)]
+pub enum PackageSpec {
+    Id(String),
+    Detailed {
+        #[serde(default)]
+        id: Option<String>,
+        #[serde(rename = "wingetId", default)]
+        winget_id: Option<String>,
+        #[serde(default)]
+        name: Option<String>,
+    },
+}
+
+impl PackageSpec {
+    pub fn get_id(&self) -> String {
+        match self {
+            PackageSpec::Id(s) => s.clone(),
+            PackageSpec::Detailed { winget_id: Some(w), .. } if !w.is_empty() => w.clone(),
+            PackageSpec::Detailed { id: Some(i), .. } if !i.is_empty() => i.clone(),
+            PackageSpec::Detailed { name: Some(n), .. } if !n.is_empty() => n.clone(),
+            _ => String::new(),
+        }
+    }
+}
+
 #[tauri::command]
-pub async fn install_packages(app: tauri::AppHandle, packages: Vec<String>, target_os: Option<String>, intent: Option<String>, api_key: Option<String>, ai_model: Option<String>) -> Result<String, String> {
+pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>, target_os: Option<String>, intent: Option<String>, api_key: Option<String>, ai_model: Option<String>) -> Result<String, String> {
+    let pkg_ids: Vec<String> = packages.iter().map(|p| p.get_id()).filter(|s| !s.is_empty()).collect();
     if let (Some(os), Some(intnt)) = (&target_os, &intent) {
         if intnt == "baremetal_grub" || intnt == "usb_flash" {
-            return generate_and_inject_ai_script(app, os.clone(), packages, api_key, ai_model).await;
+            return generate_and_inject_ai_script(app, os.clone(), pkg_ids, api_key, ai_model).await;
         }
     }
 
-    println!("[Engine] Installing {} packages with real-time telemetry...", packages.len());
+    println!("[Engine] Installing {} packages with real-time telemetry...", pkg_ids.len());
     
     let res = tauri::async_runtime::spawn_blocking(move || {
         let mut overall_success = true;
         let mut error_msg = String::new();
         
-        let total_packages = packages.len();
-        for (idx, id) in packages.iter().enumerate() {
+        let total_packages = pkg_ids.len();
+        let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        let default_winget = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+        let winget_path = if std::path::Path::new(&default_winget).exists() {
+            default_winget
+        } else {
+            "winget".to_string()
+        };
+
+        for (idx, id) in pkg_ids.iter().enumerate() {
             let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "installing".to_string() });
             let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("Starting {} ({}/{})", id, idx + 1, total_packages), total: total_packages, done: false });
             
             let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--id", id];
-            let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
-            let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
             let child = std::process::Command::new(&winget_path)
                 .args(&args)
                 .stdout(std::process::Stdio::piped())
