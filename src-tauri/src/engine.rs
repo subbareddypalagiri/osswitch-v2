@@ -1594,4 +1594,86 @@ pub async fn search_winget(query: String) -> Result<Vec<WingetSearchResult>, Str
     Ok(results)
 }
 
+#[tauri::command]
+pub async fn get_installed_tools() -> Result<Vec<String>, String> {
+    let mut installed = std::collections::HashSet::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        // 1. Scan Get-StartApps
+        if let Ok(out) = Command::new("powershell")
+            .args(["-NoProfile", "-Command", "Get-StartApps | Select-Object -ExpandProperty Name"])
+            .output().await
+        {
+            let s = String::from_utf8_lossy(&out.stdout);
+            for line in s.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    installed.insert(trimmed.to_lowercase());
+                }
+            }
+        }
+
+        // 2. Scan Registry Uninstall Keys
+        let reg_script = "Get-ItemProperty 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty DisplayName";
+        if let Ok(out) = Command::new("powershell")
+            .args(["-NoProfile", "-Command", reg_script])
+            .output().await
+        {
+            let s = String::from_utf8_lossy(&out.stdout);
+            for line in s.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    installed.insert(trimmed.to_lowercase());
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        for binary in &["git", "code", "vlc", "wireshark", "python3", "docker", "nmap", "node", "autopsy", "7z"] {
+            if let Ok(out) = Command::new("which").arg(binary).output().await {
+                if out.status.success() {
+                    installed.insert(binary.to_string());
+                }
+            }
+        }
+    }
+
+    Ok(installed.into_iter().collect())
+}
+
+#[tauri::command]
+pub async fn launch_installed_tool(tool_name: String, winget_id: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let ps_script = format!(
+            "$name = '{}'; $id = '{}';\n\
+            $app = Get-StartApps | Where-Object {{ $_.Name -like \"*$name*\" -or $_.AppId -like \"*$name*\" }} | Select-Object -First 1;\n\
+            if ($app) {{\n\
+                Start-Process \"explorer.exe\" \"shell:AppsFolder\\$($app.AppId)\";\n\
+                return 'Launched via StartApps';\n\
+            }}\n\
+            $exe = (Get-ChildItem 'C:\\Program Files', 'C:\\Program Files (x86)', '$env:LOCALAPPDATA\\Programs', '$env:LOCALAPPDATA\\OSwitchTools' -Recurse -Filter \"*$name*.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName;\n\
+            if ($exe) {{\n\
+                Start-Process $exe;\n\
+                return 'Launched via EXE';\n\
+            }}\n\
+            Start-Process $name -ErrorAction SilentlyContinue;\n\
+            'Launched via Process'",
+            tool_name, winget_id
+        );
+        let _ = Command::new("powershell").args(["-NoProfile", "-Command", &ps_script]).output().await;
+        return Ok(format!("Launched {}", tool_name));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = Command::new(&tool_name).spawn();
+        Ok(format!("Launched {}", tool_name))
+    }
+}
+
+
 

@@ -35,7 +35,9 @@ pub fn run() {
             engine::install_os,
             engine::boot_os,
             engine::get_installed_os_list,
-                                    boot_switcher::get_boot_menu,
+            engine::get_installed_tools,
+            engine::launch_installed_tool,
+            boot_switcher::get_boot_menu,
             boot_switcher::set_default_boot
         ])
         .run(tauri::generate_context!())

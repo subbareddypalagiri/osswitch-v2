@@ -43,13 +43,47 @@ export default function StepTools({
   const [aiGuide, setAiGuide] = useState<string | null>(null);
   const [liveSearchResults, setLiveSearchResults] = useState<Tool[]>([]);
   const [isSearchingLive, setIsSearchingLive] = useState(false);
+  const [installedApps, setInstalledApps] = useState<string[]>([]);
+  const [filterType, setFilterType] = useState<"all" | "installed" | "windows_winget" | "linux_vm" | "web_app" | "vendor_direct">("all");
+  const [launchMessage, setLaunchMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/tools-catalog.json')
       .then(res => res.json())
       .then(data => setCatalog(data))
       .catch(err => console.error("Failed to load tools catalog", err));
+
+    invoke<string[]>('get_installed_tools')
+      .then(apps => {
+        if (apps) setInstalledApps(apps);
+      })
+      .catch(err => console.error("Failed to load installed apps:", err));
   }, []);
+
+  const isToolInstalled = (t: Tool) => {
+    if (!installedApps || installedApps.length === 0) return false;
+    const tName = t.name.toLowerCase();
+    const wId = (t.wingetId || '').toLowerCase();
+    const idLast = (t.wingetId || '').split('.').pop()?.toLowerCase() || '';
+    return installedApps.some(app => 
+      app === tName || 
+      app.includes(tName) || 
+      tName.includes(app) ||
+      (wId && app.includes(wId)) ||
+      (idLast && idLast.length >= 4 && (app.includes(idLast) || idLast.includes(app)))
+    );
+  };
+
+  const handleLaunchApp = async (tool: Tool) => {
+    try {
+      setLaunchMessage(`🚀 Launching ${tool.name}...`);
+      await invoke('launch_installed_tool', { toolName: tool.name, wingetId: tool.wingetId });
+      setTimeout(() => setLaunchMessage(null), 3000);
+    } catch (e: any) {
+      setLaunchMessage(`⚠️ Error launching: ${e.toString()}`);
+      setTimeout(() => setLaunchMessage(null), 4000);
+    }
+  };
 
   const handleLiveSearch = async () => {
     if (!search.trim()) return;
@@ -76,6 +110,11 @@ export default function StepTools({
     }
   };
 
+  const installedCount = useMemo(() => {
+    if (!catalog) return 0;
+    return catalog.tools.filter(t => isToolInstalled(t)).length;
+  }, [catalog, installedApps]);
+
   const filteredTools = useMemo(() => {
     const baseList = catalog ? catalog.tools : [];
     const combined = [...liveSearchResults, ...baseList];
@@ -85,9 +124,17 @@ export default function StepTools({
                           t.wingetId.toLowerCase().includes(search.toLowerCase());
       const matchDept = filterDept ? t.department === filterDept : true;
       const matchRole = filterRole ? t.role === filterRole : true;
-      return matchSearch && matchDept && matchRole;
+      
+      let matchFilterType = true;
+      if (filterType === "installed") {
+        matchFilterType = isToolInstalled(t);
+      } else if (filterType !== "all") {
+        matchFilterType = t.eligibility === filterType;
+      }
+
+      return matchSearch && matchDept && matchRole && matchFilterType;
     });
-  }, [catalog, search, filterDept, filterRole, liveSearchResults]);
+  }, [catalog, search, filterDept, filterRole, liveSearchResults, filterType, installedApps]);
 
   const paginatedTools = useMemo(() => {
     const start = (page - 1) * ITEMS_PER_PAGE;
@@ -108,8 +155,8 @@ export default function StepTools({
     setActiveTool(tool);
     setAiGuide(null);
     setTimeout(() => {
-      setAiGuide(`### How to Use ${tool.name}\n\n1. **Installation:** OSwitch will automatically install this via \`${tool.wingetId}\`.\n2. **Launch:** Press the Windows Key and type '${tool.name}'.\n3. **First Steps:** This tool is widely used by ${tool.role}s in the ${tool.department} industry. Begin by setting up a new project workspace.\n\n*Generated dynamically by OSwitch AI Engine.*`);
-    }, 1000);
+      setAiGuide(`### How to Use ${tool.name}\n\n1. **Installation:** OSwitch will automatically install this via \`${tool.wingetId}\`.\n2. **Launch:** Press the Windows Key and type '${tool.name}' or click 'Launch App' directly inside OSwitch.\n3. **First Steps:** This tool is widely used by ${tool.role}s in the ${tool.department} industry. Begin by setting up a new project workspace.\n\n*Generated dynamically by OSwitch AI Engine.*`);
+    }, 600);
   };
 
   if (!catalog) {
@@ -130,9 +177,15 @@ export default function StepTools({
          <div className="absolute bottom-[10%] right-[20%] w-[40vw] h-[40vw] bg-purple-600/10 rounded-full blur-[150px]"></div>
       </div>
 
+      {launchMessage && (
+        <div className="fixed top-6 right-6 z-50 bg-slate-900 border border-emerald-500/50 text-emerald-300 px-4 py-2.5 rounded-xl shadow-[0_0_25px_rgba(16,185,129,0.3)] font-mono text-xs flex items-center gap-2 animate-bounce">
+          <span>⚡</span> {launchMessage}
+        </div>
+      )}
+
       <div className="w-full flex-grow flex flex-col max-w-7xl mx-auto">
         {/* Header Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
@@ -162,8 +215,35 @@ export default function StepTools({
           </div>
         </div>
 
+        {/* Quick Filter Category Tabs */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {[
+            { id: "all", label: `All Tools (10,500+)`, icon: "🌐" },
+            { id: "installed", label: `Installed on PC (${installedCount})`, icon: "🟢", glow: installedCount > 0 },
+            { id: "windows_winget", label: "Windows 1-Click", icon: "⚡" },
+            { id: "linux_vm", label: "Linux / VM", icon: "🐉" },
+            { id: "web_app", label: "Web & Cloud", icon: "☁️" },
+            { id: "vendor_direct", label: "Vendor Direct", icon: "🟣" }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setFilterType(tab.id as any); setPage(1); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
+                filterType === tab.id
+                  ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.35)] border border-blue-400/30'
+                  : tab.id === "installed" && installedCount > 0
+                  ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
         {/* Search and Filters Bar */}
-        <div className="flex flex-col xl:flex-row gap-3 mb-5 w-full">
+        <div className="flex flex-col xl:flex-row gap-3 mb-4 w-full">
           <div className="flex-grow relative flex gap-2 w-full xl:max-w-2xl">
             <input 
               type="text" 
@@ -212,77 +292,104 @@ export default function StepTools({
         {/* Tool Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 flex-grow overflow-y-auto pr-2 custom-scrollbar pb-6">
           {paginatedTools.length === 0 ? (
-            <div className="col-span-full flex items-center justify-center text-slate-400 py-16 text-xs font-mono">
-              No tools found matching your criteria.
+            <div className="col-span-full flex flex-col items-center justify-center text-slate-400 py-16 text-xs font-mono">
+              <span className="text-2xl mb-2">🔍</span>
+              {filterType === "installed" ? "No installed tools detected matching this query." : "No tools found matching your criteria."}
             </div>
           ) : (
-            paginatedTools.map(tool => (
-              <div 
-                key={tool.id} 
-                className={`relative group border ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]' : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'} rounded-2xl p-4.5 transition-all flex flex-col justify-between`}
-              >
-                <div>
-                  <div className="flex items-start gap-3 mb-2.5 cursor-pointer" onClick={() => toggleTool(tool.id, tool.wingetId)}>
-                    <img src={tool.icon} alt={tool.name} className="w-9 h-9 rounded-xl object-cover border border-white/10 shrink-0" />
-                    <div className="flex-grow min-w-0">
-                      <h3 className="text-sm font-bold text-white leading-tight truncate">{tool.name}</h3>
-                      <p className="text-[11px] text-blue-400 font-mono mt-0.5 truncate">{tool.department} • {tool.role}</p>
-                    </div>
-                    <div className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500 text-white' : 'border-white/20 bg-black/40'}`}>
-                      {selectedTools.includes(tool.wingetId) && (
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+            paginatedTools.map(tool => {
+              const installed = isToolInstalled(tool);
+              return (
+                <div 
+                  key={tool.id} 
+                  className={`relative group border ${
+                    installed 
+                      ? 'border-emerald-500/40 bg-emerald-500/[0.03] hover:border-emerald-500/60 shadow-[0_0_15px_rgba(16,185,129,0.08)]' 
+                      : selectedTools.includes(tool.wingetId) 
+                      ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]' 
+                      : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
+                  } rounded-2xl p-4.5 transition-all flex flex-col justify-between`}
+                >
+                  <div>
+                    <div className="flex items-start gap-3 mb-2.5 cursor-pointer" onClick={() => !installed && toggleTool(tool.id, tool.wingetId)}>
+                      <img src={tool.icon} alt={tool.name} className="w-9 h-9 rounded-xl object-cover border border-white/10 shrink-0" />
+                      <div className="flex-grow min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-white leading-tight truncate">{tool.name}</h3>
+                          {installed && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                              ✓ Installed
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-blue-400 font-mono mt-0.5 truncate">{tool.department} • {tool.role}</p>
+                      </div>
+                      
+                      {!installed && (
+                        <div className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500 text-white' : 'border-white/20 bg-black/40'}`}>
+                          {selectedTools.includes(tool.wingetId) && (
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                          )}
+                        </div>
                       )}
                     </div>
+                    
+                    {/* Clean Unified Pill Badges */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                      {tool.eligibility === "web_app" ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                          Web App
+                        </span>
+                      ) : tool.eligibility === "vendor_direct" ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                          Vendor Direct
+                        </span>
+                      ) : tool.eligibility === "linux_vm" ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                          Linux / VM
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          Windows 1-Click
+                        </span>
+                      )}
+                      {tool.source && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/5 text-slate-400 border border-white/10">
+                          {tool.source}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed mb-4">{tool.description}</p>
                   </div>
                   
-                  {/* Clean Unified Pill Badges */}
-                  <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-                    {tool.eligibility === "web_app" ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                        Web App
-                      </span>
-                    ) : tool.eligibility === "vendor_direct" ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30">
-                        Vendor Direct
-                      </span>
-                    ) : tool.eligibility === "linux_vm" ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/30">
-                        Linux / VM
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                        Windows 1-Click
-                      </span>
-                    )}
-                    {tool.source && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/5 text-slate-400 border border-white/10">
-                        {tool.source}
-                      </span>
-                    )}
-                  </div>
+                  <div className="flex gap-2 pt-2 border-t border-white/5">
+                    {installed ? (
+                      <button
+                        onClick={() => handleLaunchApp(tool)}
+                        className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <span>🚀</span> Launch App
+                      </button>
+                    ) : (tool.eligibility === "web_app" || tool.eligibility === "vendor_direct") && tool.vendorUrl ? (
+                      <button 
+                        onClick={() => openUrl(tool.vendorUrl!)}
+                        className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
+                      >
+                        Open Link
+                      </button>
+                    ) : null}
 
-                  <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed mb-4">{tool.description}</p>
-                </div>
-                
-                <div className="flex gap-2 pt-2 border-t border-white/5">
-                  {(tool.eligibility === "web_app" || tool.eligibility === "vendor_direct") && tool.vendorUrl ? (
                     <button 
-                      onClick={() => openUrl(tool.vendorUrl!)}
-                      className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
+                      onClick={() => openAiGuide(tool)}
+                      className="flex-1 py-1.5 rounded-lg bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-300 transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
                     >
-                      Open Link
+                      Quick Guide
                     </button>
-                  ) : null}
-
-                  <button 
-                    onClick={() => openAiGuide(tool)}
-                    className="flex-1 py-1.5 rounded-lg bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-300 transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
-                  >
-                    Quick Guide
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
