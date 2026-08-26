@@ -1199,10 +1199,11 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
             let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "installing".to_string() });
             let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("Starting {} ({}/{})", id, idx + 1, total_packages), total: total_packages, done: false });
             
-            let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--id", id];
+            let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", "--id", id];
             let child = std::process::Command::new(&winget_path)
                 .args(&args)
                 .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
                 .spawn();
             
             match child {
@@ -1220,7 +1221,7 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
                                     let text = current_line.trim().to_string();
                                     full_output.push_str(&text);
                                     full_output.push(' ');
-                                    if text.contains("MB") || text.contains("KB") || text.contains("GB") || text.contains("%") || text.contains("Downloading") || text.contains("Installing") || text.contains("Found") || text.contains("installed") {
+                                    if text.contains("MB") || text.contains("KB") || text.contains("GB") || text.contains("%") || text.contains("Downloading") || text.contains("Installing") || text.contains("Found") || text.contains("installed") || text.contains("Successfully") {
                                         let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("{}: {}", id, text), total: total_packages, done: false });
                                     }
                                     current_line.clear();
@@ -1232,44 +1233,56 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
                     }
                     
                     let status = c.wait();
-                    let is_already_installed = full_output.contains("already installed") || full_output.contains("No available upgrade") || full_output.contains("No newer package");
+                    let is_already_installed = full_output.contains("already installed") || full_output.contains("No available upgrade") || full_output.contains("No newer package") || full_output.contains("Successfully installed");
                     
-                    match status {
-                        Ok(s) if s.success() || is_already_installed => {
-                            // PRO UX FEATURE: Automatically create Desktop & Start Menu shortcuts so tools are immediately visible & searchable!
-                            let pkg_name = id.split('.').last().unwrap_or(id.as_str());
-                            let ps_shortcut_script = format!(
-                                "$name = '{}'; $id = '{}';\n\
-                                $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)', '$env:LOCALAPPDATA\\OSwitchTools' -Recurse -Filter \"*$name*.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName;\n\
-                                if (-not $exe) {{ $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)' -Recurse -Filter \"*.exe\" -ErrorAction SilentlyContinue | Where-Object {{ $_.FullName -like \"*$name*\" }} | Select-Object -First 1).FullName; }}\n\
-                                if ($exe) {{\n\
-                                    $ws = New-Object -ComObject WScript.Shell;\n\
-                                    $d = \"$env:USERPROFILE\\Desktop\\$name.lnk\";\n\
-                                    $sm = \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\$name.lnk\";\n\
-                                    foreach ($p in @($d, $sm)) {{\n\
-                                        $shortcut = $ws.CreateShortcut($p);\n\
-                                        $shortcut.TargetPath = $exe;\n\
-                                        $shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($exe);\n\
-                                        $shortcut.Save();\n\
-                                    }}\n\
-                                }}", 
-                                pkg_name, id
-                            );
-                            let _ = std::process::Command::new("powershell").args(["-Command", &ps_shortcut_script]).output();
+                    let mut installed_successfully = match status {
+                        Ok(s) if s.success() || is_already_installed => true,
+                        _ => false,
+                    };
 
-                            let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
-                            let _ = app.emit("install-progress", InstallProgress { i: idx + 1, text: format!("Completed {}", id), total: total_packages, done: (idx + 1 == total_packages) });
-                        },
-                        Ok(_s) => {
-                            overall_success = false;
-                            error_msg.push_str(&format!("Failed to install {}. ", id));
-                            let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
-                        },
-                        Err(e) => {
-                            overall_success = false;
-                            error_msg.push_str(&format!("Failed winget for {}: {}. ", id, e));
-                            let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
+                    // Fallback: If exact ID was not found, attempt fuzzy search & install
+                    if !installed_successfully && (full_output.contains("No packages were found") || full_output.contains("0x80072ee7") || full_output.contains("error")) {
+                        let query = id.split('.').last().unwrap_or(id.as_str());
+                        let fallback_res = std::process::Command::new(&winget_path)
+                            .args(["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", query])
+                            .output();
+                        if let Ok(fo) = fallback_res {
+                            let f_out = String::from_utf8_lossy(&fo.stdout);
+                            if fo.status.success() || f_out.contains("Successfully installed") || f_out.contains("already installed") {
+                                installed_successfully = true;
+                            }
                         }
+                    }
+
+                    if installed_successfully {
+                        // PRO UX FEATURE: Automatically create Desktop & Start Menu shortcuts so tools are immediately visible & searchable!
+                        let pkg_name = id.split('.').last().unwrap_or(id.as_str());
+                        let ps_shortcut_script = format!(
+                            "$name = '{}'; $id = '{}';\n\
+                            $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)', '$env:LOCALAPPDATA\\OSwitchTools' -Recurse -Filter \"*$name*.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName;\n\
+                            if (-not $exe) {{ $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)' -Recurse -Filter \"*.exe\" -ErrorAction SilentlyContinue | Where-Object {{ $_.FullName -like \"*$name*\" }} | Select-Object -First 1).FullName; }}\n\
+                            if ($exe) {{\n\
+                                $ws = New-Object -ComObject WScript.Shell;\n\
+                                $d = \"$env:USERPROFILE\\Desktop\\$name.lnk\";\n\
+                                $sm = \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\$name.lnk\";\n\
+                                foreach ($p in @($d, $sm)) {{\n\
+                                    $shortcut = $ws.CreateShortcut($p);\n\
+                                    $shortcut.TargetPath = $exe;\n\
+                                    $shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($exe);\n\
+                                    $shortcut.Save();\n\
+                                }}\n\
+                            }}", 
+                            pkg_name, id
+                        );
+                        let _ = std::process::Command::new("powershell").args(["-Command", &ps_shortcut_script]).output();
+
+                        let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
+                        let _ = app.emit("install-progress", InstallProgress { i: idx + 1, text: format!("Completed {}", id), total: total_packages, done: (idx + 1 == total_packages) });
+                    } else {
+                        overall_success = false;
+                        let clean_err = if full_output.trim().is_empty() { "Installation exited with error code".to_string() } else { full_output.trim().to_string() };
+                        error_msg.push_str(&format!("{}: {}. ", id, clean_err));
+                        let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
                     }
                 },
                 Err(e) => {
