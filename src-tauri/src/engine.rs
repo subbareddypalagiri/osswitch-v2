@@ -1334,21 +1334,28 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
             }
 
             if installed_successfully {
-                // Automatically create Desktop & Start Menu shortcuts
+                // Automatically create Desktop & Start Menu shortcuts (OneDrive & Multi-User aware)
                 let pkg_name = id.split('.').last().unwrap_or(id.as_str());
                 let ps_shortcut_script = format!(
                     "$name = '{}'; $id = '{}';\n\
-                    $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)', '$env:LOCALAPPDATA\\OSwitchTools' -Recurse -Filter \"*$name*.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName;\n\
-                    if (-not $exe) {{ $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)' -Recurse -Filter \"*.exe\" -ErrorAction SilentlyContinue | Where-Object {{ $_.FullName -like \"*$name*\" }} | Select-Object -First 1).FullName; }}\n\
+                    $desktop = [Environment]::GetFolderPath('Desktop');\n\
+                    $commonDesktop = [Environment]::GetFolderPath('CommonDesktopDirectory');\n\
+                    $userDesktop = \"$env:USERPROFILE\\Desktop\";\n\
+                    $startMenu = \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\";\n\
+                    $commonStartMenu = \"$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\";\n\
+                    $exe = (Get-ChildItem 'C:\\Program Files', 'C:\\Program Files (x86)', '$env:LOCALAPPDATA\\Programs', '$env:LOCALAPPDATA\\OSwitchTools' -Recurse -Filter \"*$name*.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName;\n\
+                    if (-not $exe) {{\n\
+                        $exe = (Get-ChildItem 'C:\\Program Files', 'C:\\Program Files (x86)', '$env:LOCALAPPDATA\\Programs' -Recurse -Filter \"*.exe\" -ErrorAction SilentlyContinue | Where-Object {{ $_.FullName -like \"*$name*\" -or $_.FullName -like \"*$id*\" }} | Select-Object -First 1).FullName;\n\
+                    }}\n\
                     if ($exe) {{\n\
                         $ws = New-Object -ComObject WScript.Shell;\n\
-                        $d = \"$env:USERPROFILE\\Desktop\\$name.lnk\";\n\
-                        $sm = \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\$name.lnk\";\n\
-                        foreach ($p in @($d, $sm)) {{\n\
-                            $shortcut = $ws.CreateShortcut($p);\n\
-                            $shortcut.TargetPath = $exe;\n\
-                            $shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($exe);\n\
-                            $shortcut.Save();\n\
+                        foreach ($dir in @($desktop, $commonDesktop, $userDesktop, $startMenu, $commonStartMenu)) {{\n\
+                            if ($dir -and (Test-Path $dir)) {{\n\
+                                $shortcut = $ws.CreateShortcut(\"$dir\\$name.lnk\");\n\
+                                $shortcut.TargetPath = $exe;\n\
+                                $shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($exe);\n\
+                                $shortcut.Save();\n\
+                            }}\n\
                         }}\n\
                     }}", 
                     pkg_name, id
