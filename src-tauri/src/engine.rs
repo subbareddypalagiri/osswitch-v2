@@ -1156,6 +1156,12 @@ pub enum PackageSpec {
         winget_id: Option<String>,
         #[serde(default)]
         name: Option<String>,
+        #[serde(rename = "directDownloadUrl", default)]
+        direct_download_url: Option<String>,
+        #[serde(rename = "installerType", default)]
+        installer_type: Option<String>,
+        #[serde(rename = "silentArgs", default)]
+        silent_args: Option<Vec<String>>,
     },
 }
 
@@ -1169,6 +1175,27 @@ impl PackageSpec {
             _ => String::new(),
         }
     }
+
+    pub fn get_direct_url(&self) -> Option<String> {
+        match self {
+            PackageSpec::Detailed { direct_download_url: Some(u), .. } if !u.is_empty() => Some(u.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn get_installer_type(&self) -> String {
+        match self {
+            PackageSpec::Detailed { installer_type: Some(t), .. } if !t.is_empty() => t.clone(),
+            _ => "exe".to_string(),
+        }
+    }
+
+    pub fn get_silent_args(&self) -> Vec<String> {
+        match self {
+            PackageSpec::Detailed { silent_args: Some(args), .. } if !args.is_empty() => args.clone(),
+            _ => Vec::new(),
+        }
+    }
 }
 
 #[tauri::command]
@@ -1180,13 +1207,14 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
         }
     }
 
-    println!("[Engine] Installing {} packages with real-time telemetry...", pkg_ids.len());
+    println!("[Engine] Installing {} packages with resilient multi-tier engine...", packages.len());
     
+    let app_clone = app.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
         let mut overall_success = true;
         let mut error_msg = String::new();
         
-        let total_packages = pkg_ids.len();
+        let total_packages = packages.len();
         let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
         let default_winget = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
         let winget_path = if std::path::Path::new(&default_winget).exists() {
@@ -1195,106 +1223,151 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
             "winget".to_string()
         };
 
-        for (idx, id) in pkg_ids.iter().enumerate() {
-            let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "installing".to_string() });
-            let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("Starting {} ({}/{})", id, idx + 1, total_packages), total: total_packages, done: false });
+        for (idx, spec) in packages.iter().enumerate() {
+            let id = spec.get_id();
+            let _ = app_clone.emit("bundle-progress", BundleProgress { id: id.clone(), status: "installing".to_string() });
+            let _ = app_clone.emit("install-progress", InstallProgress { i: idx, text: format!("Provisioning {} ({}/{})", id, idx + 1, total_packages), total: total_packages, done: false });
             
-            let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", "--id", id];
+            // Tier 1: Try Winget Silent Install
+            let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", "--id", &id];
             let child = std::process::Command::new(&winget_path)
                 .args(&args)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
                 .spawn();
             
-            match child {
-                Ok(mut c) => {
-                    let mut full_output = String::new();
-                    if let Some(stdout) = c.stdout.take() {
-                        use std::io::Read;
-                        let reader = std::io::BufReader::new(stdout);
-                        let mut current_line = String::new();
-                        for b in reader.bytes().flatten() {
-                            if b == 0 { continue; }
-                            let ch = b as char;
-                            if ch == '\r' || ch == '\n' {
-                                if !current_line.trim().is_empty() {
-                                    let text = current_line.trim().to_string();
-                                    full_output.push_str(&text);
-                                    full_output.push(' ');
-                                    if text.contains("MB") || text.contains("KB") || text.contains("GB") || text.contains("%") || text.contains("Downloading") || text.contains("Installing") || text.contains("Found") || text.contains("installed") || text.contains("Successfully") {
-                                        let _ = app.emit("install-progress", InstallProgress { i: idx, text: format!("{}: {}", id, text), total: total_packages, done: false });
-                                    }
-                                    current_line.clear();
+            let mut full_output = String::new();
+            let mut installed_successfully = false;
+
+            if let Ok(mut c) = child {
+                if let Some(stdout) = c.stdout.take() {
+                    use std::io::Read;
+                    let reader = std::io::BufReader::new(stdout);
+                    let mut current_line = String::new();
+                    for b in reader.bytes().flatten() {
+                        if b == 0 { continue; }
+                        let ch = b as char;
+                        if ch == '\r' || ch == '\n' {
+                            if !current_line.trim().is_empty() {
+                                let text = current_line.trim().to_string();
+                                full_output.push_str(&text);
+                                full_output.push(' ');
+                                if text.contains("MB") || text.contains("KB") || text.contains("GB") || text.contains("%") || text.contains("Downloading") || text.contains("Installing") || text.contains("Found") || text.contains("installed") || text.contains("Successfully") {
+                                    let _ = app_clone.emit("install-progress", InstallProgress { i: idx, text: format!("{}: {}", id, text), total: total_packages, done: false });
                                 }
-                            } else {
-                                current_line.push(ch);
+                                current_line.clear();
                             }
+                        } else {
+                            current_line.push(ch);
                         }
                     }
+                }
+                
+                let status = c.wait();
+                let is_already_installed = full_output.contains("already installed") || full_output.contains("No available upgrade") || full_output.contains("No newer package") || full_output.contains("Successfully installed");
+                
+                if let Ok(s) = status {
+                    if s.success() || is_already_installed {
+                        installed_successfully = true;
+                    }
+                }
+            }
+
+            // Tier 2: Fuzzy Name Fallback
+            if !installed_successfully && (full_output.contains("No packages were found") || full_output.contains("error")) {
+                let query = id.split('.').last().unwrap_or(id.as_str());
+                let fallback_res = std::process::Command::new(&winget_path)
+                    .args(["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", query])
+                    .output();
+                if let Ok(fo) = fallback_res {
+                    let f_out = String::from_utf8_lossy(&fo.stdout);
+                    if fo.status.success() || f_out.contains("Successfully installed") || f_out.contains("already installed") {
+                        installed_successfully = true;
+                    }
+                }
+            }
+
+            // Tier 3: Direct Download URL Fallback (High-Speed Resilient Mirror)
+            if !installed_successfully {
+                if let Some(direct_url) = spec.get_direct_url() {
+                    let _ = app_clone.emit("install-progress", InstallProgress { i: idx, text: format!("Direct Downloading {} from mirror...", id), total: total_packages, done: false });
                     
-                    let status = c.wait();
-                    let is_already_installed = full_output.contains("already installed") || full_output.contains("No available upgrade") || full_output.contains("No newer package") || full_output.contains("Successfully installed");
-                    
-                    let mut installed_successfully = match status {
-                        Ok(s) if s.success() || is_already_installed => true,
-                        _ => false,
+                    let download_dir = std::path::PathBuf::from(&local_app_data).join("OSwitch").join("Downloads");
+                    let _ = std::fs::create_dir_all(&download_dir);
+                    let ext = if spec.get_installer_type() == "msi" { "msi" } else if spec.get_installer_type() == "zip" { "zip" } else { "exe" };
+                    let file_dest = download_dir.join(format!("{}.{}", id.replace('.', "_"), ext));
+
+                    // Use powershell to download & execute silently
+                    let ps_direct_script = if ext == "msi" {
+                        format!(
+                            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;\n\
+                            Invoke-WebRequest -Uri '{}' -OutFile '{}' -UseBasicParsing;\n\
+                            Start-Process msiexec.exe -ArgumentList '/i \"{}\" /qn /norestart' -Wait -NoNewWindow;",
+                            direct_url, file_dest.display(), file_dest.display()
+                        )
+                    } else if ext == "zip" {
+                        let extract_dir = std::path::PathBuf::from(&local_app_data).join("OSwitchTools").join(&id);
+                        format!(
+                            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;\n\
+                            Invoke-WebRequest -Uri '{}' -OutFile '{}' -UseBasicParsing;\n\
+                            Expand-Archive -Path '{}' -DestinationPath '{}' -Force;",
+                            direct_url, file_dest.display(), file_dest.display(), extract_dir.display()
+                        )
+                    } else {
+                        let custom_args = spec.get_silent_args().join(" ");
+                        let args_str = if custom_args.is_empty() { "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-".to_string() } else { custom_args };
+                        format!(
+                            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;\n\
+                            Invoke-WebRequest -Uri '{}' -OutFile '{}' -UseBasicParsing;\n\
+                            Start-Process '{}' -ArgumentList '{}' -Wait -NoNewWindow;",
+                            direct_url, file_dest.display(), file_dest.display(), args_str
+                        )
                     };
 
-                    // Fallback: If exact ID was not found, attempt fuzzy search & install
-                    if !installed_successfully && (full_output.contains("No packages were found") || full_output.contains("0x80072ee7") || full_output.contains("error")) {
-                        let query = id.split('.').last().unwrap_or(id.as_str());
-                        let fallback_res = std::process::Command::new(&winget_path)
-                            .args(["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", query])
-                            .output();
-                        if let Ok(fo) = fallback_res {
-                            let f_out = String::from_utf8_lossy(&fo.stdout);
-                            if fo.status.success() || f_out.contains("Successfully installed") || f_out.contains("already installed") {
-                                installed_successfully = true;
-                            }
+                    let direct_res = std::process::Command::new("powershell").args(["-Command", &ps_direct_script]).output();
+                    if let Ok(dr) = direct_res {
+                        if dr.status.success() {
+                            installed_successfully = true;
                         }
                     }
-
-                    if installed_successfully {
-                        // PRO UX FEATURE: Automatically create Desktop & Start Menu shortcuts so tools are immediately visible & searchable!
-                        let pkg_name = id.split('.').last().unwrap_or(id.as_str());
-                        let ps_shortcut_script = format!(
-                            "$name = '{}'; $id = '{}';\n\
-                            $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)', '$env:LOCALAPPDATA\\OSwitchTools' -Recurse -Filter \"*$name*.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName;\n\
-                            if (-not $exe) {{ $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)' -Recurse -Filter \"*.exe\" -ErrorAction SilentlyContinue | Where-Object {{ $_.FullName -like \"*$name*\" }} | Select-Object -First 1).FullName; }}\n\
-                            if ($exe) {{\n\
-                                $ws = New-Object -ComObject WScript.Shell;\n\
-                                $d = \"$env:USERPROFILE\\Desktop\\$name.lnk\";\n\
-                                $sm = \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\$name.lnk\";\n\
-                                foreach ($p in @($d, $sm)) {{\n\
-                                    $shortcut = $ws.CreateShortcut($p);\n\
-                                    $shortcut.TargetPath = $exe;\n\
-                                    $shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($exe);\n\
-                                    $shortcut.Save();\n\
-                                }}\n\
-                            }}", 
-                            pkg_name, id
-                        );
-                        let _ = std::process::Command::new("powershell").args(["-Command", &ps_shortcut_script]).output();
-
-                        let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
-                    } else {
-                        overall_success = false;
-                        let clean_err = if full_output.contains("0x80072ee7") || full_output.contains("InternetOpenUrl") {
-                            "Network Connection Error (0x80072ee7: Server or DNS address unreachable). Please check your internet connection or try again.".to_string()
-                        } else if full_output.trim().is_empty() {
-                            "Installation exited with error code".to_string()
-                        } else {
-                            full_output.trim().to_string()
-                        };
-                        error_msg.push_str(&format!("{}: {}. ", id, clean_err));
-                        let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
-                    }
-                },
-                Err(e) => {
-                    overall_success = false;
-                    error_msg.push_str(&format!("Failed to spawn winget for {}: {}. ", id, e));
-                    let _ = app.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
                 }
+            }
+
+            if installed_successfully {
+                // Automatically create Desktop & Start Menu shortcuts
+                let pkg_name = id.split('.').last().unwrap_or(id.as_str());
+                let ps_shortcut_script = format!(
+                    "$name = '{}'; $id = '{}';\n\
+                    $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)', '$env:LOCALAPPDATA\\OSwitchTools' -Recurse -Filter \"*$name*.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName;\n\
+                    if (-not $exe) {{ $exe = (Get-ChildItem '$env:LOCALAPPDATA\\Programs', 'C:\\Program Files', 'C:\\Program Files (x86)' -Recurse -Filter \"*.exe\" -ErrorAction SilentlyContinue | Where-Object {{ $_.FullName -like \"*$name*\" }} | Select-Object -First 1).FullName; }}\n\
+                    if ($exe) {{\n\
+                        $ws = New-Object -ComObject WScript.Shell;\n\
+                        $d = \"$env:USERPROFILE\\Desktop\\$name.lnk\";\n\
+                        $sm = \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\$name.lnk\";\n\
+                        foreach ($p in @($d, $sm)) {{\n\
+                            $shortcut = $ws.CreateShortcut($p);\n\
+                            $shortcut.TargetPath = $exe;\n\
+                            $shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($exe);\n\
+                            $shortcut.Save();\n\
+                        }}\n\
+                    }}", 
+                    pkg_name, id
+                );
+                let _ = std::process::Command::new("powershell").args(["-Command", &ps_shortcut_script]).output();
+
+                let _ = app_clone.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
+                let _ = app_clone.emit("install-progress", InstallProgress { i: idx + 1, text: format!("Completed {}", id), total: total_packages, done: (idx + 1 == total_packages) });
+            } else {
+                overall_success = false;
+                let clean_err = if full_output.contains("0x80072ee7") || full_output.contains("InternetOpenUrl") {
+                    "Network Connection Error (0x80072ee7: Server or DNS address unreachable). Please check your internet connection or try again.".to_string()
+                } else if full_output.trim().is_empty() {
+                    "Installation exited with error code".to_string()
+                } else {
+                    full_output.trim().to_string()
+                };
+                error_msg.push_str(&format!("{}: {}. ", id, clean_err));
+                let _ = app_clone.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
             }
         }
         

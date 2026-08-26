@@ -200,16 +200,30 @@ export default function StepInstall({
     };
   }, []);
 
-  const fetchAiModels = async () => {
-    if (!apiKey.trim()) {
+  useEffect(() => {
+    const saved = localStorage.getItem("gemini_api_key");
+    if (saved && saved.trim()) {
+      setApiKey(saved.trim());
+      invoke<string[]>("get_gemini_models", { apiKey: saved.trim() })
+        .then(models => {
+          setModelsList(models);
+          if (models.length > 0) setSelectedModel(models[0]);
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  const fetchAiModels = async (keyOverride?: string) => {
+    const keyToUse = keyOverride || apiKey;
+    if (!keyToUse.trim()) {
       setAiError("Please enter a Gemini API Key first.");
       return;
     }
-    localStorage.setItem("gemini_api_key", apiKey.trim());
+    localStorage.setItem("gemini_api_key", keyToUse.trim());
     try {
       setFetchingModels(true);
       setAiError(null);
-      const models: string[] = await invoke("get_gemini_models", { apiKey: apiKey.trim() });
+      const models: string[] = await invoke("get_gemini_models", { apiKey: keyToUse.trim() });
       setModelsList(models);
       if (models.length > 0) setSelectedModel(models[0]);
     } catch (e: any) {
@@ -220,12 +234,17 @@ export default function StepInstall({
   };
 
   const checkAiForError = async (errMsg: string) => {
-    if (!apiKey.trim() || !selectedModel) return;
+    const keyToUse = apiKey.trim() || localStorage.getItem("gemini_api_key") || "";
+    if (!keyToUse) {
+      setAiSuggestion("💡 Gemini AI Auto-Fix Ready: Paste your API key above to instantly diagnose and auto-resolve this error.");
+      return;
+    }
     try {
+      const model = selectedModel ? selectedModel.replace('models/', '') : "gemini-2.5-flash";
       const suggestion: string = await invoke("ai_fix", { 
         errorMsg: errMsg, 
-        apiKey: apiKey.trim(),
-        model: selectedModel.replace('models/', '') 
+        apiKey: keyToUse,
+        model: model 
       });
       setAiSuggestion(suggestion);
     } catch(e) {
@@ -233,7 +252,6 @@ export default function StepInstall({
     }
   };
 
-  
   const runInstall = async (id: string, localIsoPath?: string) => {
     try {
       const intent = selectedIntents[id] || "vbox_vm";
@@ -293,25 +311,53 @@ export default function StepInstall({
       }
       
 
-      // Step 2: Install Packages (Bundles + Tools)
+      // Step 2: Install Packages (Bundles + Tools) with multi-tier metadata
       const packagesToInstallIds = [...selectedBundles, ...(selectedTools || [])];
       if (packagesToInstallIds.length > 0) {
           setInstallStatus(prev => ({ ...prev, [id]: { status: "idle", message: "Universal Provisioning: Installing tools..." } }));
+          
+          let toolsCatalog: { tools: any[] } = { tools: [] };
+          try {
+            const res = await fetch('/tools-catalog.json');
+            toolsCatalog = await res.json();
+          } catch(err) {
+            console.error("Failed to fetch tool catalog:", err);
+          }
+
+          const packagesPayload = packagesToInstallIds.map(pkgId => {
+            const tool = toolsCatalog.tools?.find((t: any) => t.wingetId === pkgId || t.id === pkgId);
+            if (tool) {
+              return {
+                id: tool.id || pkgId,
+                name: tool.name || pkgId,
+                wingetId: tool.wingetId || pkgId,
+                directDownloadUrl: tool.directDownloadUrl || null,
+                installerType: tool.installerType || null,
+                silentArgs: tool.silentArgs || null
+              };
+            }
+            return {
+              id: pkgId,
+              name: pkgId,
+              wingetId: pkgId,
+              directDownloadUrl: null,
+              installerType: null,
+              silentArgs: null
+            };
+          });
+
+          const currentKey = apiKey.trim() || localStorage.getItem("gemini_api_key") || "";
           const res = await invoke("install_packages", { 
-            packages: packagesToInstallIds, 
+            packages: packagesPayload, 
             targetOs: id === "tools_only" ? null : id, 
             intent: id === "tools_only" ? null : intent, 
-            apiKey: apiKey, 
+            apiKey: currentKey, 
             aiModel: selectedModel ? selectedModel.replace("models/", "") : "gemini-2.5-flash" 
           }) as string;
           
           if (res.includes("Completed with errors")) {
              setInstallStatus(prev => ({ ...prev, [id]: { status: "error", message: res } }));
-             if (apiKey.trim() && selectedModel) {
-                checkAiForError(res);
-             } else {
-                setAiSuggestion("💡 Gemini AI Auto-Fix Available: Please enter your Gemini API Key and click 'Connect' above to automatically diagnose & auto-repair installation errors!");
-             }
+             checkAiForError(res);
              setIsInstalling(false);
              return;
           }
@@ -498,13 +544,17 @@ export default function StepInstall({
               placeholder="Enter Gemini API Key..."
               value={apiKey}
               onChange={e => {
-                setApiKey(e.target.value);
-                localStorage.setItem("gemini_api_key", e.target.value);
+                const val = e.target.value;
+                setApiKey(val);
+                localStorage.setItem("gemini_api_key", val);
+                if (val.trim().length >= 10) {
+                  fetchAiModels(val.trim());
+                }
               }}
               className="flex-1 bg-slate-100 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors placeholder:text-slate-500"
             />
             <button 
-              onClick={fetchAiModels}
+              onClick={() => fetchAiModels()}
               disabled={isInstalling || fetchingModels || !apiKey.trim()}
               className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
