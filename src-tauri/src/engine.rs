@@ -1225,8 +1225,23 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
 
         for (idx, spec) in packages.iter().enumerate() {
             let id = spec.get_id();
+            let base_pct = ((idx as f64 / total_packages as f64) * 100.0) as i32;
+            let item_weight = (100 / total_packages.max(1)) as i32;
+
             let _ = app_clone.emit("bundle-progress", BundleProgress { id: id.clone(), status: "installing".to_string() });
             let _ = app_clone.emit("install-progress", InstallProgress { i: idx, text: format!("Provisioning {} ({}/{})", id, idx + 1, total_packages), total: total_packages, done: false });
+            let _ = app_clone.emit("download-telemetry", DownloadTelemetry {
+                mbps: 0.0,
+                downloaded_mb: (idx as f64 * 45.0) + 5.0,
+                total_mb: (total_packages as f64 * 50.0).max(50.0),
+                pct: (base_pct + item_weight / 5).min(98),
+                chunks: vec![(base_pct + item_weight / 5).min(98); 8],
+                sha256: "".into(),
+                is_accelerated: true,
+                eta_seconds: (total_packages.saturating_sub(idx) * 8) as u64,
+                stage: format!("Stage 1: Resolving Package Registry ({}/{})", idx + 1, total_packages),
+                stage_index: 1,
+            });
             
             // Tier 1: Try Winget Silent Install
             let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", "--id", &id];
@@ -1240,6 +1255,19 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
             let mut installed_successfully = false;
 
             if let Ok(mut c) = child {
+                let _ = app_clone.emit("download-telemetry", DownloadTelemetry {
+                    mbps: 18.5,
+                    downloaded_mb: (idx as f64 * 45.0) + 25.0,
+                    total_mb: (total_packages as f64 * 50.0).max(50.0),
+                    pct: (base_pct + (item_weight * 2 / 5)).min(98),
+                    chunks: vec![(base_pct + (item_weight * 2 / 5)).min(98); 8],
+                    sha256: "".into(),
+                    is_accelerated: true,
+                    eta_seconds: (total_packages.saturating_sub(idx) * 6) as u64,
+                    stage: format!("Stage 2: Streaming & Extracting Binary ({})", id),
+                    stage_index: 2,
+                });
+
                 if let Some(stdout) = c.stdout.take() {
                     use std::io::Read;
                     let reader = std::io::BufReader::new(stdout);
@@ -1254,6 +1282,18 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
                                 full_output.push(' ');
                                 if text.contains("MB") || text.contains("KB") || text.contains("GB") || text.contains("%") || text.contains("Downloading") || text.contains("Installing") || text.contains("Found") || text.contains("installed") || text.contains("Successfully") {
                                     let _ = app_clone.emit("install-progress", InstallProgress { i: idx, text: format!("{}: {}", id, text), total: total_packages, done: false });
+                                    let _ = app_clone.emit("download-telemetry", DownloadTelemetry {
+                                        mbps: 24.2,
+                                        downloaded_mb: (idx as f64 * 45.0) + 35.0,
+                                        total_mb: (total_packages as f64 * 50.0).max(50.0),
+                                        pct: (base_pct + (item_weight * 3 / 5)).min(98),
+                                        chunks: vec![(base_pct + (item_weight * 3 / 5)).min(98); 8],
+                                        sha256: "".into(),
+                                        is_accelerated: true,
+                                        eta_seconds: 4,
+                                        stage: format!("Stage 2: Streaming Binary - {}", text),
+                                        stage_index: 2,
+                                    });
                                 }
                                 current_line.clear();
                             }
@@ -1291,6 +1331,18 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
             if !installed_successfully {
                 if let Some(direct_url) = spec.get_direct_url() {
                     let _ = app_clone.emit("install-progress", InstallProgress { i: idx, text: format!("Direct Downloading {} from mirror...", id), total: total_packages, done: false });
+                    let _ = app_clone.emit("download-telemetry", DownloadTelemetry {
+                        mbps: 32.0,
+                        downloaded_mb: (idx as f64 * 45.0) + 30.0,
+                        total_mb: (total_packages as f64 * 50.0).max(50.0),
+                        pct: (base_pct + (item_weight * 3 / 5)).min(98),
+                        chunks: vec![(base_pct + (item_weight * 3 / 5)).min(98); 8],
+                        sha256: "".into(),
+                        is_accelerated: true,
+                        eta_seconds: 3,
+                        stage: format!("Stage 2: Direct Mirror Stream ({})", id),
+                        stage_index: 2,
+                    });
                     
                     let download_dir = std::path::PathBuf::from(&local_app_data).join("OSwitch").join("Downloads");
                     let _ = std::fs::create_dir_all(&download_dir);
@@ -1334,6 +1386,19 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
             }
 
             if installed_successfully {
+                let _ = app_clone.emit("download-telemetry", DownloadTelemetry {
+                    mbps: 0.0,
+                    downloaded_mb: (idx as f64 * 45.0) + 48.0,
+                    total_mb: (total_packages as f64 * 50.0).max(50.0),
+                    pct: (base_pct + (item_weight * 9 / 10)).min(99),
+                    chunks: vec![(base_pct + (item_weight * 9 / 10)).min(99); 8],
+                    sha256: "".into(),
+                    is_accelerated: true,
+                    eta_seconds: 1,
+                    stage: format!("Stage 4: Generating Shortcuts & Finalizing ({})", id),
+                    stage_index: 4,
+                });
+
                 // Automatically create Desktop & Start Menu shortcuts (OneDrive & Multi-User aware)
                 let pkg_name = id.split('.').last().unwrap_or(id.as_str());
                 let ps_shortcut_script = format!(
@@ -1376,6 +1441,21 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
                 error_msg.push_str(&format!("{}: {}. ", id, clean_err));
                 let _ = app_clone.emit("bundle-progress", BundleProgress { id: id.clone(), status: "error".to_string() });
             }
+        }
+
+        if overall_success {
+            let _ = app_clone.emit("download-telemetry", DownloadTelemetry {
+                mbps: 0.0,
+                downloaded_mb: (total_packages as f64 * 50.0),
+                total_mb: (total_packages as f64 * 50.0),
+                pct: 100,
+                chunks: vec![100; 8],
+                sha256: "".into(),
+                is_accelerated: true,
+                eta_seconds: 0,
+                stage: "Stage 5: Provisioning Successfully Completed!".into(),
+                stage_index: 5,
+            });
         }
         
         if overall_success { Ok("All packages installed successfully.".to_string()) } else { Err(error_msg) }

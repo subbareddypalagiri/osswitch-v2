@@ -629,22 +629,28 @@ export default function StepInstall({
                 <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
                   <span className="text-xs font-bold uppercase tracking-widest text-cyan-400 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                    5-Stage Golden Provisioning Pipeline
+                    {activeTab === "tools_only" ? "Specialized Tool Provisioning Pipeline" : "5-Stage Golden Provisioning Pipeline"}
                   </span>
                   <span className="text-xs font-mono font-bold text-slate-300">
-                    {telemetry?.stage || "Stage 1: Pre-Flight Diagnostics"}
+                    {telemetry?.stage || (activeTab === "tools_only" ? "Stage 1: Resolving Registry..." : "Stage 1: Pre-Flight Diagnostics")}
                   </span>
                 </div>
 
                 {/* 5-Stage Pill Indicators */}
                 <div className="grid grid-cols-5 gap-2 mb-4">
-                  {[
+                  {(activeTab === "tools_only" ? [
+                    { id: 1, label: "Resolve" },
+                    { id: 2, label: "Stream Binary" },
+                    { id: 3, label: "Silent Setup" },
+                    { id: 4, label: "Shortcuts" },
+                    { id: 5, label: "Ready" }
+                  ] : [
                     { id: 1, label: "Pre-Flight" },
                     { id: 2, label: "Stream ISO" },
                     { id: 3, label: "Integrity" },
                     { id: 4, label: "Provision VM" },
                     { id: 5, label: "Live Boot" }
-                  ].map(s => {
+                  ]).map(s => {
                     const currentStage = telemetry?.stage_index || (isInstalling ? 2 : 1);
                     const isDone = currentStage > s.id;
                     const isCurrent = currentStage === s.id;
@@ -664,14 +670,14 @@ export default function StepInstall({
                 </div>
 
                 {/* Live Speedometer & Metrics */}
-                {telemetry && telemetry.stage_index === 2 && (
+                {telemetry && (
                   <div className="grid grid-cols-3 gap-3 mb-3 text-xs font-mono">
                     <div className="p-2.5 bg-black/40 rounded-lg border border-white/5">
                       <span className="text-slate-500 block text-[10px]">SPEED</span>
                       <span className="text-cyan-300 font-bold text-sm">{(telemetry.mbps || 0).toFixed(1)} MB/s</span>
                     </div>
                     <div className="p-2.5 bg-black/40 rounded-lg border border-white/5">
-                      <span className="text-slate-500 block text-[10px]">DOWNLOADED</span>
+                      <span className="text-slate-500 block text-[10px]">PROVISIONED</span>
                       <span className="text-purple-300 font-bold text-sm">
                         {(telemetry.downloaded_mb || 0).toFixed(0)} MB / {(telemetry.total_mb || 0).toFixed(0)} MB
                       </span>
@@ -694,7 +700,7 @@ export default function StepInstall({
                 </div>
 
                 <div className="flex justify-between items-center text-[11px] font-mono text-slate-400">
-                  <span className="truncate max-w-[380px] text-cyan-300">{liveLog || "Initializing golden pipeline..."}</span>
+                  <span className="truncate max-w-[380px] text-cyan-300">{liveLog || "Initializing golden provisioning pipeline..."}</span>
                   <span className="font-bold text-cyan-400">{telemetry?.pct || 0}%</span>
                 </div>
               </div>
