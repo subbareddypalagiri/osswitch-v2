@@ -285,10 +285,11 @@ pub async fn get_connected_usb_drives() -> Result<Vec<UsbDriveInfo>, String> {
             foreach ($disk in $disks) {
                 $partitions = Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue
                 $letters = ($partitions | Where-Object DriveLetter | Select-Object -ExpandProperty DriveLetter) -join ', '
+                $dLetter = if ($letters) { "$($letters):" } else { $null }
                 $drives += [PSCustomObject]@{
                     DeviceId = "\\.\PhysicalDrive$($disk.Number)"
                     Name = if ($disk.FriendlyName) { $disk.FriendlyName } else { "USB Flash Drive" }
-                    DriveLetter = if ($letters) { "$letters:" } else { $null }
+                    DriveLetter = $dLetter
                     SizeGb = [math]::Round($disk.Size / 1GB, 2)
                     BusType = "USB"
                 }
