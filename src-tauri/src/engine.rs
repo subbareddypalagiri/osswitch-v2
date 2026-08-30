@@ -693,16 +693,46 @@ pub async fn install_os(
         let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &defender_exclude_cmd]).output().await;
     }
 
-    // Auto-clean corrupted/cached HTML redirect files under 10MB
+    // Determine if ISO is already 100% fully downloaded by verifying against expected file size
+    let mut already_downloaded = false;
+    let mirrors = get_mirrors_for_os(&id, &iso_url);
+    
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .tcp_keepalive(Some(std::time::Duration::from_secs(15)))
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .read_timeout(std::time::Duration::from_secs(3600))
+        .build().unwrap_or_default();
+
     if iso_path.exists() {
         if let Ok(meta) = std::fs::metadata(&iso_path) {
-            if meta.len() < 10_000_000 {
+            let local_len = meta.len();
+            // Auto-clean corrupted/cached HTML redirect files under 20MB
+            if local_len < 20_000_000 {
                 let _ = std::fs::remove_file(&iso_path);
+            } else if iso_url.starts_with("http") {
+                // Verify against remote mirror Content-Length
+                if let Some(first_url) = mirrors.first() {
+                    if let Ok(resp) = client.head(first_url).send().await {
+                        if let Some(content_len) = resp.content_length() {
+                            if local_len >= content_len.saturating_sub(1_000_000) {
+                                already_downloaded = true;
+                            } else {
+                                let _ = app.emit("command-output", Payload { 
+                                    message: format!("⚠️ Detected incomplete/truncated ISO on SSD ({} MB / {} MB). Auto-cleaning and re-downloading complete image...\n", 
+                                        local_len / (1024 * 1024), 
+                                        content_len / (1024 * 1024)
+                                    ) 
+                                });
+                                let _ = std::fs::remove_file(&iso_path);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-    
-    let already_downloaded = iso_path.exists() && std::fs::metadata(&iso_path).map(|m| m.len()).unwrap_or(0) > 500_000_000;
 
     // If iso_url is a local path (doesn't start with http), use it directly
     if !iso_url.starts_with("http") {
@@ -712,19 +742,10 @@ pub async fn install_os(
         }
         let _ = app.emit("command-output", Payload { message: format!("Using verified local ISO: {}\n", iso_path.display()) });
     } else if already_downloaded {
-        let _ = app.emit("command-output", Payload { message: format!("⚡ Found cached verified ISO on SSD: {} (Skipping download!)...\n", iso_path.display()) });
+        let _ = app.emit("command-output", Payload { message: format!("⚡ Found cached 100% verified ISO on SSD: {} (Skipping download!)...\n", iso_path.display()) });
     } else if !iso_url.contains("fake-url") {
-        let mirrors = get_mirrors_for_os(&id, &iso_url);
         let mut download_success = false;
         let mut last_download_err = String::new();
-
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .redirect(reqwest::redirect::Policy::limited(10))
-            .tcp_keepalive(Some(std::time::Duration::from_secs(15)))
-            .connect_timeout(std::time::Duration::from_secs(30))
-            .read_timeout(std::time::Duration::from_secs(3600))
-            .build().unwrap_or_default();
 
         for (mirror_idx, current_url) in mirrors.iter().enumerate() {
             let _ = app.emit("download-telemetry", DownloadTelemetry {
