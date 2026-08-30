@@ -242,43 +242,47 @@ export default function StepInstall({
     }
   }, []);
 
+  // Run safety preflight check strictly ONCE on mount (not in a loop)
   useEffect(() => {
-    if (!usbPromptState.show || !isTauri()) return;
+    if (!isTauri() || isInstalling) return;
+    let isMounted = true;
+    setIsCheckingSafety(true);
+    invoke<PreflightSafetyResult>('run_preflight_safety_check', { osSpaceGb: osSpace })
+      .then(safety => {
+        if (isMounted) setSafetyCheck(safety);
+      })
+      .catch(err => console.error("Failed to run safety check:", err))
+      .finally(() => {
+        if (isMounted) setIsCheckingSafety(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [osSpace]);
+
+  // Lightweight USB detection polling ONLY while USB modal is open and not yet detected
+  useEffect(() => {
+    if (!usbPromptState.show || usbPromptState.detected || isInstalling || !isTauri()) return;
     let isMounted = true;
 
-    const pollUsbAndSafety = async () => {
+    const pollUsb = async () => {
       try {
         const usbs = await invoke<UsbDriveInfo[]>('get_connected_usb_drives');
-        if (isMounted) {
-          setConnectedUsbs(usbs || []);
-          if (usbs && usbs.length > 0) {
-            setUsbPromptState(prev => ({ ...prev, detected: true }));
-          }
+        if (isMounted && usbs && usbs.length > 0) {
+          setConnectedUsbs(usbs);
+          setUsbPromptState(prev => ({ ...prev, detected: true }));
         }
       } catch (err) {
         console.error("Failed to query USB drives:", err);
       }
-
-      try {
-        setIsCheckingSafety(true);
-        const safety = await invoke<PreflightSafetyResult>('run_preflight_safety_check', { osSpaceGb: osSpace });
-        if (isMounted) {
-          setSafetyCheck(safety);
-        }
-      } catch (err) {
-        console.error("Failed to run safety check:", err);
-      } finally {
-        if (isMounted) setIsCheckingSafety(false);
-      }
     };
 
-    pollUsbAndSafety();
-    const interval = setInterval(pollUsbAndSafety, 3000);
+    pollUsb();
+    const interval = setInterval(pollUsb, 4000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [usbPromptState.show, osSpace]);
+  }, [usbPromptState.show, usbPromptState.detected, isInstalling]);
 
   const fetchAiModels = async (keyOverride?: string) => {
     const keyToUse = keyOverride || apiKey;

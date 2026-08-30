@@ -15,6 +15,7 @@ pub fn create_silent_powershell() -> Command {
     let mut cmd = Command::new("powershell");
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd.kill_on_drop(true);
     cmd
 }
 
@@ -22,6 +23,7 @@ pub fn create_silent_cmd(program: &str) -> Command {
     let mut cmd = Command::new(program);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd.kill_on_drop(true);
     cmd
 }
 
@@ -663,7 +665,7 @@ pub async fn install_os(
     };
     let mut iso_path = temp_dir.join(&iso_filename);
     
-    // Stage 1: Pre-Flight Environment Diagnostics
+    // Stage 1: Pre-Flight Environment Diagnostics & Antivirus Guard
     let _ = app.emit("download-telemetry", DownloadTelemetry {
         mbps: 0.0,
         downloaded_mb: 0.0,
@@ -673,10 +675,21 @@ pub async fn install_os(
         sha256: "".into(),
         is_accelerated: true,
         eta_seconds: 0,
-        stage: "Stage 1: Pre-Flight Environment Diagnostics".into(),
+        stage: "Stage 1: Pre-Flight Diagnostics & Defender Stream Guard".into(),
         stage_index: 1,
     });
-    let _ = app.emit("command-output", Payload { message: format!("🔍 Stage 1: Running Pre-Flight Diagnostics for {} ({})\n", id, iso_filename) });
+    let _ = app.emit("command-output", Payload { message: format!("🔍 Stage 1: Running Pre-Flight Diagnostics & Antivirus Guard for {} ({})\n", id, iso_filename) });
+
+    // 🛡️ Auto-Exclude OSwitch download workspace from Windows Defender to prevent 20GB+ Pentest ISO blocking
+    #[cfg(target_os = "windows")]
+    {
+        let oswitch_dir = temp_dir.clone();
+        let defender_exclude_cmd = format!(
+            "try {{ Add-MpPreference -ExclusionPath '{}' -ErrorAction SilentlyContinue; Add-MpPreference -ExclusionPath 'C:\\OSwitch' -ErrorAction SilentlyContinue; }} catch {{}}",
+            oswitch_dir.display()
+        );
+        let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &defender_exclude_cmd]).output().await;
+    }
 
     // Auto-clean corrupted/cached HTML redirect files under 10MB
     if iso_path.exists() {
@@ -706,8 +719,9 @@ pub async fn install_os(
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .redirect(reqwest::redirect::Policy::limited(10))
+            .tcp_keepalive(Some(std::time::Duration::from_secs(15)))
             .connect_timeout(std::time::Duration::from_secs(30))
-            .read_timeout(std::time::Duration::from_secs(1800))
+            .read_timeout(std::time::Duration::from_secs(3600))
             .build().unwrap_or_default();
 
         for (mirror_idx, current_url) in mirrors.iter().enumerate() {
