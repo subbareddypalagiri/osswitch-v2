@@ -9,7 +9,7 @@ use futures_util::StreamExt;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
-const CREATE_NO_WINDOW: u32 = 0x08000000;
+pub const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub fn create_silent_powershell() -> Command {
     let mut cmd = Command::new("powershell");
@@ -20,6 +20,20 @@ pub fn create_silent_powershell() -> Command {
 
 pub fn create_silent_cmd(program: &str) -> Command {
     let mut cmd = Command::new(program);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+pub fn create_silent_std_powershell() -> std::process::Command {
+    let mut cmd = std::process::Command::new("powershell");
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+pub fn create_silent_std_cmd(program: &str) -> std::process::Command {
+    let mut cmd = std::process::Command::new(program);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
     cmd
@@ -186,7 +200,7 @@ pub async fn get_sys_info() -> Result<SysInfo, String> {
     let mut disk_total_gb = 0.0;
     
     if cfg!(target_os = "windows") {
-        let out = Command::new("powershell").args(["-Command", "Get-Volume -DriveLetter C | Select-Object SizeRemaining, Size | ConvertTo-Json"]).output().await;
+        let out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Get-Volume -DriveLetter C | Select-Object SizeRemaining, Size | ConvertTo-Json"]).output().await;
         if let Ok(o) = out {
             let stdout = String::from_utf8_lossy(&o.stdout);
             if let Ok(v) = serde_json::from_str::<Vol>(&stdout) {
@@ -599,7 +613,7 @@ pub async fn install_os(
     }
     
     if intent == "baremetal_grub" && id.to_lowercase().contains("arch") {
-        let sb_check = Command::new("powershell").args(["-Command", "Confirm-SecureBootUEFI"]).output().await;
+        let sb_check = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Confirm-SecureBootUEFI"]).output().await;
         if let Ok(out) = sb_check {
             let res = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
             if res == "true" {
@@ -621,7 +635,7 @@ pub async fn install_os(
             _ => &id
         };
         
-        let out = Command::new("wsl").arg("--install").arg("-d").arg(wsl_distro).output().await;
+        let out = create_silent_cmd("wsl").arg("--install").arg("-d").arg(wsl_distro).output().await;
         match out {
             Ok(output) => {
                 if !output.status.success() {
@@ -882,7 +896,7 @@ pub async fn install_os(
                 let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VirtualBox via Winget...".into(), total: 3, done: false });
                 let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
                 let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-                let output = Command::new(&winget_path).args(["install", "-e", "--id", "Oracle.VirtualBox", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--source", "winget"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+                let output = create_silent_cmd(&winget_path).args(["install", "-e", "--id", "Oracle.VirtualBox", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--source", "winget"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
                 let code = output.status.code().unwrap_or(-1);
                 if code != 0 && code != 3010 {
                     return Err(format!("VirtualBox installation failed (exit code {}).", code));
@@ -927,7 +941,7 @@ pub async fn install_os(
                 & $vbox startvm $vm;",
                 vm_name, vdi_path.display(), iso_path.display(), ostype, disk_size_mb
             );
-            let _ = Command::new("powershell").args(["-Command", &ps_script]).output().await;
+            let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
 
             let _ = app.emit("download-telemetry", DownloadTelemetry {
                 mbps: 0.0,
@@ -953,7 +967,7 @@ pub async fn install_os(
                 let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VMware via Winget...".into(), total: 3, done: false });
                 let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
                 let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-                let output = Command::new(&winget_path).args(["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--source", "winget"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+                let output = create_silent_cmd(&winget_path).args(["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--source", "winget"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
                 let code = output.status.code().unwrap_or(-1);
                 if code != 0 && code != 3010 {
                     return Err(format!("VMware installation failed (exit code {}).", code));
@@ -979,7 +993,7 @@ pub async fn install_os(
             let _ = tokio::fs::write(&vmx_path, vmx_content).await;
             
             let vmware_exe = vmware_paths.iter().find(|p| p.exists()).map(|p| p.to_str().unwrap()).unwrap_or("vmplayer.exe");
-            let _ = Command::new(vmware_exe).arg(vmx_path.to_str().unwrap()).spawn();
+            let _ = create_silent_cmd(vmware_exe).arg(vmx_path.to_str().unwrap()).spawn();
             let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
         }
     } else if intent == "usb_flash" {
@@ -993,7 +1007,7 @@ pub async fn install_os(
             }
         }
         if rufus_path.exists() {
-             let _ = Command::new("powershell").args(["-Command", &format!("Start-Process '{}' -ArgumentList '-i {}' -Wait", rufus_path.display(), iso_path.display())]).output().await;
+             let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &format!("Start-Process '{}' -ArgumentList '-i {}' -Wait", rufus_path.display(), iso_path.display())]).output().await;
         } else {
              return Err("Failed to download Rufus.".into());
         }
@@ -1055,11 +1069,11 @@ pub async fn install_os(
 
         if cfg!(target_os = "windows") {
             // 🛡️ BitLocker Auto-Pause Guard (Prevents TPM recovery lockout on reboot)
-            let _ = Command::new("powershell").args(["-Command", "Suspend-BitLocker -MountPoint C: -RebootCount 1 -ErrorAction SilentlyContinue"]).output().await;
+            let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Suspend-BitLocker -MountPoint C: -RebootCount 1 -ErrorAction SilentlyContinue"]).output().await;
 
             // Backup Windows BCD before making any changes
-            let _ = Command::new("cmd").args(["/c", "mkdir", "C:\\OSwitch_BCD_Backup"]).output().await;
-            let _ = Command::new("bcdedit").args(["/export", "C:\\OSwitch_BCD_Backup\\bcd_backup"]).output().await;
+            let _ = create_silent_cmd("cmd").args(["/c", "mkdir", "C:\\OSwitch_BCD_Backup"]).output().await;
+            let _ = create_silent_cmd("bcdedit").args(["/export", "C:\\OSwitch_BCD_Backup\\bcd_backup"]).output().await;
 
             let ps_script = format!(
                 "$id = '{}';\n\
@@ -1107,7 +1121,7 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
                 id, display_name
             );
 
-            let _ = Command::new("powershell").args(["-Command", &ps_script]).output().await;
+            let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
         } else {
             // Linux Dual-Boot configuration (systemd-boot and GRUB)
             // 1. Check systemd-boot (/boot/loader/entries)
@@ -1237,7 +1251,7 @@ pub async fn install_bundle(winget_ids: String) -> Result<String, String> {
     
     let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
     let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-    let output = Command::new(&winget_path)
+    let output = create_silent_cmd(&winget_path)
         .args(&args)
         .output().await.map_err(|e| e.to_string())?;
         
@@ -1247,7 +1261,7 @@ pub async fn install_bundle(winget_ids: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn run_command_secure(cmd: String) -> Result<String, String> {
     if cmd.to_lowercase().contains("systeminfo") {
-        let out = Command::new("systeminfo").output().await.map_err(|e| e.to_string())?;
+        let out = create_silent_cmd("systeminfo").output().await.map_err(|e| e.to_string())?;
         return Ok(String::from_utf8_lossy(&out.stdout).into());
     }
     Err("Command blocked by strict security policy.".into())
@@ -1275,7 +1289,7 @@ pub async fn boot_os(os: String) -> Result<String, String> {
     if cfg!(target_os = "windows") {
         let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
         if std::path::Path::new(vbox_path).exists() {
-            let _ = Command::new("powershell").args(["-Command", &format!("& '{}' startvm '{}'", vbox_path, vm_name)]).output().await;
+            let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &format!("& '{}' startvm '{}'", vbox_path, vm_name)]).output().await;
             return Ok(format!("Successfully launched {} in VirtualBox!", vm_name));
         }
     } else {
@@ -1355,7 +1369,7 @@ pub async fn uninstall_os(os: String) -> Result<String, String> {
             os_lower = os.to_lowercase(),
             iso = iso_path.display()
         );
-        let _ = Command::new("powershell").args(["-NoProfile", "-Command", &ps_script]).output().await;
+        let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
     } else {
         let _ = Command::new("VBoxManage").args(["controlvm", &vm_name, "poweroff"]).output().await;
         let _ = Command::new("VBoxManage").args(["unregistervm", &vm_name, "--delete"]).output().await;
@@ -1374,7 +1388,7 @@ pub async fn get_installed_os_list() -> Result<Vec<InstalledOSInfo>, String> {
     if cfg!(target_os = "windows") {
         let mut disk_free = 0.0f64;
         let mut disk_total = 0.0f64;
-        let out = Command::new("powershell").args(["-Command", "Get-Volume -DriveLetter C | Select-Object SizeRemaining, Size | ConvertTo-Json"]).output().await;
+        let out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Get-Volume -DriveLetter C | Select-Object SizeRemaining, Size | ConvertTo-Json"]).output().await;
         if let Ok(o) = out {
             let stdout = String::from_utf8_lossy(&o.stdout);
             if let Ok(v) = serde_json::from_str::<Vol>(&stdout) {
@@ -1416,8 +1430,8 @@ pub async fn get_installed_os_list() -> Result<Vec<InstalledOSInfo>, String> {
     }
 
     // 2. Scan VirtualBox for OSwitch-*-VM
-    let vbox_out = Command::new("powershell").args(["-Command", "& 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe' list vms"]).output().await;
-    let running_out = Command::new("powershell").args(["-Command", "& 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe' list runningvms"]).output().await;
+    let vbox_out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "& 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe' list vms"]).output().await;
+    let running_out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "& 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe' list runningvms"]).output().await;
     let running_str = running_out.map(|o| String::from_utf8_lossy(&o.stdout).to_string()).unwrap_or_default();
 
     if let Ok(o) = vbox_out {
@@ -1481,7 +1495,7 @@ pub struct SafetyReport {
 pub async fn run_safety_check() -> Result<SafetyReport, String> {
     // 1. Check Admin / Root
     let is_admin = if cfg!(target_os = "windows") {
-        Command::new("net").arg("session").output().await.map(|o| o.status.success()).unwrap_or(false)
+        create_silent_cmd("net").arg("session").output().await.map(|o| o.status.success()).unwrap_or(false)
     } else {
         Command::new("id").arg("-u").output().await.map(|o| String::from_utf8_lossy(&o.stdout).trim() == "0").unwrap_or(true)
     };
@@ -1489,7 +1503,7 @@ pub async fn run_safety_check() -> Result<SafetyReport, String> {
     // 2. Check Secure Boot
     let mut secure_boot_enabled = false;
     if cfg!(target_os = "windows") {
-        if let Ok(out) = Command::new("powershell").args(["-Command", "Confirm-SecureBootUEFI"]).output().await {
+        if let Ok(out) = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Confirm-SecureBootUEFI"]).output().await {
             let res = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
             if res == "true" { secure_boot_enabled = true; }
         }
@@ -1518,16 +1532,16 @@ pub async fn backup_system() -> Result<String, String> {
     if cfg!(target_os = "windows") {
         // 1. Create a System Restore Point
         let restore_script = "Checkpoint-Computer -Description 'OSwitch Pre-Install Backup' -RestorePointType 'MODIFY_SETTINGS'";
-        let _ = Command::new("powershell")
-            .args(["-Command", restore_script])
+        let _ = create_silent_powershell()
+            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", restore_script])
             .output().await;
             
         // 2. Backup BCD (Bootloader)
         let bcd_path = "C:\\OSwitch_BCD_Backup";
-        let _ = Command::new("cmd")
+        let _ = create_silent_cmd("cmd")
             .args(["/c", "mkdir", bcd_path])
             .output().await;
-        let _ = Command::new("bcdedit")
+        let _ = create_silent_cmd("bcdedit")
             .args(["/export", &format!("{}\\bcd_backup", bcd_path)])
             .output().await;
     } else {
@@ -1819,7 +1833,7 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
             
             // Tier 1: Try Winget Silent Install (--source winget prevents msstore timeout 0x80072ee2)
             let args = vec!["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", "--id", &id, "--source", "winget"];
-            let child = std::process::Command::new(&winget_path)
+            let child = create_silent_std_cmd(&winget_path)
                 .args(&args)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
@@ -1890,7 +1904,7 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
             // Tier 2: Fuzzy Name Fallback (--source winget skips msstore)
             if !installed_successfully && (full_output.contains("No packages were found") || full_output.contains("error")) {
                 let query = id.split('.').last().unwrap_or(id.as_str());
-                let fallback_res = std::process::Command::new(&winget_path)
+                let fallback_res = create_silent_std_cmd(&winget_path)
                     .args(["install", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity", "--source", "winget", query])
                     .output();
                 if let Ok(fo) = fallback_res {
@@ -1950,7 +1964,7 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
                         )
                     };
 
-                    let direct_res = std::process::Command::new("powershell").args(["-Command", &ps_direct_script]).output();
+                    let direct_res = create_silent_std_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_direct_script]).output();
                     if let Ok(dr) = direct_res {
                         if dr.status.success() {
                             installed_successfully = true;
@@ -1999,7 +2013,7 @@ pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>,
                     }}", 
                     pkg_name, id
                 );
-                let _ = std::process::Command::new("powershell").args(["-Command", &ps_shortcut_script]).output();
+                let _ = create_silent_std_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_shortcut_script]).output();
 
                 let _ = app_clone.emit("bundle-progress", BundleProgress { id: id.clone(), status: "success".to_string() });
                 let _ = app_clone.emit("install-progress", InstallProgress { i: idx + 1, text: format!("Completed {}", id), total: total_packages, done: (idx + 1 == total_packages) });
@@ -2331,10 +2345,10 @@ async fn generate_and_inject_ai_script(app: tauri::AppHandle, target_os: String,
     let _ = app.emit("install-progress", InstallProgress { i: 0, text: "Injecting AI Script into Motherboard EFI...".into(), total: 1, done: false });
 
     // Mount EFI & inject
-    let _ = std::process::Command::new("cmd").args(["/c", "mountvol", "S:", "/S"]).output();
+    let _ = create_silent_std_cmd("cmd").args(["/c", "mountvol", "S:", "/S"]).output();
     let _ = std::fs::create_dir_all("S:\\EFI\\oswitch");
     let write_res = std::fs::write("S:\\EFI\\oswitch\\auto-install.sh", &clean_script);
-    let _ = std::process::Command::new("cmd").args(["/c", "mountvol", "S:", "/D"]).output();
+    let _ = create_silent_std_cmd("cmd").args(["/c", "mountvol", "S:", "/D"]).output();
 
     // Also save to LOCALAPPDATA for VirtualBox/VMware auto-provisioning
     let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
@@ -2360,7 +2374,7 @@ pub async fn search_winget(query: String) -> Result<Vec<WingetSearchResult>, Str
     let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
     let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
 
-    let output = std::process::Command::new(&winget_path)
+    let output = create_silent_std_cmd(&winget_path)
         .args(["search", "--source", "winget", "-n", "30", "--accept-source-agreements", &query])
         .output()
         .map_err(|e| format!("Failed to execute winget: {}", e))?;
@@ -2407,8 +2421,8 @@ pub async fn get_installed_tools() -> Result<Vec<String>, String> {
         ];
 
         // 1. Scan Get-StartApps
-        if let Ok(out) = Command::new("powershell")
-            .args(["-NoProfile", "-Command", "Get-StartApps | Select-Object -ExpandProperty Name"])
+        if let Ok(out) = create_silent_powershell()
+            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Get-StartApps | Select-Object -ExpandProperty Name"])
             .output().await
         {
             let s = String::from_utf8_lossy(&out.stdout);
@@ -2422,8 +2436,8 @@ pub async fn get_installed_tools() -> Result<Vec<String>, String> {
 
         // 2. Scan Registry Uninstall Keys
         let reg_script = "Get-ItemProperty 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty DisplayName";
-        if let Ok(out) = Command::new("powershell")
-            .args(["-NoProfile", "-Command", reg_script])
+        if let Ok(out) = create_silent_powershell()
+            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", reg_script])
             .output().await
         {
             let s = String::from_utf8_lossy(&out.stdout);
@@ -2543,7 +2557,7 @@ pub async fn launch_installed_tool(tool_name: String, winget_id: String) -> Resu
             'Launched via Process'",
             tool_name, winget_id
         );
-        let _ = Command::new("powershell").args(["-NoProfile", "-Command", &ps_script]).output().await;
+        let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
         return Ok(format!("Launched {}", tool_name));
     }
 

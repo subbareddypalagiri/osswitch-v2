@@ -2,6 +2,11 @@ use tauri::command;
 use std::process::Command;
 use serde::{Serialize, Deserialize};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 #[derive(Serialize, Deserialize)]
 pub struct BootEntry {
     pub id: String,
@@ -10,7 +15,10 @@ pub struct BootEntry {
 
 #[command]
 pub fn get_boot_menu() -> Result<Vec<BootEntry>, String> {
-    let output = Command::new("bcdedit")
+    let mut cmd = Command::new("bcdedit");
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    let output = cmd
         .arg("/enum")
         .output()
         .map_err(|e| format!("Failed to execute bcdedit: {}", e))?;
@@ -40,7 +48,10 @@ pub fn get_boot_menu() -> Result<Vec<BootEntry>, String> {
 
 #[command]
 pub fn set_default_boot(identifier: String) -> Result<String, String> {
-    let output = Command::new("bcdedit")
+    let mut cmd = Command::new("bcdedit");
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    let output = cmd
         .args(["/default", &identifier])
         .output()
         .map_err(|e| format!("Failed to set default boot: {}", e))?;
