@@ -807,6 +807,7 @@ pub async fn install_os(
                     let url = current_url.clone();
                     let w_bytes = worker_bytes.clone();
 
+                    let expected_chunk_len = end - start + 1;
                     tasks.push(tokio::spawn(async move {
                         let res = c.get(&url).header("Range", format!("bytes={}-{}", start, end)).send().await;
                         match res {
@@ -815,13 +816,19 @@ pub async fn install_os(
                                 if let Ok(f) = f_res {
                                     let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1024, f);
                                     let mut stream = r.bytes_stream();
+                                    let mut stream_bytes = 0u64;
                                     while let Some(Ok(chunk)) = stream.next().await {
                                         if writer.write_all(&chunk).await.is_err() {
                                             return false;
                                         }
-                                        w_bytes[idx].fetch_add(chunk.len() as u64, std::sync::atomic::Ordering::Relaxed);
+                                        stream_bytes += chunk.len() as u64;
+                                        w_bytes[idx].store(stream_bytes, std::sync::atomic::Ordering::Relaxed);
                                     }
-                                    writer.flush().await.is_ok()
+                                    if writer.flush().await.is_ok() && stream_bytes >= expected_chunk_len {
+                                        true
+                                    } else {
+                                        false
+                                    }
                                 } else {
                                     false
                                 }
@@ -910,17 +917,19 @@ pub async fn install_os(
                     if let Ok(iso_file) = iso_file_res {
                         let mut final_writer = tokio::io::BufWriter::with_capacity(4 * 1024 * 1024, iso_file);
                         let mut merge_ok = true;
+                        let mut merged_bytes = 0u64;
                         for p in &part_paths {
                             if let Ok(mut pf) = tokio::fs::File::open(p).await {
-                                if tokio::io::copy(&mut pf, &mut final_writer).await.is_err() {
-                                    merge_ok = false;
+                                match tokio::io::copy(&mut pf, &mut final_writer).await {
+                                    Ok(n) => merged_bytes += n,
+                                    Err(_) => merge_ok = false,
                                 }
                             } else {
                                 merge_ok = false;
                             }
                             let _ = tokio::fs::remove_file(p).await;
                         }
-                        if final_writer.flush().await.is_ok() && merge_ok {
+                        if final_writer.flush().await.is_ok() && merge_ok && merged_bytes >= total_size.saturating_sub(1024) {
                             download_success = true;
                             break;
                         }
