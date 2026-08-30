@@ -130,20 +130,11 @@ fn get_mirrors_for_os(id: &str, primary_url: &str) -> Vec<String> {
     }
     match id {
         "blackarch" => {
+            mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
             if primary_url.contains("full") {
                 mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
-                mirrors.push("https://mirror.osbeck.com/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
-                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
-                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
             } else if primary_url.contains("netinst") {
                 mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso".into());
-                mirrors.push("https://mirror.osbeck.com/blackarch/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso".into());
-                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso".into());
-            } else {
-                mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-                mirrors.push("https://mirror.osbeck.com/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
             }
         },
         "kali" => {
