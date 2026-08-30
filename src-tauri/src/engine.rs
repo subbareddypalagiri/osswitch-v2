@@ -1214,13 +1214,14 @@ pub async fn install_os(
         });
 
         // 🌟 NATIVE HIGH-SPEED RAW DD SECTOR FLASHER
-        // 1. Clean & Dismount USB partitions to prevent Windows file-lock collisions
+        // 1. Clean & Dismount USB partitions to prevent Windows volume-lock collisions
         let prep_ps = format!(
             "$diskNum = {};\n\
             try {{\n\
-                Get-Disk -Number $diskNum | Clear-Disk -RemoveData -RemoveOEM -Confirm:$false -ErrorAction SilentlyContinue;\n\
-                Set-Disk -Number $diskNum -IsOffline $false -ErrorAction SilentlyContinue;\n\
-                Set-Disk -Number $diskNum -IsReadOnly $false -ErrorAction SilentlyContinue;\n\
+                Get-Disk -Number $diskNum | Set-Disk -IsOffline $false -ErrorAction SilentlyContinue;\n\
+                Get-Disk -Number $diskNum | Set-Disk -IsReadOnly $false -ErrorAction SilentlyContinue;\n\
+                Clear-Disk -Number $diskNum -RemoveData -RemoveOEM -Confirm:$false -ErrorAction SilentlyContinue;\n\
+                Update-Disk -Number $diskNum -ErrorAction SilentlyContinue;\n\
             }} catch {{}}\n",
             disk_num
         );
@@ -1229,54 +1230,70 @@ pub async fn install_os(
         // 2. Stream Raw ISO bytes directly to physical drive using native Win32 FileStream in 4MB blocks
         let mut flash_success = false;
         let target_path = device_id.clone();
+        let mut flash_error_msg = String::new();
         
         let mut raw_disk_opt = std::fs::OpenOptions::new();
         raw_disk_opt.read(true).write(true);
         #[cfg(target_os = "windows")]
         raw_disk_opt.share_mode(1 | 2); // FILE_SHARE_READ | FILE_SHARE_WRITE
 
-        if let Ok(mut raw_disk) = raw_disk_opt.open(&target_path) {
-            if let Ok(mut iso_file) = std::fs::File::open(&iso_path) {
-                let total_bytes = iso_file.metadata().map(|m| m.len()).unwrap_or(1);
-                let mut buf = vec![0u8; 4 * 1024 * 1024]; // 4MB High-Throughput Buffer
-                let mut written_bytes = 0u64;
-                let mut last_time = std::time::Instant::now();
-                let mut last_bytes = 0u64;
+        match raw_disk_opt.open(&target_path) {
+            Ok(mut raw_disk) => {
+                match std::fs::File::open(&iso_path) {
+                    Ok(mut iso_file) => {
+                        let total_bytes = iso_file.metadata().map(|m| m.len()).unwrap_or(1);
+                        let mut buf = vec![0u8; 4 * 1024 * 1024]; // 4MB High-Throughput Buffer
+                        let mut written_bytes = 0u64;
+                        let mut last_time = std::time::Instant::now();
+                        let mut last_bytes = 0u64;
 
-                use std::io::{Read, Write};
-                while let Ok(n) = iso_file.read(&mut buf) {
-                    if n == 0 { break; }
-                    if raw_disk.write_all(&buf[..n]).is_err() {
-                        break;
-                    }
-                    written_bytes += n as u64;
-                    
-                    let elapsed = last_time.elapsed().as_secs_f64();
-                    if elapsed >= 0.5 {
-                        let speed_mbps = ((written_bytes.saturating_sub(last_bytes)) as f64) / (1024.0 * 1024.0 * elapsed.max(0.001));
-                        let pct = (((written_bytes as f64) / (total_bytes as f64)) * 100.0).min(100.0) as u8;
-                        let eta = if speed_mbps > 0.1 { ((total_bytes.saturating_sub(written_bytes)) as f64 / (1024.0 * 1024.0 * speed_mbps)) as u64 } else { 0 };
+                        use std::io::{Read, Write};
+                        while let Ok(n) = iso_file.read(&mut buf) {
+                            if n == 0 { break; }
+                            if let Err(write_err) = raw_disk.write_all(&buf[..n]) {
+                                flash_error_msg = format!("Write error at byte {}: {}", written_bytes, write_err);
+                                let _ = app.emit("command-output", Payload { message: format!("⚠️ {}\n", flash_error_msg) });
+                                break;
+                            }
+                            written_bytes += n as u64;
+                            
+                            let elapsed = last_time.elapsed().as_secs_f64();
+                            if elapsed >= 0.5 {
+                                let speed_mbps = ((written_bytes.saturating_sub(last_bytes)) as f64) / (1024.0 * 1024.0 * elapsed.max(0.001));
+                                let pct = (((written_bytes as f64) / (total_bytes as f64)) * 100.0).min(100.0) as u8;
+                                let eta = if speed_mbps > 0.1 { ((total_bytes.saturating_sub(written_bytes)) as f64 / (1024.0 * 1024.0 * speed_mbps)) as u64 } else { 0 };
 
-                        let _ = app.emit("download-telemetry", DownloadTelemetry {
-                            mbps: speed_mbps,
-                            downloaded_mb: (written_bytes as f64) / (1024.0 * 1024.0),
-                            total_mb: (total_bytes as f64) / (1024.0 * 1024.0),
-                            pct: pct as i32,
-                            chunks: vec![pct as i32; 8],
-                            sha256: "".into(),
-                            is_accelerated: true,
-                            eta_seconds: eta,
-                            stage: format!("Stage 4: Writing Raw DD Image to USB ({}% @ {:.1} MB/s)", pct, speed_mbps),
-                            stage_index: 4,
-                        });
-                        last_time = std::time::Instant::now();
-                        last_bytes = written_bytes;
+                                let _ = app.emit("download-telemetry", DownloadTelemetry {
+                                    mbps: speed_mbps,
+                                    downloaded_mb: (written_bytes as f64) / (1024.0 * 1024.0),
+                                    total_mb: (total_bytes as f64) / (1024.0 * 1024.0),
+                                    pct: pct as i32,
+                                    chunks: vec![pct as i32; 8],
+                                    sha256: "".into(),
+                                    is_accelerated: true,
+                                    eta_seconds: eta,
+                                    stage: format!("Stage 4: Writing Raw DD Image to USB ({}% @ {:.1} MB/s)", pct, speed_mbps),
+                                    stage_index: 4,
+                                });
+                                last_time = std::time::Instant::now();
+                                last_bytes = written_bytes;
+                            }
+                        }
+                        let _ = raw_disk.flush();
+                        if written_bytes >= (total_bytes * 95 / 100) {
+                            flash_success = true;
+                        } else {
+                            flash_error_msg = format!("Only wrote {} MB of {} MB before stream interrupted.", written_bytes / (1024 * 1024), total_bytes / (1024 * 1024));
+                        }
+                    },
+                    Err(e) => {
+                        flash_error_msg = format!("Failed to read ISO file: {}", e);
                     }
                 }
-                let _ = raw_disk.flush();
-                if written_bytes >= (total_bytes * 95 / 100) {
-                    flash_success = true;
-                }
+            },
+            Err(e) => {
+                flash_error_msg = format!("Failed to open physical drive {} for writing (Win32 Lock Error): {}. Please ensure no other app is using the USB drive.", target_path, e);
+                let _ = app.emit("command-output", Payload { message: format!("⚠️ {}\n", flash_error_msg) });
             }
         }
 
@@ -1291,9 +1308,14 @@ pub async fn install_os(
                 }
             }
             if rufus_path.exists() {
-                let _ = app.emit("command-output", Payload { message: "ℹ️ Launching Rufus: Please select 'Write in DD Image mode' if prompted for Arch/BlackArch Linux.\n".into() });
+                let _ = app.emit("command-output", Payload { message: "ℹ️ Launching Rufus: Please select 'Write in DD Image mode' for 100% genuine sector copy.\n".into() });
                 let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-Command", &format!("Start-Process '{}' -ArgumentList '-i \"{}\"' -Wait", rufus_path.display(), iso_path.display())]).output().await;
+                flash_success = true;
             }
+        }
+
+        if !flash_success {
+            return Err(format!("USB Flash Error: {}", flash_error_msg));
         }
 
         // Universal Multi-Distro 2-in-1 EFI Injection
