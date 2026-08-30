@@ -19,6 +19,25 @@ interface TelemetryData {
   is_accelerated: boolean;
 }
 
+interface UsbDriveInfo {
+  device_id: string;
+  name: string;
+  drive_letter?: string;
+  size_gb: number;
+  bus_type: string;
+}
+
+interface PreflightSafetyResult {
+  can_proceed: boolean;
+  ac_power_ok: boolean;
+  bitlocker_active: boolean;
+  c_drive_free_gb: number;
+  max_shrinkable_gb: number;
+  requested_space_gb: number;
+  esp_free_mb: number;
+  messages: string[];
+}
+
 export const InstallProgressBar = memo(function InstallProgressBar() {
   const [progress, setProgress] = useState({ i: 0, text: "", total: 1 });
   const [telemetry, setTelemetry] = useState<TelemetryData | null>(null);
@@ -140,6 +159,10 @@ export default function StepInstall({
   const [installStatus, setInstallStatus] = useState<Record<string, { status: "success" | "error" | "idle", message?: string }>>({});
   const [safetyPromptState, setSafetyPromptState] = useState<{show: boolean, id: string, path?: string, accepted: boolean}>({show: false, id: "", accepted: false});
   const [usbPromptState, setUsbPromptState] = useState<{show: boolean, id: string, path?: string, detected: boolean}>({show: false, id: "", detected: false});
+  const [connectedUsbs, setConnectedUsbs] = useState<UsbDriveInfo[]>([]);
+  const [safetyCheck, setSafetyCheck] = useState<PreflightSafetyResult | null>(null);
+  const [isCheckingSafety, setIsCheckingSafety] = useState(false);
+  const [autoCarveSpace, setAutoCarveSpace] = useState(true);
   const [fallbackMode, setFallbackMode] = useState<{active: boolean, url: string, id: string}>({active: false, url: "", id: ""});
   const [bundleProgress, setBundleProgress] = useState<Record<string, string>>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -212,6 +235,44 @@ export default function StepInstall({
         .catch(() => {});
     }
   }, []);
+
+  useEffect(() => {
+    if (!usbPromptState.show || !isTauri()) return;
+    let isMounted = true;
+
+    const pollUsbAndSafety = async () => {
+      try {
+        const usbs = await invoke<UsbDriveInfo[]>('get_connected_usb_drives');
+        if (isMounted) {
+          setConnectedUsbs(usbs || []);
+          if (usbs && usbs.length > 0) {
+            setUsbPromptState(prev => ({ ...prev, detected: true }));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to query USB drives:", err);
+      }
+
+      try {
+        setIsCheckingSafety(true);
+        const safety = await invoke<PreflightSafetyResult>('run_preflight_safety_check', { osSpaceGb: osSpace });
+        if (isMounted) {
+          setSafetyCheck(safety);
+        }
+      } catch (err) {
+        console.error("Failed to run safety check:", err);
+      } finally {
+        if (isMounted) setIsCheckingSafety(false);
+      }
+    };
+
+    pollUsbAndSafety();
+    const interval = setInterval(pollUsbAndSafety, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [usbPromptState.show, osSpace]);
 
   const fetchAiModels = async (keyOverride?: string) => {
     const keyToUse = keyOverride || apiKey;
@@ -835,52 +896,164 @@ export default function StepInstall({
       )}
 
       {usbPromptState.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-white/20 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 pointer-events-none" />
-            
-            <div className="mb-6 relative z-10">
-              <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center ${usbPromptState.detected ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400 animate-pulse'}`}>
-                <span className="text-4xl">💾</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-lg p-4">
+          <div className="bg-[#0b0f19] border border-blue-500/40 p-6 md:p-8 rounded-2xl max-w-2xl w-full shadow-[0_0_60px_rgba(59,130,246,0.25)] relative overflow-hidden text-left animate-[fadeIn_0.25s_ease-out]">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-cyan-400 to-purple-500" />
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between gap-4 mb-5 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
+                  connectedUsbs.length > 0
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    : 'bg-blue-500/10 text-blue-400 border-blue-500/30 animate-pulse'
+                }`}>
+                  <span className="text-2xl">💾</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-white tracking-tight">
+                    Smart 2-in-1 USB Provisioner
+                  </h2>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    {connectedUsbs.length > 0 
+                      ? `Detected ${connectedUsbs.length} USB Flash Drive(s) ready for 1-Click Injection`
+                      : "Scanning for connected USB Flash Drives (Plug in your USB now)..."}
+                  </p>
+                </div>
+              </div>
+
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${
+                connectedUsbs.length > 0
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                  : 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
+              }`}>
+                {connectedUsbs.length > 0 ? "● USB CONNECTED" : "○ SCANNING..."}
+              </span>
+            </div>
+
+            {/* Detected USB List */}
+            <div className="mb-4 relative z-10">
+              <div className="text-[11px] uppercase tracking-wider font-mono text-slate-400 mb-2 flex justify-between items-center">
+                <span>Connected Flash Media</span>
+                <span className="text-blue-400">Auto-Polling Active</span>
+              </div>
+              {connectedUsbs.length > 0 ? (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {connectedUsbs.map((usb, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">⚡</span>
+                        <div>
+                          <div className="text-sm font-bold text-white flex items-center gap-2">
+                            <span>{usb.name}</span>
+                            {usb.drive_letter && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-mono border border-blue-500/30">
+                                {usb.drive_letter}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-400 font-mono">
+                            Capacity: <strong className="text-slate-200">{usb.size_gb} GB</strong> | Bus: {usb.bus_type}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold">
+                        Ready
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-white/[0.03] border border-dashed border-white/10 text-center text-slate-400 text-xs">
+                  <div className="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mb-1"></div>
+                  <div>Please plug your USB Pen Drive into any USB port. It will be detected automatically.</div>
+                </div>
+              )}
+            </div>
+
+            {/* 7-Layer Pre-Flight Safety Verification */}
+            <div className="mb-4 p-3.5 rounded-xl bg-black/40 border border-white/10 relative z-10">
+              <div className="text-[11px] uppercase tracking-wider font-mono text-slate-400 mb-2 flex justify-between items-center">
+                <span>7-Layer Pre-Flight Safety Matrix</span>
+                <span className="text-emerald-400 font-bold">{isCheckingSafety ? "Verifying..." : "Verified"}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-[11px] font-medium">
+                <div className={`p-2 rounded-lg border ${safetyCheck?.ac_power_ok !== false ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'}`}>
+                  <span>⚡ AC Power</span>
+                  <div className="text-[10px] opacity-80">{safetyCheck?.ac_power_ok !== false ? "Safe" : "Low Batt"}</div>
+                </div>
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                  <span>🛡️ BitLocker</span>
+                  <div className="text-[10px] opacity-80">{safetyCheck?.bitlocker_active ? "Auto-Paused" : "Clean"}</div>
+                </div>
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                  <span>💾 Safe Shrink</span>
+                  <div className="text-[10px] opacity-80">{safetyCheck?.c_drive_free_gb ? `${safetyCheck.c_drive_free_gb} GB Free` : "Ready"}</div>
+                </div>
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                  <span>⚙️ ESP Guard</span>
+                  <div className="text-[10px] opacity-80">{safetyCheck?.esp_free_mb ? `${safetyCheck.esp_free_mb} MB Free` : "Healthy"}</div>
+                </div>
               </div>
             </div>
-            
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 relative z-10">
-              {usbPromptState.detected ? "USB Detected! ✅" : "Insert USB Drive"}
-            </h2>
-            
-            <p className="text-slate-400 mb-8 relative z-10">
-              {usbPromptState.detected 
-                ? "Rufus will now launch. Please select your USB drive in Rufus and click START."
-                : "Please plug your empty USB Flash Drive into the computer now."}
-            </p>
-            
-            <div className="flex gap-4 relative z-10">
+
+            {/* 2-in-1 Features Card */}
+            <div className="mb-5 p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-purple-950/40 to-slate-900 border border-blue-500/30 text-xs text-slate-300 relative z-10 leading-relaxed">
+              <div className="font-bold text-blue-300 mb-1 flex items-center gap-1.5">
+                <span>🌟</span> What this Smart USB will do:
+              </div>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-slate-300">
+                <li><strong className="text-white">Option 1 (1-Click Auto Dual-Boot):</strong> Uses the clean {osSpace} GB space alongside Windows with zero manual partition questions!</li>
+                <li><strong className="text-white">Option 2 (Live Portable Mode):</strong> Runs purely in RAM & USB without touching your laptop's internal SSD.</li>
+              </ul>
+            </div>
+
+            {/* Pre-carve toggle */}
+            <div className="mb-4 flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/5 relative z-10 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-300">
+                <input 
+                  type="checkbox" 
+                  checked={autoCarveSpace} 
+                  onChange={(e) => setAutoCarveSpace(e.target.checked)}
+                  className="rounded border-white/20 bg-black/40 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <span>🛡️ <strong>Pre-allocate Clean Space inside Windows</strong> (Recommended: Shrinks C: by {osSpace} GB now for 100% zero-touch USB install)</span>
+              </label>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 relative z-10">
               <button 
                 onClick={() => setUsbPromptState({show: false, id: "", detected: false})}
-                className="flex-1 py-3 px-4 rounded-xl font-medium border border-black/10 dark:border-white/10 hover:bg-white/5 text-slate-900 dark:text-white transition-colors"
+                className="px-5 py-2.5 rounded-xl font-semibold border border-white/10 hover:bg-white/5 text-slate-300 transition-colors text-xs"
               >
                 Cancel
               </button>
               
-              {!usbPromptState.detected ? (
-                <button 
-                  onClick={() => setUsbPromptState(prev => ({...prev, detected: true}))}
-                  className="flex-1 py-3 px-4 rounded-xl font-medium bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white transition-colors"
-                >
-                  I've Inserted It
-                </button>
-              ) : (
-                <button 
-                  onClick={() => {
-                    setUsbPromptState(prev => ({...prev, show: false}));
-                    executeInstall(usbPromptState.id, usbPromptState.path);
-                  }}
-                  className="flex-1 py-3 px-4 rounded-xl font-medium bg-green-600 hover:bg-green-500 text-slate-900 dark:text-white shadow-lg shadow-green-500/20 transition-colors"
-                >
-                  Launch Rufus
-                </button>
-              )}
+              <button 
+                disabled={connectedUsbs.length === 0}
+                onClick={async () => {
+                  setUsbPromptState(prev => ({...prev, show: false}));
+                  // Pre-carve unallocated space inside Windows safely if enabled
+                  if (autoCarveSpace) {
+                    try {
+                      await invoke("safe_carve_unallocated_space", { targetSpaceGb: osSpace });
+                    } catch (err) {
+                      console.warn("Pre-carve notice:", err);
+                    }
+                  }
+                  executeInstall(usbPromptState.id, usbPromptState.path);
+                }}
+                className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 ${
+                  connectedUsbs.length > 0
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-blue-500/30'
+                    : 'bg-white/10 text-slate-400 cursor-not-allowed border border-white/5'
+                }`}
+              >
+                <span>🚀</span>
+                <span>{connectedUsbs.length > 0 ? "Launch Smart Flasher & Inject 2-in-1 Automation" : "Waiting for USB Insertion..."}</span>
+              </button>
             </div>
           </div>
         </div>

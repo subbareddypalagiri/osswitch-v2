@@ -46,6 +46,7 @@ export default function StepTools({
   const [installedApps, setInstalledApps] = useState<string[]>([]);
   const [filterType, setFilterType] = useState<"all" | "installed" | "windows_winget" | "linux_vm" | "web_app" | "vendor_direct">("all");
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
+  const [hostPlatform, setHostPlatform] = useState<"windows" | "linux">("windows");
 
   useEffect(() => {
     fetch('/tools-catalog.json')
@@ -58,6 +59,10 @@ export default function StepTools({
         if (apps) setInstalledApps(apps);
       })
       .catch(err => console.error("Failed to load installed apps:", err));
+
+    invoke<string>('get_host_platform')
+      .then(platform => setHostPlatform(platform as "windows" | "linux"))
+      .catch(() => setHostPlatform("windows"));
   }, []);
 
   const isToolInstalled = (t: Tool) => {
@@ -66,6 +71,8 @@ export default function StepTools({
     const cleanT = tName.replace(/[^a-z0-9]/g, '');
     if (!cleanT || cleanT.length < 2) return false;
     const wId = (t.wingetId || '').toLowerCase().trim();
+    // Derive the Linux package name the same way Rust maps it (last dot-segment)
+    const linuxPkg = wId.split('.').pop()?.replace(/[^a-z0-9-]/g, '') || '';
 
     return installedApps.some(app => {
       const rawApp = app.toLowerCase().trim();
@@ -75,11 +82,16 @@ export default function StepTools({
       // 1. Exact equality (e.g. "git" === "git", "docker desktop" === "docker desktop")
       if (cleanApp === cleanT) return true;
 
-      // 2. Prefix match for versioned apps (e.g. "autopsy 4.23.1" starts with "autopsy", "pycharm community edition 2025" starts with "pycharm community")
+      // 2. Prefix match for versioned apps (e.g. "autopsy 4.23.1" starts with "autopsy")
       if (cleanT.length >= 4 && cleanApp.startsWith(cleanT)) return true;
 
-      // 3. Exact Winget ID matching (e.g. "SleuthKit.Autopsy", "Microsoft.VisualStudioCode")
+      // 3. Exact Winget ID matching (Windows registry entries)
       if (wId && (rawApp === wId || (wId.length >= 8 && rawApp.includes(wId)))) {
+        return true;
+      }
+
+      // 4. Linux package name match (from dpkg/pacman/flatpak scan)
+      if (linuxPkg && linuxPkg.length >= 3 && (rawApp === linuxPkg || rawApp.startsWith(linuxPkg))) {
         return true;
       }
 
@@ -100,6 +112,11 @@ export default function StepTools({
 
   const handleLiveSearch = async () => {
     if (!search.trim()) return;
+    // On Linux, Winget is unavailable — local catalog search is sufficient
+    if (hostPlatform === 'linux') {
+      setIsSearchingLive(false);
+      return;
+    }
     setIsSearchingLive(true);
     try {
       const res = await invoke<Array<{ name: string; id: string; version: string }>>('search_winget', { query: search });
@@ -168,7 +185,14 @@ export default function StepTools({
     setActiveTool(tool);
     setAiGuide(null);
     setTimeout(() => {
-      setAiGuide(`### How to Use ${tool.name}\n\n1. **Installation:** OSwitch will automatically install this via \`${tool.wingetId}\`.\n2. **Launch:** Press the Windows Key and type '${tool.name}' or click 'Launch App' directly inside OSwitch.\n3. **First Steps:** This tool is widely used by ${tool.role}s in the ${tool.department} industry. Begin by setting up a new project workspace.\n\n*Generated dynamically by OSwitch AI Engine.*`);
+      const linuxPkg = tool.wingetId.split('.').pop()?.toLowerCase() || tool.name.toLowerCase();
+      const installCmd = hostPlatform === 'linux'
+        ? `sudo apt install ${linuxPkg}  # or: sudo pacman -S ${linuxPkg}`
+        : `winget install ${tool.wingetId}`;
+      const launchNote = hostPlatform === 'linux'
+        ? `Open a terminal and run \`${linuxPkg}\`, or search your application launcher.`
+        : `Press the Windows Key and type '${tool.name}' or click 'Launch App' directly inside OSwitch.`;
+      setAiGuide(`### How to Use ${tool.name}\n\n1. **Installation:** OSwitch will automatically install this via \`${installCmd}\`.\n2. **Launch:** ${launchNote}\n3. **First Steps:** This tool is widely used by ${tool.role}s in the ${tool.department} industry. Begin by setting up a new project workspace.\n\n*Generated dynamically by OSwitch AI Engine.*`);
     }, 600);
   };
 
@@ -203,12 +227,22 @@ export default function StepTools({
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
               <span className="text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">Step 5 of 7</span>
+              {/* Host OS badge */}
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                hostPlatform === 'linux'
+                  ? 'bg-orange-500/10 text-orange-300 border-orange-500/30'
+                  : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+              }`}>
+                {hostPlatform === 'linux' ? '🐧 Linux Host' : '🪟 Windows Host'}
+              </span>
             </div>
             <h2 className="text-2xl font-extrabold text-white tracking-tight">
               Software & Tool Ecosystem
             </h2>
             <p className="text-slate-400 text-xs mt-0.5">
-              Browse 10,500+ curated tools powered by direct repository mirrors and Microsoft Winget.
+              {hostPlatform === 'linux'
+                ? 'Browse 10,500+ tools — Linux-native packages auto-installed via apt / pacman / flatpak / pip.'
+                : 'Browse 10,500+ curated tools powered by direct repository mirrors and Microsoft Winget.'}
             </p>
           </div>
 
@@ -232,8 +266,8 @@ export default function StepTools({
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {[
             { id: "all", label: `All Tools (10,500+)`, icon: "🌐" },
-            { id: "installed", label: `Installed on PC (${installedCount})`, icon: "🟢", glow: installedCount > 0 },
-            { id: "windows_winget", label: "Windows 1-Click", icon: "⚡" },
+            { id: "installed", label: `Installed on ${hostPlatform === 'linux' ? 'Linux' : 'PC'} (${installedCount})`, icon: "🟢", glow: installedCount > 0 },
+            { id: "windows_winget", label: hostPlatform === 'linux' ? "Linux Native" : "Windows 1-Click", icon: hostPlatform === 'linux' ? "🐧" : "⚡" },
             { id: "linux_vm", label: "Linux / VM", icon: "🐉" },
             { id: "web_app", label: "Web & Cloud", icon: "☁️" },
             { id: "vendor_direct", label: "Vendor Direct", icon: "🟣" }
@@ -260,11 +294,14 @@ export default function StepTools({
           <div className="flex-grow relative flex gap-2 w-full xl:max-w-2xl">
             <input 
               type="text" 
-              placeholder="Search 10,500+ tools by name, category, or Winget ID..." 
+              placeholder={hostPlatform === 'linux'
+                ? "Search 10,500+ tools by name, category, or Linux package name..."
+                : "Search 10,500+ tools by name, category, or Winget ID..."} 
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="flex-grow bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors min-w-0"
             />
+            {hostPlatform === 'windows' && (
             <button
               onClick={handleLiveSearch}
               disabled={isSearchingLive || !search.trim()}
@@ -279,6 +316,7 @@ export default function StepTools({
                 "Cloud Search"
               )}
             </button>
+            )}
           </div>
           
           <div className="flex flex-col sm:flex-row gap-2.5 flex-grow w-full xl:w-auto">
@@ -361,9 +399,13 @@ export default function StepTools({
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/30">
                           Linux / VM
                         </span>
+                      ) : hostPlatform === 'linux' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-orange-500/10 text-orange-300 border border-orange-500/30">
+                          🐧 Linux Native
+                        </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                          Windows 1-Click
+                          ⚡ Windows 1-Click
                         </span>
                       )}
                       {tool.source && (

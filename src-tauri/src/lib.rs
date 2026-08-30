@@ -37,6 +37,10 @@ pub fn run() {
             engine::get_installed_os_list,
             engine::get_installed_tools,
             engine::launch_installed_tool,
+            engine::get_host_platform,
+            engine::get_connected_usb_drives,
+            engine::run_preflight_safety_check,
+            engine::safe_carve_unallocated_space,
             boot_switcher::get_boot_menu,
             boot_switcher::set_default_boot
         ])

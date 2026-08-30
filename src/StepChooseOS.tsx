@@ -170,10 +170,15 @@ export default function StepChooseOS({
   }, [catalog]);
 
   const filteredOS = useMemo(() => {
-    return displayList.filter(os => 
-      os.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      os.sub.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return displayList;
+    return displayList.filter(os => {
+      const name = (os?.name || "").toLowerCase();
+      const sub = (os?.sub || (os as any)?.category || "").toLowerCase();
+      const cat = ((os as any)?.category || "").toLowerCase();
+      const id = (os?.id || "").toLowerCase();
+      return name.includes(q) || sub.includes(q) || cat.includes(q) || id.includes(q);
+    });
   }, [displayList, searchQuery]);
 
   const selectedOSSet = useMemo(() => new Set(selectedOS), [selectedOS]);
@@ -356,7 +361,7 @@ export default function StepChooseOS({
                               )}
                             </div>
                             <div className="text-slate-400 text-xs leading-relaxed mt-1 line-clamp-2">
-                              {os.sub}
+                              {os.sub || (os as any).category || "Official Release"}
                             </div>
                           </div>
                         </div>
@@ -412,6 +417,13 @@ export default function StepChooseOS({
                   );
                 })}
               </div>
+
+              {filteredOS.length === 0 && (
+                <div className="py-16 text-center text-slate-400">
+                  <p className="text-base font-semibold text-white mb-1">No distributions match "{searchQuery}"</p>
+                  <p className="text-xs text-slate-500">Try searching for Ubuntu, Kali, Arch, Debian, Fedora, or clear the search query.</p>
+                </div>
+              )}
             </div>
           </>
         )}
