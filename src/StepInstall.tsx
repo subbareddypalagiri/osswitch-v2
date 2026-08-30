@@ -335,7 +335,7 @@ export default function StepInstall({
         setSafetyPromptState({show: true, id, path: localIsoPath, accepted: false});
         return;
       }
-      if (intent === "usb_flash") {
+      if (intent === "usb_flash" || intent === "usb_live" || intent === "usb_installer") {
         setUsbPromptState({show: true, id, path: localIsoPath, detected: false});
         return;
       }
@@ -784,9 +784,11 @@ export default function StepInstall({
                 <h3 className="text-emerald-300 font-bold text-lg mb-2 flex items-center gap-2">
                   <span className="text-2xl">🎉</span> Provisioning Successful!
                 </h3>
-                <div className="text-slate-300 text-sm leading-relaxed">
-                  {selectedIntents[activeTab || ""] === "usb_flash" && (
-                    <p><strong>Next Steps (USB):</strong> Please restart your computer. As it boots up, tap your BIOS key (usually <strong>F12, F2, F8, or DEL</strong>) to open the Boot Menu. Select your USB Flash Drive to begin installing the OS.</p>
+                  {(selectedIntents[activeTab || ""] === "usb_flash" || selectedIntents[activeTab || ""] === "usb_live") && (
+                    <p><strong>Next Steps (Live USB Portable):</strong> Your Live USB is 100% ready! Restart your laptop, tap <strong>F12 / F9</strong>, and select your USB Drive to run Linux directly in RAM/USB with 0% risk to Windows!</p>
+                  )}
+                  {selectedIntents[activeTab || ""] === "usb_installer" && (
+                    <p><strong>Next Steps (1-Click Dual-Boot USB Installer):</strong> Automated Dual-Boot preseed engine injected! Restart your laptop, tap <strong>F12 / F9</strong>, and select your USB to automatically install Linux side-by-side with Windows on your SSD with 0 manual partition hassle!</p>
                   )}
                   {selectedIntents[activeTab || ""] === "baremetal_grub" && (
                     <p><strong>Next Steps (Native Dual-Boot):</strong> Zero-Partition Bare-Metal Bootloader has been injected into your Windows Boot Manager. When you restart your PC, Windows will automatically display the Boot Menu allowing you to boot directly into your new OS on real hardware with full CPU/GPU performance (Zero USB needed)!</p>

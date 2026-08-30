@@ -1181,8 +1181,18 @@ pub async fn install_os(
             let _ = create_silent_cmd(vmware_exe).arg(vmx_path.to_str().unwrap()).spawn();
             let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
         }
-    } else if intent == "usb_flash" {
-        let _ = app.emit("install-progress", InstallProgress { i: 1, text: "🚀 Stage 4: Initializing High-Speed Direct USB Flasher...".into(), total: 2, done: false });
+    } else if intent == "usb_flash" || intent == "usb_live" || intent == "usb_installer" {
+        let is_installer_mode = intent == "usb_installer";
+        let _ = app.emit("install-progress", InstallProgress { 
+            i: 1, 
+            text: if is_installer_mode {
+                "🚀 Stage 4: Initializing 1-Click Dual-Boot USB Installer Writer...".into()
+            } else {
+                "🚀 Stage 4: Initializing Live USB Portable Flasher (0% SSD Touch)...".into()
+            }, 
+            total: 2, 
+            done: false 
+        });
         
         let drives = get_connected_usb_drives().await.unwrap_or_default();
         let usb_info = drives.first().cloned();
@@ -1194,9 +1204,10 @@ pub async fn install_os(
         };
 
         let _ = app.emit("command-output", Payload { 
-            message: format!("⚡ Preparing USB Device {} (PhysicalDrive{}) for Direct DD Image Writing...\n", 
+            message: format!("⚡ Writing to USB Device {} (PhysicalDrive{}) [Mode: {}]...\n", 
                 usb_info.as_ref().map(|d| d.name.as_str()).unwrap_or("USB Flash Drive"), 
-                disk_num
+                disk_num,
+                if is_installer_mode { "1-Click Dual-Boot Auto-Installer" } else { "Live Portable Drive" }
             ) 
         });
 
@@ -1215,12 +1226,8 @@ pub async fn install_os(
 
         // 2. Stream Raw ISO bytes directly to physical drive in 4MB buffered blocks
         let mut flash_success = false;
-        if let Ok(mut iso_file) = tokio::fs::File::open(&iso_path).await {
+        if let Ok(iso_file) = tokio::fs::File::open(&iso_path).await {
             let total_bytes = iso_file.metadata().await.map(|m| m.len()).unwrap_or(1);
-            let mut buf = vec![0u8; 4 * 1024 * 1024]; // 4MB High-Throughput Buffer
-            let mut written_bytes = 0u64;
-            let mut last_time = std::time::Instant::now();
-            let mut bytes_since_last = 0u64;
 
             // Direct Win32 block stream via PowerShell raw byte pipeline
             let raw_stream_script = format!(
@@ -1310,10 +1317,15 @@ pub async fn install_os(
             sha256: "".into(),
             is_accelerated: true,
             eta_seconds: 0,
-            stage: "Stage 5: 🎉 Smart 2-in-1 USB Provisioning Complete!".into(),
+            stage: format!("Stage 5: 🎉 {} Complete!", if is_installer_mode { "1-Click Dual-Boot USB Provisioning" } else { "Live USB Portable Provisioning" }),
             stage_index: 5,
         });
-        let _ = app.emit("install-progress", InstallProgress { i: 2, text: "🎉 Smart 2-in-1 USB Provisioning Complete!".into(), total: 2, done: true });
+        let _ = app.emit("install-progress", InstallProgress { 
+            i: 2, 
+            text: format!("🎉 {} Ready!", if is_installer_mode { "1-Click Dual-Boot USB Installer" } else { "Live USB Portable Drive" }), 
+            total: 2, 
+            done: true 
+        });
 
     } else if intent == "baremetal_grub" {
         let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Stage 1: Pre-Flight Safety & BCD Backup...".into(), total: 3, done: false });

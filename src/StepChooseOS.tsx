@@ -376,10 +376,11 @@ export default function StepChooseOS({
                               value={intent}
                               onChange={(e) => handleIntentChange(os.id, e.target.value)}
                             >
-                              <option value="vbox_vm">VirtualBox VM (Safe Sandbox)</option>
-                              <option value="baremetal_grub">Native Bare-Metal (UEFI Dual-Boot)</option>
-                              <option value="usb_flash">Physical USB Flash Drive</option>
-                              <option value="vmware_vm">VMware Workstation Pro VM</option>
+                              <option value="vbox_vm">1. VirtualBox VM (Safe Sandbox)</option>
+                              <option value="vmware_vm">2. VMware Workstation Pro VM</option>
+                              <option value="baremetal_grub">3. Native Bare-Metal (UEFI Dual-Boot - No USB)</option>
+                              <option value="usb_live">4. Live USB Portable (Run in RAM/USB - 0% SSD Touch)</option>
+                              <option value="usb_installer">5. USB 1-Click Automated Dual-Boot Installer (Install to PC)</option>
                             </select>
                           </div>
 
