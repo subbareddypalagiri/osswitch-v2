@@ -6,6 +6,25 @@ use std::path::PathBuf;
 use sysinfo::System;
 use futures_util::StreamExt;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+pub fn create_silent_powershell() -> Command {
+    let mut cmd = Command::new("powershell");
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+pub fn create_silent_cmd(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 fn check_virtualization() -> bool {
     #[cfg(target_os = "windows")]
     {
@@ -196,8 +215,8 @@ pub async fn get_sys_info() -> Result<SysInfo, String> {
 #[tauri::command]
 pub async fn get_drives() -> Result<String, String> {
     if cfg!(target_os = "windows") {
-        let out = Command::new("powershell")
-            .args(["-Command", "Get-Volume | Where-Object DriveType -eq 'Fixed' | Select-Object DriveLetter, SizeRemaining, Size | ConvertTo-Json"])
+        let out = create_silent_powershell()
+            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Get-Volume | Where-Object DriveType -eq 'Fixed' | Select-Object DriveLetter, SizeRemaining, Size | ConvertTo-Json"])
             .output()
             .await
             .map_err(|e| e.to_string())?;
@@ -294,7 +313,7 @@ pub async fn get_connected_usb_drives() -> Result<Vec<UsbDriveInfo>, String> {
 
         $drives | ConvertTo-Json -Compress
         "#;
-        let out = Command::new("powershell").args(["-NoProfile", "-Command", ps_cmd]).output().await.map_err(|e| e.to_string())?;
+        let out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps_cmd]).output().await.map_err(|e| e.to_string())?;
         let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if stdout.is_empty() || stdout == "null" {
             return Ok(vec![]);
@@ -441,7 +460,7 @@ pub async fn run_preflight_safety_check(os_space_gb: u32) -> Result<PreflightSaf
         $res | ConvertTo-Json -Compress
         "#;
         
-        let out = Command::new("powershell").args(["-NoProfile", "-Command", ps_script]).output().await.map_err(|e| e.to_string())?;
+        let out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps_script]).output().await.map_err(|e| e.to_string())?;
         let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
         
         let mut can_proceed = true;
@@ -524,7 +543,7 @@ pub async fn safe_carve_unallocated_space(target_space_gb: u32) -> Result<String
         "Successfully carved $targetGb GB clean unallocated space alongside Windows C:"
         "#, target_space_gb);
         
-        let out = Command::new("powershell").args(["-NoProfile", "-Command", &ps_script]).output().await.map_err(|e| e.to_string())?;
+        let out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await.map_err(|e| e.to_string())?;
         if out.status.success() {
             Ok(format!("Successfully carved {} GB clean unallocated partition space safely inside Windows.", target_space_gb))
         } else {
