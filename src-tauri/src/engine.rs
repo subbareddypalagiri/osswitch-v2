@@ -717,21 +717,199 @@ pub async fn install_os(
                 sha256: "".into(),
                 is_accelerated: true,
                 eta_seconds: 0,
-                stage: format!("Stage 2: High-Speed Stream (Mirror {}/{})", mirror_idx + 1, mirrors.len()),
+                stage: format!("Stage 2: 8-Stream Acceleration (Connecting to Mirror {}/{})", mirror_idx + 1, mirrors.len()),
                 stage_index: 2,
             });
             let _ = app.emit("command-output", Payload { message: format!("⚡ Mirror [{}/{}]: Connecting to {}\n", mirror_idx + 1, mirrors.len(), current_url) });
 
+            // Probe server for Content-Length and Range support
+            let probe_res = client.head(current_url).send().await;
+            let mut total_size = 0u64;
+            let mut accept_ranges = false;
+
+            if let Ok(ref pr) = probe_res {
+                if pr.status().is_success() {
+                    total_size = pr.content_length().unwrap_or(0);
+                    if let Some(ar) = pr.headers().get(reqwest::header::ACCEPT_RANGES) {
+                        if ar.to_str().unwrap_or("").contains("bytes") {
+                            accept_ranges = true;
+                        }
+                    }
+                }
+            }
+
+            if total_size == 0 {
+                // Fallback probe with GET range 0-0
+                if let Ok(gr) = client.get(current_url).header("Range", "bytes=0-0").send().await {
+                    if gr.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+                        accept_ranges = true;
+                        if let Some(cr) = gr.headers().get(reqwest::header::CONTENT_RANGE) {
+                            if let Ok(cr_str) = cr.to_str() {
+                                if let Some(len_str) = cr_str.split('/').last() {
+                                    total_size = len_str.trim().parse::<u64>().unwrap_or(0);
+                                }
+                            }
+                        }
+                    } else if gr.status().is_success() {
+                        total_size = gr.content_length().unwrap_or(0);
+                    }
+                }
+            }
+
+            // 🌟 8-STREAM PARALLEL ACCELERATION ENGINE
+            if accept_ranges && total_size >= 40_000_000 {
+                let _ = app.emit("command-output", Payload { message: format!("🚀 8-Stream Parallel Acceleration Enabled: {:.2} GB divided into 8 concurrent streams.\n", total_size as f64 / 1024.0 / 1024.0 / 1024.0) });
+
+                let num_streams = 8u64;
+                let chunk_size = total_size / num_streams;
+                let worker_bytes = std::sync::Arc::new((0..8).map(|_| std::sync::atomic::AtomicU64::new(0)).collect::<Vec<_>>());
+                let mut tasks = Vec::new();
+                let mut part_paths = Vec::new();
+
+                for idx in 0..8 {
+                    let start = idx as u64 * chunk_size;
+                    let end = if idx == 7 { total_size - 1 } else { (idx as u64 + 1) * chunk_size - 1 };
+                    let part_file = temp_dir.join(format!("{}.part{}", iso_filename, idx));
+                    part_paths.push(part_file.clone());
+
+                    let c = client.clone();
+                    let url = current_url.clone();
+                    let w_bytes = worker_bytes.clone();
+
+                    tasks.push(tokio::spawn(async move {
+                        let res = c.get(&url).header("Range", format!("bytes={}-{}", start, end)).send().await;
+                        match res {
+                            Ok(r) if r.status() == reqwest::StatusCode::PARTIAL_CONTENT || r.status().is_success() => {
+                                let f_res = tokio::fs::OpenOptions::new().write(true).create(true).truncate(true).open(&part_file).await;
+                                if let Ok(f) = f_res {
+                                    let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1024, f);
+                                    let mut stream = r.bytes_stream();
+                                    while let Some(Ok(chunk)) = stream.next().await {
+                                        if writer.write_all(&chunk).await.is_err() {
+                                            return false;
+                                        }
+                                        w_bytes[idx].fetch_add(chunk.len() as u64, std::sync::atomic::Ordering::Relaxed);
+                                    }
+                                    writer.flush().await.is_ok()
+                                } else {
+                                    false
+                                }
+                            }
+                            _ => false,
+                        }
+                    }));
+                }
+
+                // Telemetry ticker loop while parallel tasks download
+                let mut last_time = std::time::Instant::now();
+                let mut last_total = 0u64;
+                let mut all_done = false;
+
+                while !all_done {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+                    
+                    let mut current_total = 0u64;
+                    let mut chunks_pct = Vec::with_capacity(8);
+                    for (i, b) in worker_bytes.iter().enumerate() {
+                        let cur = b.load(std::sync::atomic::Ordering::Relaxed);
+                        current_total += cur;
+                        let part_len = if i == 7 { total_size - (7 * chunk_size) } else { chunk_size };
+                        let cp = ((cur as f64 / part_len as f64) * 100.0).clamp(0.0, 100.0) as i32;
+                        chunks_pct.push(cp);
+                    }
+
+                    let elapsed = last_time.elapsed().as_secs_f64();
+                    let bytes_diff = current_total.saturating_sub(last_total);
+                    let mbps = if elapsed > 0.05 { (bytes_diff as f64 / 1024.0 / 1024.0 / elapsed).max(0.0) } else { 0.0 };
+                    
+                    if elapsed >= 0.25 {
+                        last_time = std::time::Instant::now();
+                        last_total = current_total;
+                    }
+
+                    let pct = if total_size > 0 { ((current_total as f64 / total_size as f64) * 100.0) as i32 } else { 0 };
+                    let remaining_bytes = total_size.saturating_sub(current_total);
+                    let eta_seconds = if mbps > 0.05 { (remaining_bytes as f64 / (mbps * 1024.0 * 1024.0)) as u64 } else { 0 };
+
+                    let telemetry = DownloadTelemetry {
+                        mbps,
+                        downloaded_mb: (current_total as f64) / (1024.0 * 1024.0),
+                        total_mb: (total_size as f64) / (1024.0 * 1024.0),
+                        pct,
+                        chunks: chunks_pct,
+                        sha256: "".into(),
+                        is_accelerated: true,
+                        eta_seconds,
+                        stage: format!("Stage 2: 8-Stream Parallel Turbo ({:.1} MB/s)", mbps),
+                        stage_index: 2,
+                    };
+                    let _ = app.emit("download-telemetry", telemetry);
+                    let _ = app.emit("install-progress", InstallProgress { 
+                        i: pct as usize, 
+                        text: format!("🚀 8-Stream Turbo: {:.1} MB/s ({} MB / {} MB)", mbps, current_total / 1024 / 1024, total_size / 1024 / 1024), 
+                        total: 100, 
+                        done: false 
+                    });
+
+                    // Check if all worker tasks completed
+                    let mut finished_count = 0;
+                    for t in &tasks {
+                        if t.is_finished() {
+                            finished_count += 1;
+                        }
+                    }
+                    if finished_count == 8 {
+                        all_done = true;
+                    }
+                }
+
+                // Verify all 8 tasks succeeded
+                let mut all_tasks_ok = true;
+                for t in tasks {
+                    if let Ok(res) = t.await {
+                        if !res { all_tasks_ok = false; }
+                    } else {
+                        all_tasks_ok = false;
+                    }
+                }
+
+                if all_tasks_ok {
+                    let _ = app.emit("command-output", Payload { message: "⚡ Assembling 8 parallel data streams into unified OS image...\n".into() });
+                    let iso_file_res = tokio::fs::OpenOptions::new().write(true).create(true).truncate(true).open(&iso_path).await;
+                    if let Ok(iso_file) = iso_file_res {
+                        let mut final_writer = tokio::io::BufWriter::with_capacity(4 * 1024 * 1024, iso_file);
+                        let mut merge_ok = true;
+                        for p in &part_paths {
+                            if let Ok(mut pf) = tokio::fs::File::open(p).await {
+                                if tokio::io::copy(&mut pf, &mut final_writer).await.is_err() {
+                                    merge_ok = false;
+                                }
+                            } else {
+                                merge_ok = false;
+                            }
+                            let _ = tokio::fs::remove_file(p).await;
+                        }
+                        if final_writer.flush().await.is_ok() && merge_ok {
+                            download_success = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Clean part files on fallback
+                for p in &part_paths {
+                    let _ = tokio::fs::remove_file(p).await;
+                }
+            }
+
+            // Fallback: Standard Single-Stream Engine (if server doesn't support ranges)
             let mut req = client.get(current_url);
-            
-            // Check existing file size for potential resumption
             let mut existing_bytes = 0u64;
             if iso_path.exists() {
                 if let Ok(meta) = std::fs::metadata(&iso_path) {
                     existing_bytes = meta.len();
                 }
             }
-
             if existing_bytes > 0 {
                 req = req.header("Range", format!("bytes={}-", existing_bytes));
             }
@@ -741,13 +919,11 @@ pub async fn install_os(
                 Ok(r) if r.status().is_success() || r.status() == reqwest::StatusCode::PARTIAL_CONTENT => r,
                 Ok(r) => {
                     let msg = format!("Mirror returned HTTP {}", r.status());
-                    let _ = app.emit("command-output", Payload { message: format!("⚠️ Mirror {} failed: {}. Trying fallback...\n", mirror_idx + 1, msg) });
                     last_download_err = msg;
                     continue;
-                },
+                }
                 Err(e) => {
                     let msg = format!("Network failure: {}", e);
-                    let _ = app.emit("command-output", Payload { message: format!("⚠️ Mirror {} failed: {}. Trying fallback...\n", mirror_idx + 1, msg) });
                     last_download_err = msg;
                     continue;
                 }
@@ -755,9 +931,8 @@ pub async fn install_os(
 
             let is_partial = res.status() == reqwest::StatusCode::PARTIAL_CONTENT;
             let content_len = res.content_length().unwrap_or(0);
-            let total_size = if is_partial { existing_bytes + content_len } else { content_len };
+            let s_total_size = if is_partial { existing_bytes + content_len } else { content_len };
 
-            // If the server didn't honor range (returned 200 OK), only truncate if starting a fresh file
             let file_result = if is_partial {
                 tokio::fs::OpenOptions::new().write(true).append(true).open(&iso_path).await
             } else {
@@ -775,7 +950,6 @@ pub async fn install_os(
             let mut writer = tokio::io::BufWriter::with_capacity(2 * 1024 * 1024, file);
             let mut downloaded: u64 = if is_partial { existing_bytes } else { 0 };
             let mut stream = res.bytes_stream();
-            let mut last_reported_pct = 0i32;
             let mut last_time = std::time::Instant::now();
             let mut bytes_since_last = 0u64;
             let mut stream_failed = false;
@@ -804,41 +978,29 @@ pub async fn install_os(
                     last_time = std::time::Instant::now();
                     bytes_since_last = 0;
 
-                    let pct = if total_size > 0 { ((downloaded as f64 / total_size as f64) * 100.0) as i32 } else { 50 };
-                    let remaining_bytes = total_size.saturating_sub(downloaded);
+                    let pct = if s_total_size > 0 { ((downloaded as f64 / s_total_size as f64) * 100.0) as i32 } else { 50 };
+                    let remaining_bytes = s_total_size.saturating_sub(downloaded);
                     let eta_seconds = if mbps > 0.05 { (remaining_bytes as f64 / (mbps * 1024.0 * 1024.0)) as u64 } else { 0 };
-                    
-                    // Generate realistic 8-worker stream distribution based on total progress
-                    let mut chunk_pcts = Vec::with_capacity(8);
-                    for chunk_idx in 0..8 {
-                        let chunk_target_pct = ((pct as f64 * 8.0) - (chunk_idx as f64 * 100.0)).clamp(0.0, 100.0) as i32;
-                        chunk_pcts.push(chunk_target_pct);
-                    }
 
                     let telemetry = DownloadTelemetry {
                         mbps,
                         downloaded_mb: (downloaded as f64) / (1024.0 * 1024.0),
-                        total_mb: (total_size as f64) / (1024.0 * 1024.0),
+                        total_mb: (s_total_size as f64) / (1024.0 * 1024.0),
                         pct,
-                        chunks: chunk_pcts,
+                        chunks: vec![pct; 8],
                         sha256: "".into(),
                         is_accelerated: true,
                         eta_seconds,
-                        stage: format!("Stage 2: 8-Stream Acceleration ({:.1} MB/s)", mbps),
+                        stage: format!("Stage 2: Downloading Image ({:.1} MB/s)", mbps),
                         stage_index: 2,
                     };
                     let _ = app.emit("download-telemetry", telemetry);
-
-                    if pct > last_reported_pct {
-                        let eta_text = if eta_seconds > 60 { format!("~{}m {}s left", eta_seconds / 60, eta_seconds % 60) } else if eta_seconds > 0 { format!("~{}s left", eta_seconds) } else { "calculating...".into() };
-                        let _ = app.emit("install-progress", InstallProgress { 
-                            i: pct as usize, 
-                            text: format!("🚀 Streaming ISO: {:.1} MB/s ({} MB / {} MB) - {}", mbps, downloaded / 1024 / 1024, total_size / 1024 / 1024, eta_text), 
-                            total: 100, 
-                            done: false 
-                        });
-                        last_reported_pct = pct;
-                    }
+                    let _ = app.emit("install-progress", InstallProgress { 
+                        i: pct as usize, 
+                        text: format!("🚀 Streaming ISO: {:.1} MB/s ({} MB / {} MB)", mbps, downloaded / 1024 / 1024, s_total_size / 1024 / 1024), 
+                        total: 100, 
+                        done: false 
+                    });
                 }
             }
 
@@ -847,13 +1009,9 @@ pub async fn install_os(
                 last_download_err = format!("Flush error: {}", e);
             }
 
-            // A valid Linux/OS ISO must be at least 50MB. If < 50MB, it's an HTML error/redirect page.
-            if !stream_failed && downloaded >= 50_000_000 && (total_size == 0 || downloaded >= total_size) {
+            if !stream_failed && downloaded >= 50_000_000 && (s_total_size == 0 || downloaded >= s_total_size) {
                 download_success = true;
                 break;
-            } else if downloaded < 50_000_000 {
-                let _ = app.emit("command-output", Payload { message: format!("⚠️ Mirror [{}/{}] returned incomplete data ({} KB). Cascading to next verified mirror...\n", mirror_idx + 1, mirrors.len(), downloaded / 1024) });
-                let _ = std::fs::remove_file(&iso_path);
             }
         }
 

@@ -110,12 +110,14 @@ export const InstallProgressBar = memo(function InstallProgressBar() {
         </div>
       )}
 
-      <p className="text-blue-400 mb-6 font-mono break-all text-center max-w-xl px-4 text-sm font-medium">{progress.text || "Running provisioning sequence..."}</p>
+      <p className="text-cyan-400 mb-6 font-mono break-all text-center max-w-xl px-4 text-sm font-medium">
+        {telemetry?.stage || progress.text || "Running provisioning sequence..."}
+      </p>
       
       <div className="w-full max-w-md bg-white/5 rounded-full h-3 mb-6 overflow-hidden border border-black/10 dark:border-white/10 relative">
         <div 
-          className="bg-gradient-to-r from-blue-600 via-purple-500 to-pink-500 h-full origin-left transition-transform duration-150 ease-out shadow-[0_0_15px_rgba(59,130,246,0.6)]" 
-          style={{ transform: `scaleX(${percentage / 100})` }}
+          className="bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 h-full origin-left transition-all duration-200 ease-out shadow-[0_0_15px_rgba(6,182,212,0.6)]" 
+          style={{ width: `${Math.min(100, Math.max(0, telemetry ? telemetry.pct : percentage))}%` }}
         />
       </div>
     </div>
