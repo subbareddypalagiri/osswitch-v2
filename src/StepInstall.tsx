@@ -780,6 +780,7 @@ export default function StepInstall({
             )}
             
             {installStatus[activeTab || ""]?.status === "success" && !installStatus[activeTab || ""]?.message && (
+              <div className="mb-4 p-5 bg-gradient-to-r from-emerald-900/40 via-blue-900/40 to-purple-900/40 border border-emerald-500/40 rounded-xl shadow-lg animate-[fadeIn_0.3s_ease-out]">
                 <h3 className="text-emerald-300 font-bold text-lg mb-2 flex items-center gap-2">
                   <span className="text-2xl">🎉</span> Provisioning Successful!
                 </h3>
