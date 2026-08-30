@@ -93,10 +93,19 @@ fn get_mirrors_for_os(id: &str, primary_url: &str) -> Vec<String> {
     }
     match id {
         "blackarch" => {
-            mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-            mirrors.push("https://mirror.cedia.org.ec/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-            mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-            mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+            if primary_url.contains("full") {
+                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-full-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://mirror.cedia.org.ec/blackarch/iso/blackarch-linux-full-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-full-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-full-2023.05.01-x86_64.iso".into());
+            } else if primary_url.contains("netinst") {
+                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-netinst-2023.05.01-x86_64.iso".into());
+            } else {
+                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://mirror.cedia.org.ec/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+            }
         },
         "kali" => {
             mirrors.push("https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
@@ -507,7 +516,12 @@ pub async fn install_os(
     }
 
     let temp_dir = get_oswitch_dir();
-    let mut iso_path = temp_dir.join(format!("{}.iso", id));
+    let iso_filename = if let Some(fname) = iso_url.split('?').next().and_then(|u| u.split('/').last()).filter(|f| f.ends_with(".iso")) {
+        fname.to_string()
+    } else {
+        format!("{}.iso", id)
+    };
+    let mut iso_path = temp_dir.join(&iso_filename);
     
     // Stage 1: Pre-Flight Environment Diagnostics
     let _ = app.emit("download-telemetry", DownloadTelemetry {
@@ -522,7 +536,7 @@ pub async fn install_os(
         stage: "Stage 1: Pre-Flight Environment Diagnostics".into(),
         stage_index: 1,
     });
-    let _ = app.emit("command-output", Payload { message: format!("🔍 Stage 1: Running Pre-Flight Diagnostics for {}...\n", id) });
+    let _ = app.emit("command-output", Payload { message: format!("🔍 Stage 1: Running Pre-Flight Diagnostics for {} ({})\n", id, iso_filename) });
 
     // Auto-clean corrupted/cached HTML redirect files under 10MB
     if iso_path.exists() {
@@ -533,7 +547,7 @@ pub async fn install_os(
         }
     }
     
-    let already_downloaded = iso_path.exists() && std::fs::metadata(&iso_path).map(|m| m.len()).unwrap_or(0) > 100_000_000;
+    let already_downloaded = iso_path.exists() && std::fs::metadata(&iso_path).map(|m| m.len()).unwrap_or(0) > 500_000_000;
 
     // If iso_url is a local path (doesn't start with http), use it directly
     if !iso_url.starts_with("http") {
