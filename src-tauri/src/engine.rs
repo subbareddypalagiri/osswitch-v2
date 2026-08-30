@@ -286,7 +286,73 @@ pub async fn get_connected_usb_drives() -> Result<Vec<UsbDriveInfo>, String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        Ok(vec![])
+        let mut list = Vec::new();
+        // 1. Try lsblk with JSON output
+        if let Ok(out) = Command::new("lsblk").args(["-J", "-b", "-d", "-o", "NAME,SIZE,TYPE,TRAN,MODEL,VENDOR,RM"]).output().await {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&stdout) {
+                if let Some(devices) = v["blockdevices"].as_array() {
+                    for dev in devices {
+                        let name = dev["name"].as_str().unwrap_or_default();
+                        let tran = dev["tran"].as_str().unwrap_or_default();
+                        let rm = dev["rm"].as_bool().unwrap_or(false) || dev["rm"].as_i64().unwrap_or(0) == 1;
+                        let dev_type = dev["type"].as_str().unwrap_or_default();
+                        
+                        // Check if USB transport or removable disk
+                        if dev_type == "disk" && (tran == "usb" || rm || name.starts_with("sd")) && !name.starts_with("loop") && !name.starts_with("zram") && !name.starts_with("nvme") {
+                            let is_removable = rm || tran == "usb" || std::fs::read_to_string(format!("/sys/block/{}/removable", name)).map(|s| s.trim() == "1").unwrap_or(false);
+                            if is_removable || tran == "usb" {
+                                let bytes = dev["size"].as_u64().or_else(|| dev["size"].as_str().and_then(|s| s.parse::<u64>().ok())).unwrap_or(0);
+                                let size_gb = ((bytes as f64) / (1024.0 * 1024.0 * 1024.0) * 100.0).round() / 100.0;
+                                let model = dev["model"].as_str().unwrap_or("").trim();
+                                let vendor = dev["vendor"].as_str().unwrap_or("").trim();
+                                let friendly_name = if !model.is_empty() || !vendor.is_empty() {
+                                    format!("{} {}", vendor, model).trim().to_string()
+                                } else {
+                                    format!("USB Flash Drive (/dev/{})", name)
+                                };
+                                list.push(UsbDriveInfo {
+                                    device_id: format!("/dev/{}", name),
+                                    name: friendly_name,
+                                    drive_letter: Some(format!("/dev/{}", name)),
+                                    size_gb,
+                                    bus_type: "USB".into(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: If lsblk JSON is empty, scan /sys/block/
+        if list.is_empty() {
+            if let Ok(entries) = std::fs::read_dir("/sys/block") {
+                for entry in entries.flatten() {
+                    let dev_name = entry.file_name().to_string_lossy().to_string();
+                    if dev_name.starts_with("sd") {
+                        let rem_path = entry.path().join("removable");
+                        if let Ok(rem) = std::fs::read_to_string(&rem_path) {
+                            if rem.trim() == "1" {
+                                let size_path = entry.path().join("size");
+                                let sectors = std::fs::read_to_string(&size_path).unwrap_or_default().trim().parse::<u64>().unwrap_or(0);
+                                let bytes = sectors * 512;
+                                let size_gb = ((bytes as f64) / (1024.0 * 1024.0 * 1024.0) * 100.0).round() / 100.0;
+                                list.push(UsbDriveInfo {
+                                    device_id: format!("/dev/{}", dev_name),
+                                    name: format!("USB Flash Drive (/dev/{})", dev_name),
+                                    drive_letter: Some(format!("/dev/{}", dev_name)),
+                                    size_gb,
+                                    bus_type: "USB".into(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(list)
     }
 }
 
