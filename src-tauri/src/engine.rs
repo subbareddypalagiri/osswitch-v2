@@ -246,18 +246,53 @@ pub async fn get_connected_usb_drives() -> Result<Vec<UsbDriveInfo>, String> {
     #[cfg(target_os = "windows")]
     {
         let ps_cmd = r#"
-        Get-Disk | Where-Object BusType -eq 'USB' | ForEach-Object {
-            $disk = $_
-            $partitions = Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue
-            $letters = ($partitions | Where-Object DriveLetter | Select-Object -ExpandProperty DriveLetter) -join ', '
-            [PSCustomObject]@{
-                DeviceId = "\\.\PhysicalDrive$($disk.Number)"
-                Name = if ($disk.FriendlyName) { $disk.FriendlyName } else { "Generic USB Drive" }
-                DriveLetter = if ($letters) { "$letters:" } else { $null }
-                SizeGb = [math]::Round($disk.Size / 1GB, 2)
-                BusType = $disk.BusType
+        $drives = @()
+        try {
+            $disks = Get-Disk -ErrorAction SilentlyContinue | Where-Object { $_.BusType -eq 'USB' -or ($_.Number -gt 0 -and ($_.MediaType -match 'Removable' -or $_.BusType -eq 'SD')) }
+            foreach ($disk in $disks) {
+                $partitions = Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue
+                $letters = ($partitions | Where-Object DriveLetter | Select-Object -ExpandProperty DriveLetter) -join ', '
+                $drives += [PSCustomObject]@{
+                    DeviceId = "\\.\PhysicalDrive$($disk.Number)"
+                    Name = if ($disk.FriendlyName) { $disk.FriendlyName } else { "USB Flash Drive" }
+                    DriveLetter = if ($letters) { "$letters:" } else { $null }
+                    SizeGb = [math]::Round($disk.Size / 1GB, 2)
+                    BusType = "USB"
+                }
             }
-        } | ConvertTo-Json -Compress
+        } catch {}
+
+        if ($drives.Count -eq 0) {
+            try {
+                $wmi = Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceType -eq 'USB' -or $_.MediaType -match 'Removable' -or $_.Caption -match 'USB' -or $_.Model -match 'USB' }
+                foreach ($w in $wmi) {
+                    $drives += [PSCustomObject]@{
+                        DeviceId = $w.DeviceID
+                        Name = if ($w.Model) { $w.Model } elseif ($w.Caption) { $w.Caption } else { "USB Flash Drive" }
+                        DriveLetter = $null
+                        SizeGb = [math]::Round($w.Size / 1GB, 2)
+                        BusType = "USB"
+                    }
+                }
+            } catch {}
+        }
+
+        if ($drives.Count -eq 0) {
+            try {
+                $vols = Get-Volume -ErrorAction SilentlyContinue | Where-Object { $_.DriveType -eq 'Removable' -and $_.DriveLetter }
+                foreach ($v in $vols) {
+                    $drives += [PSCustomObject]@{
+                        DeviceId = "$($v.DriveLetter):"
+                        Name = if ($v.FriendlyName) { $v.FriendlyName } else { "USB Drive ($($v.DriveLetter):)" }
+                        DriveLetter = "$($v.DriveLetter):"
+                        SizeGb = [math]::Round($v.Size / 1GB, 2)
+                        BusType = "USB"
+                    }
+                }
+            } catch {}
+        }
+
+        $drives | ConvertTo-Json -Compress
         "#;
         let out = Command::new("powershell").args(["-NoProfile", "-Command", ps_cmd]).output().await.map_err(|e| e.to_string())?;
         let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
