@@ -249,9 +249,9 @@ export const OS_CATALOG: OSConfig[] = [
     category: "Security", 
     isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso",
     editions: [
-      { id: "slim", name: "Slim Edition (XFCE GUI)", size: "5.2 GB", desc: "Recommended • Fast Download & Top Pentesting Tools", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso", recommended: true },
-      { id: "full", name: "Full ISO (Complete Suite)", size: "22.0 GB", desc: "All 2,800+ Offensive Tools Offline Pre-installed", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-full-2023.05.01-x86_64.iso" },
-      { id: "netinst", name: "Netinstaller (Minimal)", size: "850 MB", desc: "Lightweight Base Network Installer", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-netinst-2023.05.01-x86_64.iso" }
+      { id: "slim", name: "Slim Edition (XFCE GUI)", size: "5.5 GB", desc: "Recommended • Fast Download & Top Pentesting Tools", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso", recommended: true },
+      { id: "full", name: "Full ISO (Complete Suite)", size: "22.0 GB", desc: "All 2,800+ Offensive Tools Offline Pre-installed", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso" },
+      { id: "netinst", name: "Netinstaller (Minimal)", size: "815 MB", desc: "Lightweight Base Network Installer", isoUrl: "https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso" }
     ]
   },
   { 
