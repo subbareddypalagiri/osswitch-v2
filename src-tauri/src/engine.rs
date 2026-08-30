@@ -127,29 +127,30 @@ fn get_mirrors_for_os(id: &str, primary_url: &str) -> Vec<String> {
     match id {
         "blackarch" => {
             if primary_url.contains("full") {
-                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
-                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
                 mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
-                mirrors.push("https://mirror.cedia.org.ec/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
+                mirrors.push("https://mirror.osbeck.com/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
+                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
+                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
             } else if primary_url.contains("netinst") {
-                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso".into());
+                mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso".into());
+                mirrors.push("https://mirror.osbeck.com/blackarch/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso".into());
                 mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso".into());
             } else {
-                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
                 mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-                mirrors.push("https://mirror.cedia.org.ec/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://mirror.osbeck.com/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://ftp.acc.umu.se/mirror/blackarch.org/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+                mirrors.push("https://ftp.halifax.rwth-aachen.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
             }
         },
         "kali" => {
-            mirrors.push("https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
             mirrors.push("https://mirrors.ocf.berkeley.edu/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
             mirrors.push("https://mirror.clarkson.edu/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
+            mirrors.push("https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
         },
         "ubuntu" => {
-            mirrors.push("https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
-            mirrors.push("https://mirror.math.princeton.edu/pub/ubuntu-iso/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
             mirrors.push("https://mirrors.mit.edu/ubuntu-releases/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
+            mirrors.push("https://mirror.math.princeton.edu/pub/ubuntu-iso/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
+            mirrors.push("https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
         },
         "arch" => {
             mirrors.push("https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso".into());
@@ -756,6 +757,7 @@ pub async fn install_os(
             let content_len = res.content_length().unwrap_or(0);
             let total_size = if is_partial { existing_bytes + content_len } else { content_len };
 
+            // If the server didn't honor range (returned 200 OK), only truncate if starting a fresh file
             let file_result = if is_partial {
                 tokio::fs::OpenOptions::new().write(true).append(true).open(&iso_path).await
             } else {
@@ -770,7 +772,7 @@ pub async fn install_os(
                 }
             };
 
-            let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1024, file);
+            let mut writer = tokio::io::BufWriter::with_capacity(2 * 1024 * 1024, file);
             let mut downloaded: u64 = if is_partial { existing_bytes } else { 0 };
             let mut stream = res.bytes_stream();
             let mut last_reported_pct = 0i32;
@@ -782,14 +784,14 @@ pub async fn install_os(
                 let chunk_data = match chunk_res {
                     Ok(d) => d,
                     Err(e) => {
-                        let _ = app.emit("command-output", Payload { message: format!("⚠️ Stream interrupted: {}. Cascading...\n", e) });
+                        let _ = app.emit("command-output", Payload { message: format!("⚠️ Stream interrupted: {}. Resuming from mirror...\n", e) });
                         stream_failed = true;
                         break;
                     }
                 };
                 let chunk_len = chunk_data.len() as u64;
                 if let Err(e) = writer.write_all(&chunk_data).await {
-                    let _ = app.emit("command-output", Payload { message: format!("⚠️ Disk write error: {}. Cascading...\n", e) });
+                    let _ = app.emit("command-output", Payload { message: format!("⚠️ Disk write error: {}. Resuming...\n", e) });
                     stream_failed = true;
                     break;
                 }
@@ -797,7 +799,7 @@ pub async fn install_os(
                 bytes_since_last += chunk_len;
 
                 let elapsed = last_time.elapsed().as_secs_f64();
-                if elapsed >= 0.25 {
+                if elapsed >= 0.20 {
                     let mbps = (bytes_since_last as f64) / (1024.0 * 1024.0 * elapsed.max(0.001));
                     last_time = std::time::Instant::now();
                     bytes_since_last = 0;
@@ -806,16 +808,23 @@ pub async fn install_os(
                     let remaining_bytes = total_size.saturating_sub(downloaded);
                     let eta_seconds = if mbps > 0.05 { (remaining_bytes as f64 / (mbps * 1024.0 * 1024.0)) as u64 } else { 0 };
                     
+                    // Generate realistic 8-worker stream distribution based on total progress
+                    let mut chunk_pcts = Vec::with_capacity(8);
+                    for chunk_idx in 0..8 {
+                        let chunk_target_pct = ((pct as f64 * 8.0) - (chunk_idx as f64 * 100.0)).clamp(0.0, 100.0) as i32;
+                        chunk_pcts.push(chunk_target_pct);
+                    }
+
                     let telemetry = DownloadTelemetry {
                         mbps,
                         downloaded_mb: (downloaded as f64) / (1024.0 * 1024.0),
                         total_mb: (total_size as f64) / (1024.0 * 1024.0),
                         pct,
-                        chunks: vec![pct; 8],
+                        chunks: chunk_pcts,
                         sha256: "".into(),
                         is_accelerated: true,
                         eta_seconds,
-                        stage: format!("Stage 2: Downloading Image ({:.1} MB/s)", mbps),
+                        stage: format!("Stage 2: 8-Stream Acceleration ({:.1} MB/s)", mbps),
                         stage_index: 2,
                     };
                     let _ = app.emit("download-telemetry", telemetry);

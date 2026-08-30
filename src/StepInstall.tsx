@@ -70,18 +70,19 @@ export const InstallProgressBar = memo(function InstallProgressBar() {
       {/* Sleek Steam/Vercel-Style Live Telemetry Dashboard */}
       {telemetry && telemetry.is_accelerated && (
         <div className="w-full max-w-xl bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.2)] mb-8 animate-[fadeIn_0.3s_ease-out]">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+            <div className="flex items-center gap-2.5">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
               </span>
-              <span className="text-cyan-400 font-bold text-sm tracking-wider uppercase font-mono">8-Stream Accelerator Active</span>
+              <span className="text-cyan-400 font-bold text-xs sm:text-sm tracking-wider uppercase font-mono">8-Stream Accelerator Active</span>
             </div>
-            <div className="text-right font-mono">
-              <span className="text-3xl font-black bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                {telemetry.mbps.toFixed(1)} <span className="text-xs text-slate-400">MB/s</span>
+            <div className="text-right font-mono flex items-baseline gap-1">
+              <span className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                {(telemetry.mbps || 0).toFixed(1)}
               </span>
+              <span className="text-xs text-slate-400 font-bold">MB/s</span>
             </div>
           </div>
 
@@ -91,7 +92,7 @@ export const InstallProgressBar = memo(function InstallProgressBar() {
               <div key={idx} className="flex flex-col gap-1 items-center">
                 <div className="w-full bg-slate-800/80 rounded-lg h-14 overflow-hidden relative border border-cyan-500/20">
                   <div 
-                    className="w-full bg-gradient-to-t from-cyan-500 via-blue-500 to-purple-500 rounded-lg transition-all duration-200 absolute bottom-0 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                    className="w-full bg-gradient-to-t from-cyan-500 via-blue-500 to-purple-500 rounded-lg transition-all duration-300 absolute bottom-0 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
                     style={{ height: `${chunkPct}%` }}
                   />
                 </div>
@@ -100,8 +101,8 @@ export const InstallProgressBar = memo(function InstallProgressBar() {
             ))}
           </div>
 
-          <div className="flex justify-between items-center text-xs font-mono text-slate-400 border-t border-slate-800 pt-3">
-            <span>{telemetry.downloaded_mb.toFixed(0)} MB / {telemetry.total_mb.toFixed(0)} MB ({telemetry.pct}%)</span>
+          <div className="flex flex-wrap justify-between items-center gap-2 text-xs font-mono text-slate-400 border-t border-slate-800 pt-3">
+            <span>{(telemetry.downloaded_mb || 0).toFixed(0)} MB / {(telemetry.total_mb || 0).toFixed(0)} MB ({telemetry.pct || 0}%)</span>
             <span className="text-emerald-400 flex items-center gap-1 font-semibold">
               🔒 SHA256 Stream Guard Active
             </span>
