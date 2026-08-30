@@ -780,10 +780,10 @@ export default function StepInstall({
             )}
             
             {installStatus[activeTab || ""]?.status === "success" && !installStatus[activeTab || ""]?.message && (
-              <div className="mb-4 p-5 bg-gradient-to-r from-emerald-900/40 via-blue-900/40 to-purple-900/40 border border-emerald-500/40 rounded-xl shadow-lg animate-[fadeIn_0.3s_ease-out]">
                 <h3 className="text-emerald-300 font-bold text-lg mb-2 flex items-center gap-2">
                   <span className="text-2xl">🎉</span> Provisioning Successful!
                 </h3>
+                <div className="text-slate-300 text-sm leading-relaxed">
                   {(selectedIntents[activeTab || ""] === "usb_flash" || selectedIntents[activeTab || ""] === "usb_live") && (
                     <p><strong>Next Steps (Live USB Portable):</strong> Your Live USB is 100% ready! Restart your laptop, tap <strong>F12 / F9</strong>, and select your USB Drive to run Linux directly in RAM/USB with 0% risk to Windows!</p>
                   )}
