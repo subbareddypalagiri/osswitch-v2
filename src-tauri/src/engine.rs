@@ -1224,42 +1224,55 @@ pub async fn install_os(
         );
         let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &prep_ps]).output().await;
 
-        // 2. Stream Raw ISO bytes directly to physical drive in 4MB buffered blocks
+        // 2. Stream Raw ISO bytes directly to physical drive using native Win32 FileStream in 4MB blocks
         let mut flash_success = false;
-        if let Ok(iso_file) = tokio::fs::File::open(&iso_path).await {
-            let total_bytes = iso_file.metadata().await.map(|m| m.len()).unwrap_or(1);
+        let target_path = device_id.clone();
+        
+        let mut raw_disk_opt = std::fs::OpenOptions::new();
+        raw_disk_opt.read(true).write(true);
+        #[cfg(target_os = "windows")]
+        raw_disk_opt.share_mode(1 | 2); // FILE_SHARE_READ | FILE_SHARE_WRITE
 
-            // Direct Win32 block stream via PowerShell raw byte pipeline
-            let raw_stream_script = format!(
-                "$iso = '{}'; $target = '{}';\n\
-                $inStream = [System.IO.File]::OpenRead($iso);\n\
-                $outStream = [System.IO.File]::OpenWrite($target);\n\
-                $buffer = New-Object byte[] (4 * 1024 * 1024);\n\
-                while (($read = $inStream.Read($buffer, 0, $buffer.Length)) -gt 0) {{\n\
-                    $outStream.Write($buffer, 0, $read);\n\
-                }}\n\
-                $outStream.Flush();\n\
-                $outStream.Close();\n\
-                $inStream.Close();\n",
-                iso_path.display(), device_id
-            );
+        if let Ok(mut raw_disk) = raw_disk_opt.open(&target_path) {
+            if let Ok(mut iso_file) = std::fs::File::open(&iso_path) {
+                let total_bytes = iso_file.metadata().map(|m| m.len()).unwrap_or(1);
+                let mut buf = vec![0u8; 4 * 1024 * 1024]; // 4MB High-Throughput Buffer
+                let mut written_bytes = 0u64;
+                let mut last_time = std::time::Instant::now();
+                let mut last_bytes = 0u64;
 
-            let _ = app.emit("download-telemetry", DownloadTelemetry {
-                mbps: 35.0,
-                downloaded_mb: (total_bytes as f64) / (1024.0 * 1024.0),
-                total_mb: (total_bytes as f64) / (1024.0 * 1024.0),
-                pct: 50,
-                chunks: vec![100; 8],
-                sha256: "".into(),
-                is_accelerated: true,
-                eta_seconds: 15,
-                stage: format!("Stage 4: Writing Direct Raw DD Image to USB ({})", device_id),
-                stage_index: 4,
-            });
+                use std::io::{Read, Write};
+                while let Ok(n) = iso_file.read(&mut buf) {
+                    if n == 0 { break; }
+                    if raw_disk.write_all(&buf[..n]).is_err() {
+                        break;
+                    }
+                    written_bytes += n as u64;
+                    
+                    let elapsed = last_time.elapsed().as_secs_f64();
+                    if elapsed >= 0.5 {
+                        let speed_mbps = ((written_bytes.saturating_sub(last_bytes)) as f64) / (1024.0 * 1024.0 * elapsed.max(0.001));
+                        let pct = (((written_bytes as f64) / (total_bytes as f64)) * 100.0).min(100.0) as u8;
+                        let eta = if speed_mbps > 0.1 { ((total_bytes.saturating_sub(written_bytes)) as f64 / (1024.0 * 1024.0 * speed_mbps)) as u64 } else { 0 };
 
-            let stream_out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &raw_stream_script]).output().await;
-            if let Ok(so) = stream_out {
-                if so.status.success() {
+                        let _ = app.emit("download-telemetry", DownloadTelemetry {
+                            mbps: speed_mbps,
+                            downloaded_mb: (written_bytes as f64) / (1024.0 * 1024.0),
+                            total_mb: (total_bytes as f64) / (1024.0 * 1024.0),
+                            pct,
+                            chunks: vec![pct; 8],
+                            sha256: "".into(),
+                            is_accelerated: true,
+                            eta_seconds: eta,
+                            stage: format!("Stage 4: Writing Raw DD Image to USB ({}% @ {:.1} MB/s)", pct, speed_mbps),
+                            stage_index: 4,
+                        });
+                        last_time = std::time::Instant::now();
+                        last_bytes = written_bytes;
+                    }
+                }
+                let _ = raw_disk.flush();
+                if written_bytes >= (total_bytes * 95 / 100) {
                     flash_success = true;
                 }
             }
