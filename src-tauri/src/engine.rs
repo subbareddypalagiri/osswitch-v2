@@ -8,6 +8,8 @@ use futures_util::StreamExt;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+#[cfg(target_os = "windows")]
+use std::os::windows::fs::OpenOptionsExt;
 
 pub const CREATE_NO_WINDOW: u32 = 0x08000000;
 
@@ -1259,8 +1261,8 @@ pub async fn install_os(
                             mbps: speed_mbps,
                             downloaded_mb: (written_bytes as f64) / (1024.0 * 1024.0),
                             total_mb: (total_bytes as f64) / (1024.0 * 1024.0),
-                            pct,
-                            chunks: vec![pct; 8],
+                            pct: pct as i32,
+                            chunks: vec![pct as i32; 8],
                             sha256: "".into(),
                             is_accelerated: true,
                             eta_seconds: eta,
