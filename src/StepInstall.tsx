@@ -17,6 +17,9 @@ interface TelemetryData {
   chunks: number[];
   sha256: string;
   is_accelerated: boolean;
+  eta_seconds?: number;
+  stage?: string;
+  stage_index?: number;
 }
 
 interface UsbDriveInfo {
