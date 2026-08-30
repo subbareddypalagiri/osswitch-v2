@@ -327,7 +327,7 @@ pub async fn get_connected_usb_drives() -> Result<Vec<UsbDriveInfo>, String> {
             } catch {}
         }
 
-        $drives | ConvertTo-Json -Compress
+        @($drives) | ConvertTo-Json -Compress
         "#;
         let out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps_cmd]).output().await.map_err(|e| e.to_string())?;
         let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -343,14 +343,17 @@ pub async fn get_connected_usb_drives() -> Result<Vec<UsbDriveInfo>, String> {
                 bus_type: item["BusType"].as_str().unwrap_or("USB").to_string(),
             }).collect();
             return Ok(parsed);
-        } else if let Ok(single) = serde_json::from_str::<serde_json::Value>(&stdout) {
-            return Ok(vec![UsbDriveInfo {
-                device_id: single["DeviceId"].as_str().unwrap_or_default().to_string(),
-                name: single["Name"].as_str().unwrap_or("USB Flash Drive").to_string(),
-                drive_letter: single["DriveLetter"].as_str().map(|s| s.to_string()),
-                size_gb: single["SizeGb"].as_f64().unwrap_or(0.0),
-                bus_type: single["BusType"].as_str().unwrap_or("USB").to_string(),
-            }]);
+        } else if let Ok(item) = serde_json::from_str::<serde_json::Value>(&stdout) {
+            if item.is_object() {
+                let single = vec![UsbDriveInfo {
+                    device_id: item["DeviceId"].as_str().unwrap_or_default().to_string(),
+                    name: item["Name"].as_str().unwrap_or("USB Flash Drive").to_string(),
+                    drive_letter: item["DriveLetter"].as_str().map(|s| s.to_string()),
+                    size_gb: item["SizeGb"].as_f64().unwrap_or(0.0),
+                    bus_type: item["BusType"].as_str().unwrap_or("USB").to_string(),
+                }];
+                return Ok(single);
+            }
         }
         Ok(vec![])
     }
