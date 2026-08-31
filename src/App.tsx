@@ -218,16 +218,16 @@ function App() {
 
       <div className="flex w-full h-full text-slate-900 dark:text-[#f5f5f7]">
         {/* Apple-Tier Sidebar */}
-        <aside className="w-[260px] shrink-0 h-full flex flex-col border-r border-black/5 dark:border-white/5 bg-white/50 dark:bg-[#141419]/50 backdrop-blur-3xl pt-10 pb-6 px-4">
+        <aside className="w-[260px] shrink-0 h-full flex flex-col border-r border-[#e2d8cc] dark:border-white/5 bg-white/70 dark:bg-[#141419]/50 backdrop-blur-3xl pt-10 pb-6 px-4">
           <div className="flex items-center gap-3 mb-10 px-2 cursor-pointer transition-opacity hover:opacity-80">
             <Logo className="w-8 h-8" />
-            <span className="font-semibold text-xl tracking-tight">OSwitch</span>
+            <span className="font-semibold text-xl tracking-tight text-stone-900 dark:text-white">OSwitch</span>
           </div>
 
           <div className="flex-grow overflow-y-auto custom-scrollbar pr-1 space-y-6">
             {NAV_SECTIONS.map((section, sIdx) => (
               <div key={sIdx}>
-                <div className="text-[10px] font-bold text-slate-500 dark:text-[#86868b] mb-2 tracking-wider pl-3 uppercase">
+                <div className="text-[10px] font-bold text-stone-500 dark:text-[#86868b] mb-2 tracking-wider pl-3 uppercase">
                   {section.title}
                 </div>
                 <ul className="list-none space-y-1">
@@ -243,10 +243,10 @@ function App() {
                         className={`
                           px-3 py-2 rounded-lg flex items-center gap-3 text-[13px] font-medium transition-all duration-200 cursor-pointer
                           ${isActive 
-                            ? 'bg-[#007aff]/15 text-[#007aff] shadow-[inset_0_0_0_1px_rgba(0,122,255,0.2)]' 
+                            ? 'bg-amber-800/15 text-amber-900 dark:bg-[#007aff]/15 dark:text-[#007aff] shadow-[inset_0_0_0_1px_rgba(180,100,50,0.3)] dark:shadow-[inset_0_0_0_1px_rgba(0,122,255,0.2)] font-semibold' 
                             : isInstalling 
-                              ? 'text-slate-500 dark:text-[#86868b] cursor-not-allowed opacity-50' 
-                              : 'text-[#a1a1a6] hover:bg-white/5 hover:text-slate-900 dark:text-white'}
+                              ? 'text-stone-400 dark:text-[#86868b] cursor-not-allowed opacity-50' 
+                              : 'text-stone-600 hover:bg-[#f0ebe1] hover:text-stone-900 dark:text-[#a1a1a6] dark:hover:bg-white/5 dark:hover:text-white'}
                         `}
                       >
                         <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : ''}`}>

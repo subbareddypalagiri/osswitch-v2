@@ -24,19 +24,19 @@
   }
 
   html.light {
-    --bg-color: #f8fafc;
-    --panel-bg: rgba(255, 255, 255, 0.85);
-    --panel-border: rgba(226, 232, 240, 0.8);
-    --panel-shadow: 0 8px 32px rgba(148, 163, 184, 0.15);
+    --bg-color: #f7f5f0;
+    --panel-bg: rgba(255, 255, 255, 0.92);
+    --panel-border: rgba(218, 207, 192, 0.7);
+    --panel-shadow: 0 10px 40px rgba(180, 140, 100, 0.12);
     
-    --text-main: #0f172a;
-    --text-muted: #64748b;
-    --glass-card-bg: rgba(255, 255, 255, 0.8);
-    --glass-card-border: rgba(226, 232, 240, 0.9);
-    --btn-primary-bg: #2563eb;
+    --text-main: #1c1917;
+    --text-muted: #57534e;
+    --glass-card-bg: rgba(255, 255, 255, 0.96);
+    --glass-card-border: rgba(225, 214, 199, 0.85);
+    --btn-primary-bg: #854d0e;
     --btn-primary-text: #ffffff;
-    --input-bg: #ffffff;
-    --input-border: #cbd5e1;
+    --input-bg: #fbf9f5;
+    --input-border: #dcd2c4;
   }
   
   html.dark {

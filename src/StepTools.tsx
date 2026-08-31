@@ -255,7 +255,7 @@ export default function StepTools({
             </button>
             <button 
               onClick={onNext}
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-[0_2px_10px_rgba(59,130,246,0.4)] transition-all"
+              className="px-5 py-2 rounded-xl bg-amber-900 hover:bg-amber-800 dark:bg-blue-600 dark:hover:bg-blue-500 text-white font-semibold text-xs shadow-[0_2px_10px_rgba(180,100,50,0.4)] transition-all"
             >
               Next ({selectedTools.length} Selected)
             </button>
@@ -277,10 +277,10 @@ export default function StepTools({
               onClick={() => { setFilterType(tab.id as any); setPage(1); }}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
                 filterType === tab.id
-                  ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.35)] border border-blue-400/30'
+                  ? 'bg-amber-800 text-white dark:bg-blue-600 shadow-[0_0_15px_rgba(180,100,50,0.3)] dark:shadow-[0_0_15px_rgba(59,130,246,0.35)] border border-amber-900/30 dark:border-blue-400/30'
                   : tab.id === "installed" && installedCount > 0
-                  ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20'
+                  : 'bg-[#f0ebe1] dark:bg-white/5 text-stone-700 dark:text-slate-300 hover:bg-[#e4ddce] dark:hover:bg-white/10 border border-[#ded3c4] dark:border-white/10'
               }`}
             >
               <span>{tab.icon}</span>
@@ -299,43 +299,41 @@ export default function StepTools({
                 : "Search 10,500+ tools by name, category, or Winget ID..."} 
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="flex-grow bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors min-w-0"
+              className="w-full bg-[#fbf8f3] dark:bg-[#090b10] border border-[#dcd2c4] dark:border-white/15 rounded-xl px-4 py-2 text-stone-900 dark:text-white text-xs placeholder-stone-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-700 dark:focus:border-blue-500 transition-colors"
             />
+            {isSearchingLive && (
+              <div className="absolute right-3 top-2.5">
+                <div className="w-3.5 h-3.5 border-2 border-amber-700 dark:border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
             {hostPlatform === 'windows' && (
             <button
               onClick={handleLiveSearch}
               disabled={isSearchingLive || !search.trim()}
-              className="px-3.5 py-2 rounded-xl bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 font-semibold transition-all disabled:opacity-50 text-xs whitespace-nowrap flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-amber-800/20 text-amber-900 dark:bg-blue-600/20 dark:text-blue-300 border border-amber-800/30 dark:border-blue-500/30 hover:bg-amber-800/30 dark:hover:bg-blue-600/30 font-semibold transition-all disabled:opacity-50 text-xs whitespace-nowrap flex items-center gap-1.5"
             >
-              {isSearchingLive ? (
-                <>
-                  <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin"></span>
-                  Searching...
-                </>
-              ) : (
-                "Cloud Search"
-              )}
+              {isSearchingLive ? "Searching..." : "Cloud Search"}
             </button>
             )}
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-2.5 flex-grow w-full xl:w-auto">
+          <div className="flex gap-2 w-full xl:w-auto">
             <select 
-              className="flex-grow xl:w-56 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer min-w-0"
+              className="flex-grow xl:w-48 bg-[#fbf8f3] dark:bg-black/30 border border-[#dcd2c4] dark:border-white/10 rounded-xl px-3 py-2 text-xs text-stone-900 dark:text-white focus:outline-none focus:border-amber-700 dark:focus:border-blue-500 cursor-pointer min-w-0"
               value={filterDept || ""}
-              onChange={(e) => { setFilterDept(e.target.value || null); setPage(1); }}
+              onChange={(e) => { setFilterDept(e.target.value || null); setFilterRole(null); setPage(1); }}
             >
-              <option value="" className="bg-[#090b10]">All Departments</option>
-              {catalog.departments.map(d => <option key={d} value={d} className="bg-[#090b10]">{d}</option>)}
+              <option value="" className="bg-[#fbf8f3] dark:bg-[#090b10]">All Categories</option>
+              {catalog.departments.map(d => <option key={d} value={d} className="bg-[#fbf8f3] dark:bg-[#090b10]">{d}</option>)}
             </select>
 
             <select 
-              className="flex-grow xl:w-56 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer min-w-0"
+              className="flex-grow xl:w-56 bg-[#fbf8f3] dark:bg-black/30 border border-[#dcd2c4] dark:border-white/10 rounded-xl px-3 py-2 text-xs text-stone-900 dark:text-white focus:outline-none focus:border-amber-700 dark:focus:border-blue-500 cursor-pointer min-w-0"
               value={filterRole || ""}
               onChange={(e) => { setFilterRole(e.target.value || null); setPage(1); }}
             >
-              <option value="" className="bg-[#090b10]">All Roles</option>
-              {catalog.roles.map(r => <option key={r} value={r} className="bg-[#090b10]">{r}</option>)}
+              <option value="" className="bg-[#fbf8f3] dark:bg-[#090b10]">All Roles</option>
+              {catalog.roles.map(r => <option key={r} value={r} className="bg-[#fbf8f3] dark:bg-[#090b10]">{r}</option>)}
             </select>
           </div>
         </div>
@@ -343,7 +341,7 @@ export default function StepTools({
         {/* Tool Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 flex-grow overflow-y-auto pr-2 custom-scrollbar pb-6">
           {paginatedTools.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center text-slate-400 py-16 text-xs font-mono">
+            <div className="col-span-full flex flex-col items-center justify-center text-stone-500 dark:text-slate-400 py-16 text-xs font-mono">
               <span className="text-2xl mb-2">🔍</span>
               {filterType === "installed" ? "No installed tools detected matching this query." : "No tools found matching your criteria."}
             </div>
@@ -355,29 +353,29 @@ export default function StepTools({
                   key={tool.id} 
                   className={`relative group border ${
                     installed 
-                      ? 'border-emerald-500/40 bg-emerald-500/[0.03] hover:border-emerald-500/60 shadow-[0_0_15px_rgba(16,185,129,0.08)]' 
+                      ? 'border-emerald-500/40 bg-emerald-500/[0.04] hover:border-emerald-500/60 shadow-[0_0_15px_rgba(16,185,129,0.08)]' 
                       : selectedTools.includes(tool.wingetId) 
-                      ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]' 
-                      : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
+                      ? 'border-amber-700 bg-amber-500/10 dark:border-blue-500 dark:bg-blue-500/10 shadow-[0_0_15px_rgba(180,100,50,0.15)] dark:shadow-[0_0_15px_rgba(59,130,246,0.15)]' 
+                      : 'border-[#ebe3d5] dark:border-white/10 bg-[#fbf8f3] dark:bg-white/[0.02] hover:border-amber-700/30 dark:hover:border-white/20 hover:bg-[#f6f0e4] dark:hover:bg-white/[0.04]'
                   } rounded-2xl p-4.5 transition-all flex flex-col justify-between`}
                 >
                   <div>
                     <div className="flex items-start gap-3 mb-2.5 cursor-pointer" onClick={() => !installed && toggleTool(tool.id, tool.wingetId)}>
-                      <img src={tool.icon} alt={tool.name} className="w-9 h-9 rounded-xl object-cover border border-white/10 shrink-0" />
+                      <img src={tool.icon} alt={tool.name} className="w-9 h-9 rounded-xl object-cover border border-[#ded3c4] dark:border-white/10 shrink-0" />
                       <div className="flex-grow min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-white leading-tight truncate">{tool.name}</h3>
+                          <h3 className="text-sm font-bold text-stone-900 dark:text-white leading-tight truncate">{tool.name}</h3>
                           {installed && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                               ✓ Installed
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-blue-400 font-mono mt-0.5 truncate">{tool.department} • {tool.role}</p>
+                        <p className="text-[11px] text-amber-800 dark:text-blue-400 font-mono mt-0.5 truncate">{tool.department} • {tool.role}</p>
                       </div>
                       
                       {!installed && (
-                        <div className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedTools.includes(tool.wingetId) ? 'border-blue-500 bg-blue-500 text-white' : 'border-white/20 bg-black/40'}`}>
+                        <div className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedTools.includes(tool.wingetId) ? 'border-amber-800 bg-amber-800 dark:border-blue-500 dark:bg-blue-500 text-white' : 'border-[#dcd2c4] dark:border-white/20 bg-white dark:bg-black/40'}`}>
                           {selectedTools.includes(tool.wingetId) && (
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                           )}
@@ -388,37 +386,37 @@ export default function StepTools({
                     {/* Clean Unified Pill Badges */}
                     <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
                       {tool.eligibility === "web_app" ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/30">
                           Web App
                         </span>
                       ) : tool.eligibility === "vendor_direct" ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/30">
                           Vendor Direct
                         </span>
                       ) : tool.eligibility === "linux_vm" ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 dark:bg-blue-500/10 text-amber-800 dark:text-blue-400 border border-amber-500/30 dark:border-blue-500/30">
                           Linux / VM
                         </span>
                       ) : hostPlatform === 'linux' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-orange-500/10 text-orange-300 border border-orange-500/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/30">
                           🐧 Linux Native
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                           ⚡ Windows 1-Click
                         </span>
                       )}
                       {tool.source && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/5 text-slate-400 border border-white/10">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#f0ebe1] dark:bg-white/5 text-stone-600 dark:text-slate-400 border border-[#ded3c4] dark:border-white/10">
                           {tool.source}
                         </span>
                       )}
                     </div>
 
-                    <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed mb-4">{tool.description}</p>
+                    <p className="text-stone-600 dark:text-slate-400 text-xs line-clamp-2 leading-relaxed mb-4">{tool.description}</p>
                   </div>
                   
-                  <div className="flex gap-2 pt-2 border-t border-white/5">
+                  <div className="flex gap-2 pt-2 border-t border-[#ebe3d5] dark:border-white/5">
                     {installed ? (
                       <button
                         onClick={() => handleLaunchApp(tool)}
@@ -429,7 +427,7 @@ export default function StepTools({
                     ) : (tool.eligibility === "web_app" || tool.eligibility === "vendor_direct") && tool.vendorUrl ? (
                       <button 
                         onClick={() => openUrl(tool.vendorUrl!)}
-                        className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
+                        className="flex-1 py-1.5 rounded-lg bg-[#f0ebe1] hover:bg-[#e4ddce] border border-[#ded3c4] text-stone-800 dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 dark:text-slate-300 dark:hover:text-white transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
                       >
                         Open Link
                       </button>
@@ -437,7 +435,7 @@ export default function StepTools({
 
                     <button 
                       onClick={() => openAiGuide(tool)}
-                      className="flex-1 py-1.5 rounded-lg bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-300 transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
+                      className="flex-1 py-1.5 rounded-lg bg-amber-800/10 hover:bg-amber-800/20 border border-amber-800/30 text-amber-900 dark:bg-blue-600/10 dark:hover:bg-blue-600/20 dark:border-blue-500/30 dark:text-blue-300 transition-colors text-[11px] font-semibold flex items-center justify-center gap-1"
                     >
                       Quick Guide
                     </button>

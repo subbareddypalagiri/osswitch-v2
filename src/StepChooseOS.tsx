@@ -195,26 +195,26 @@ export default function StepChooseOS({
 
   return (
     <div className="w-full h-full flex flex-col items-center pt-8 pb-4">
-      <div className="bg-[#111522]/95 border border-white/10 rounded-3xl max-w-[1240px] p-8 w-full flex-grow flex flex-col overflow-hidden animate-[fadeIn_0.3s_ease-out] shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
+      <div className="bg-white/95 dark:bg-[#111522]/95 border border-[#e2d8cc] dark:border-white/10 rounded-3xl max-w-[1240px] p-8 w-full flex-grow flex flex-col overflow-hidden animate-[fadeIn_0.3s_ease-out] shadow-[0_20px_50px_rgba(180,140,100,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
-              <span className="text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">Step 3 of 7</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-600 dark:bg-blue-500 shadow-[0_0_8px_rgba(217,119,6,0.8)] dark:shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
+              <span className="text-amber-800 dark:text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">Step 3 of 7</span>
             </div>
-            <h2 className="text-2xl font-extrabold text-white tracking-tight">
+            <h2 className="text-2xl font-extrabold text-stone-900 dark:text-white tracking-tight">
               Operating System Catalog
             </h2>
           </div>
 
-          <div className="flex items-center bg-black/40 p-1 rounded-xl border border-white/10">
+          <div className="flex items-center bg-[#f0ebe1] dark:bg-black/40 p-1 rounded-xl border border-[#ded3c4] dark:border-white/10">
             <button 
               onClick={() => setActiveTab("catalog")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === "catalog" 
-                  ? "bg-blue-600 text-white shadow-[0_2px_10px_rgba(59,130,246,0.4)]" 
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-amber-800 dark:bg-blue-600 text-white shadow-[0_2px_10px_rgba(180,100,50,0.3)] dark:shadow-[0_2px_10px_rgba(59,130,246,0.4)]" 
+                  : "text-stone-600 hover:text-stone-900 dark:text-slate-400 dark:hover:text-white"
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -224,69 +224,69 @@ export default function StepChooseOS({
               onClick={() => setActiveTab("manage")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === "manage" 
-                  ? "bg-blue-600 text-white shadow-[0_2px_10px_rgba(59,130,246,0.4)]" 
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-amber-800 dark:bg-blue-600 text-white shadow-[0_2px_10px_rgba(180,100,50,0.3)] dark:shadow-[0_2px_10px_rgba(59,130,246,0.4)]" 
+                  : "text-stone-600 hover:text-stone-900 dark:text-slate-400 dark:hover:text-white"
               }`}
             >
               <MonitorCheck className="w-3.5 h-3.5" />
               Manage Installed
-              <span className="bg-white/20 text-[10px] px-1.5 py-0.5 rounded-full font-mono">{installedOSList.length}</span>
+              <span className="bg-amber-900/20 dark:bg-white/20 text-stone-800 dark:text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono">{installedOSList.length}</span>
             </button>
           </div>
         </div>
 
         {osMessage && (
-          <div className="mb-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 font-mono text-xs flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
+          <div className="mb-4 p-3 rounded-xl bg-amber-500/10 dark:bg-blue-500/10 border border-amber-500/30 dark:border-blue-500/30 text-amber-900 dark:text-blue-300 font-mono text-xs flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-600 dark:bg-blue-400 animate-ping"></span>
             {osMessage}
           </div>
         )}
 
         {activeTab === "manage" ? (
           <div className="flex-grow custom-scrollbar overflow-y-auto pr-2">
-            <p className="text-slate-400 text-sm mb-6">
+            <p className="text-stone-600 dark:text-slate-400 text-sm mb-6">
               View, boot, or uninstall operating systems provisioned on your local hardware or hypervisors.
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pb-8">
               {installedOSList.map(os => (
-                <div key={os.id} className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 flex flex-col justify-between hover:border-white/20 transition-all">
+                <div key={os.id} className="bg-[#fbf8f3] dark:bg-white/[0.03] border border-[#ebe3d5] dark:border-white/10 rounded-2xl p-5 flex flex-col justify-between hover:border-amber-700/30 dark:hover:border-white/20 transition-all">
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3.5">
                         <OSLogo id={os.id} size={36} className="flex-shrink-0" />
                         <div>
-                          <h3 className="text-base font-bold text-white leading-tight">{os.name}</h3>
-                          <p className="text-xs text-slate-400 font-mono mt-0.5">{os.type}</p>
+                          <h3 className="text-base font-bold text-stone-900 dark:text-white leading-tight">{os.name}</h3>
+                          <p className="text-xs text-stone-500 dark:text-slate-400 font-mono mt-0.5">{os.type}</p>
                         </div>
                       </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono border ${os.isHost ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-blue-500/10 text-blue-400 border-blue-500/30"}`}>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono border ${os.isHost ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" : "bg-amber-500/10 dark:bg-blue-500/10 text-amber-800 dark:text-blue-400 border-amber-500/30 dark:border-blue-500/30"}`}>
                         {os.status}
                       </span>
                     </div>
 
                     <div className="mb-5">
-                      <div className="flex justify-between text-xs text-slate-400 mb-1 font-mono">
+                      <div className="flex justify-between text-xs text-stone-500 dark:text-slate-400 mb-1 font-mono">
                         <span>Storage Allocated</span>
-                        <span className="text-white font-bold">{os.used} / {os.total}</span>
+                        <span className="text-stone-900 dark:text-white font-bold">{os.used} / {os.total}</span>
                       </div>
-                      <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(parseFloat(os.used) / parseFloat(os.total)) * 100}%` }}></div>
+                      <div className="w-full bg-[#ebe3d5] dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-amber-700 dark:bg-blue-500 h-full rounded-full" style={{ width: `${(parseFloat(os.used) / parseFloat(os.total)) * 100}%` }}></div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-3 border-t border-white/10">
+                  <div className="flex gap-3 pt-3 border-t border-[#ebe3d5] dark:border-white/10">
                     <button
                       onClick={() => handleBootOS(os.name)}
-                      className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-[0_2px_8px_rgba(59,130,246,0.3)]"
+                      className="flex-1 py-2 rounded-xl bg-amber-800 hover:bg-amber-900 dark:bg-blue-600 dark:hover:bg-blue-500 text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-[0_2px_8px_rgba(180,100,50,0.3)] dark:shadow-[0_2px_8px_rgba(59,130,246,0.3)]"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" /> Boot OS
                     </button>
                     {!os.isHost && (
                       <button
                         onClick={() => handleUninstallOS(os.id)}
-                        className="py-2 px-3.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold text-xs transition-all flex items-center justify-center gap-1"
+                        className="py-2 px-3.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400 font-semibold text-xs transition-all flex items-center justify-center gap-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Uninstall
                       </button>
@@ -299,18 +299,18 @@ export default function StepChooseOS({
         ) : (
           <>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <p className="text-slate-400 text-sm">
+              <p className="text-stone-600 dark:text-slate-400 text-sm">
                 Select your target operating system and choose the execution environment.
               </p>
               
               <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-slate-400" />
                 <input 
                   type="text" 
                   placeholder="Search 101 OS Distributions..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-black/30 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-full sm:w-[280px]"
+                  className="bg-[#fbf8f3] dark:bg-black/30 border border-[#dcd2c4] dark:border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-stone-900 dark:text-white placeholder:text-stone-400 dark:placeholder-slate-400 focus:outline-none focus:border-amber-700 dark:focus:border-blue-500 focus:ring-1 focus:ring-amber-700 dark:focus:ring-blue-500 transition-all w-full sm:w-[280px]"
                 />
               </div>
             </div>
@@ -338,12 +338,12 @@ export default function StepChooseOS({
                         }
                       }}
                       className={`rounded-2xl p-4.5 flex flex-col justify-between transition-all cursor-pointer relative border
-                        ${os.locked ? 'opacity-50 cursor-not-allowed bg-white/[0.02] border-white/5' : 
-                          isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.05]'}`}
+                        ${os.locked ? 'opacity-50 cursor-not-allowed bg-stone-100/50 dark:bg-white/[0.02] border-stone-200 dark:border-white/5' : 
+                          isSelected ? 'border-amber-700 bg-amber-500/10 dark:border-blue-500 dark:bg-blue-500/10 shadow-[0_0_20px_rgba(180,100,50,0.15)] dark:shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'bg-[#fbf8f3] dark:bg-white/[0.03] border-[#ebe3d5] dark:border-white/10 hover:border-amber-700/30 dark:hover:border-white/20 hover:bg-[#f6f0e4] dark:hover:bg-white/[0.05]'}`}
                       onClick={() => !os.locked && toggleOS(os.id)}
                     >
                       {isSelected && !os.locked && (
-                        <div className="absolute top-3.5 right-3.5 w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] z-10"></div>
+                        <div className="absolute top-3.5 right-3.5 w-2.5 h-2.5 rounded-full bg-amber-600 dark:bg-blue-500 shadow-[0_0_8px_rgba(217,119,6,0.8)] dark:shadow-[0_0_8px_rgba(59,130,246,0.8)] z-10"></div>
                       )}
 
                       <div>
@@ -351,16 +351,16 @@ export default function StepChooseOS({
                           <OSLogo id={os.id} size={36} className="flex-shrink-0 mt-0.5" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-white font-bold text-base leading-tight">
+                              <span className="text-stone-900 dark:text-white font-bold text-base leading-tight">
                                 {os.name}
                               </span>
                               {activeEdition && (
-                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 shrink-0">
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/15 dark:bg-blue-500/15 text-amber-800 dark:text-blue-400 border border-amber-500/30 dark:border-blue-500/30 shrink-0">
                                   {activeEdition.size}
                                 </span>
                               )}
                             </div>
-                            <div className="text-slate-400 text-xs leading-relaxed mt-1 line-clamp-2">
+                            <div className="text-stone-500 dark:text-slate-400 text-xs leading-relaxed mt-1 line-clamp-2">
                               {os.sub || (os as any).category || "Official Release"}
                             </div>
                           </div>
@@ -368,11 +368,11 @@ export default function StepChooseOS({
                       </div>
                       
                       {isSelected && !os.locked && (
-                        <div className="mt-3 pt-3 border-t border-white/10 flex flex-col gap-2.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="mt-3 pt-3 border-t border-[#ebe3d5] dark:border-white/10 flex flex-col gap-2.5" onClick={(e) => e.stopPropagation()}>
                           <div>
-                            <label className="text-[11px] text-slate-400 block mb-1 font-medium">Execution Method:</label>
+                            <label className="text-[11px] text-stone-600 dark:text-slate-400 block mb-1 font-medium">Execution Method:</label>
                             <select 
-                              className="bg-[#090b10] border border-white/15 rounded-lg px-3 py-1.5 text-white w-full text-xs font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                              className="bg-[#fbf8f3] dark:bg-[#090b10] border border-[#dcd2c4] dark:border-white/15 rounded-lg px-3 py-1.5 text-stone-900 dark:text-white w-full text-xs font-medium focus:outline-none focus:border-amber-700 dark:focus:border-blue-500 transition-colors"
                               value={intent}
                               onChange={(e) => handleIntentChange(os.id, e.target.value)}
                             >
@@ -387,15 +387,15 @@ export default function StepChooseOS({
                           {editions && editions.length > 1 && (
                             <div>
                               <div className="flex justify-between items-center mb-1">
-                                <label className="text-[11px] text-slate-400 font-medium">Edition / Flavor:</label>
+                                <label className="text-[11px] text-stone-600 dark:text-slate-400 font-medium">Edition / Flavor:</label>
                                 {activeEdition && (
-                                  <span className="text-[10px] font-mono font-bold text-blue-400">
+                                  <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-blue-400">
                                     {activeEdition.size}
                                   </span>
                                 )}
                               </div>
                               <select 
-                                className="bg-[#090b10] border border-white/15 rounded-lg px-3 py-1.5 text-white w-full text-xs font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                                className="bg-[#fbf8f3] dark:bg-[#090b10] border border-[#dcd2c4] dark:border-white/15 rounded-lg px-3 py-1.5 text-stone-900 dark:text-white w-full text-xs font-medium focus:outline-none focus:border-amber-700 dark:focus:border-blue-500 transition-colors"
                                 value={currentEditionId}
                                 onChange={(e) => handleEditionChange(os.id, e.target.value)}
                               >
@@ -406,7 +406,7 @@ export default function StepChooseOS({
                                 ))}
                               </select>
                               {activeEdition?.desc && (
-                                <p className="text-[10px] text-slate-400 mt-1 font-mono leading-tight">
+                                <p className="text-[10px] text-stone-500 dark:text-slate-400 mt-1 font-mono leading-tight">
                                   {activeEdition.desc}
                                 </p>
                               )}
@@ -420,32 +420,32 @@ export default function StepChooseOS({
               </div>
 
               {filteredOS.length === 0 && (
-                <div className="py-16 text-center text-slate-400">
-                  <p className="text-base font-semibold text-white mb-1">No distributions match "{searchQuery}"</p>
-                  <p className="text-xs text-slate-500">Try searching for Ubuntu, Kali, Arch, Debian, Fedora, or clear the search query.</p>
+                <div className="py-16 text-center text-stone-500 dark:text-slate-400">
+                  <p className="text-base font-semibold text-stone-900 dark:text-white mb-1">No distributions match "{searchQuery}"</p>
+                  <p className="text-xs text-stone-500 dark:text-slate-500">Try searching for Ubuntu, Kali, Arch, Debian, Fedora, or clear the search query.</p>
                 </div>
               )}
             </div>
           </>
         )}
 
-        <div className="flex justify-between items-center pt-4 border-t border-white/10">
+        <div className="flex justify-between items-center pt-4 border-t border-[#ebe3d5] dark:border-white/10">
           <button 
-            className="bg-white/5 hover:bg-white/10 text-white text-xs font-semibold py-2.5 px-5 rounded-xl transition-colors flex items-center gap-2 border border-white/10"
+            className="bg-[#f0ebe1] hover:bg-[#e4ddce] text-stone-800 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white text-xs font-semibold py-2.5 px-5 rounded-xl transition-colors flex items-center gap-2 border border-[#ded3c4] dark:border-white/10"
             onClick={onBack}
           >
             <span>←</span> Back
           </button>
           
-          <div className="text-xs text-slate-400 font-mono">
+          <div className="text-xs text-stone-600 dark:text-slate-400 font-mono">
             {selectableCount === 0 ? "Select at least 1 OS to proceed" : `${selectableCount} OS selected`}
           </div>
 
           <button 
             className={`text-xs font-semibold py-2.5 px-6 rounded-xl transition-all flex items-center gap-2 text-white
               ${selectableCount > 0 
-                ? 'bg-blue-600 hover:bg-blue-500 shadow-[0_2px_12px_rgba(59,130,246,0.4)]' 
-                : 'bg-white/10 text-slate-500 cursor-not-allowed'}`}
+                ? 'bg-amber-800 hover:bg-amber-900 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-[0_2px_12px_rgba(180,100,50,0.35)] dark:shadow-[0_2px_12px_rgba(59,130,246,0.4)]' 
+                : 'bg-stone-200 dark:bg-white/10 text-stone-400 dark:text-slate-500 cursor-not-allowed'}`}
             onClick={onNext}
             disabled={selectableCount === 0}
           >
