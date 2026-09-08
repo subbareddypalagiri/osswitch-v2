@@ -142,7 +142,9 @@ export default function StepInstall({
   osSpace,
   userName = "archer",
   userPassword = "password123",
-  hostName = "oswitch-pc"
+  hostName = "oswitch-pc",
+  localIsoPaths = {},
+  setLocalIsoPaths
 }: { 
   onNext: () => void, 
   onBack: () => void,
@@ -158,7 +160,9 @@ export default function StepInstall({
   osSpace: number,
   userName?: string,
   userPassword?: string,
-  hostName?: string
+  hostName?: string,
+  localIsoPaths?: Record<string, string>,
+  setLocalIsoPaths?: React.Dispatch<React.SetStateAction<Record<string, string>>>
 }) {
   const targets = selectedOS.filter(id => id !== 'windows');
   const [activeTab, setActiveTab] = useState(targets.length > 0 ? targets[0] : "tools_only");
@@ -323,23 +327,37 @@ export default function StepInstall({
     }
   };
 
+  const handlePickLocalIsoForActive = async () => {
+    try {
+      const meta = await invoke<any>("pick_local_iso");
+      if (meta && meta.path && activeTab) {
+        if (setLocalIsoPaths) {
+          setLocalIsoPaths(prev => ({ ...prev, [activeTab]: meta.path }));
+        }
+      }
+    } catch (err) {
+      console.error("Error picking local ISO:", err);
+    }
+  };
+
   const runInstall = async (id: string, localIsoPath?: string) => {
+    const effectivePath = localIsoPath || localIsoPaths?.[id];
     try {
       const intent = selectedIntents[id] || "vbox_vm";
       // tools_only mode: skip all OS-related prompts, go straight to package install
       if (id === "tools_only") {
-        await executeInstall(id, localIsoPath);
+        await executeInstall(id, effectivePath);
         return;
       }
       if (intent === "baremetal_grub") {
-        setSafetyPromptState({show: true, id, path: localIsoPath, accepted: false});
+        setSafetyPromptState({show: true, id, path: effectivePath, accepted: false});
         return;
       }
       if (intent === "usb_flash" || intent === "usb_live" || intent === "usb_installer") {
-        setUsbPromptState({show: true, id, path: localIsoPath, detected: false});
+        setUsbPromptState({show: true, id, path: effectivePath, detected: false});
         return;
       }
-      await executeInstall(id, localIsoPath);
+      await executeInstall(id, effectivePath);
     } catch (e: any) {
       alert("CRASH in runInstall: " + e.toString());
     }
@@ -363,7 +381,8 @@ export default function StepInstall({
       const catalogEntry = catalog.find(o => o.id === id);
       const selectedEditionId = selectedEditions?.[id];
       const editionObj = catalogEntry?.editions?.find((e: any) => e.id === selectedEditionId) || (catalogEntry?.editions && catalogEntry.editions.length > 0 ? catalogEntry.editions[0] : null);
-      const iso_url = localIsoPath || editionObj?.isoUrl || catalogEntry?.isoUrl || "";
+      const effectivePath = localIsoPath || localIsoPaths?.[id];
+      const iso_url = effectivePath || editionObj?.isoUrl || catalogEntry?.isoUrl || "";
       
       // Step 1: Install OS (Skip if tools_only)
       if (id !== "tools_only") {
@@ -665,6 +684,11 @@ export default function StepInstall({
               </div>
             )}
             {activeTab !== "tools_only" && <div className="text-green-400 mb-1">$ Intent: {selectedIntents[activeTab || ""] || "vbox_vm"}</div>}
+            {activeTab !== "tools_only" && localIsoPaths?.[activeTab || ""] && (
+              <div className="text-cyan-300 mb-1 font-bold">
+                $ Local ISO: {localIsoPaths[activeTab || ""]} (0 GB Network Usage)
+              </div>
+            )}
             {selectedBundles.length > 0 && (
                <div className="text-yellow-400 mb-1">$ Bundles: {selectedBundles.length} selected for post-install</div>
             )}
@@ -807,6 +831,34 @@ export default function StepInstall({
             {installStatus[activeTab || ""]?.status === "success" && installStatus[activeTab || ""]?.message && (
               <div className="text-yellow-400 mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                 <strong>Warning:</strong> {installStatus[activeTab || ""].message}
+              </div>
+            )}
+
+            {activeTab !== "tools_only" && (
+              <div className="mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 flex items-center justify-between gap-3 text-xs">
+                {localIsoPaths?.[activeTab || ""] ? (
+                  <div className="truncate flex items-center gap-2 text-emerald-400">
+                    <span className="text-base">⚡</span>
+                    <div className="truncate">
+                      <span className="font-bold">Using Local ISO (0 GB Network Download):</span>
+                      <p className="font-mono text-[11px] text-slate-300 truncate mt-0.5">{localIsoPaths[activeTab || ""]}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <span>💡</span>
+                    <span>Already downloaded this ISO on your PC?</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handlePickLocalIsoForActive}
+                  disabled={isInstalling}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shrink-0 shadow-sm transition-all flex items-center gap-1.5"
+                >
+                  <span>📁</span>
+                  <span>{localIsoPaths?.[activeTab || ""] ? "Change ISO" : "Select Local ISO"}</span>
+                </button>
               </div>
             )}
             

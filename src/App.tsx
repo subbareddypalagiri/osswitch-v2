@@ -83,6 +83,7 @@ function App() {
   const [userName, setUserName] = useState("");
   const [userPassword, setUserPassword] = useState("");
   const [hostName, setHostName] = useState("");
+  const [localIsoPaths, setLocalIsoPaths] = useState<Record<string, string>>({});
   
   // 0ms Latency Local Caching Engine
   const [catalog, setCatalog] = useState(() => {
@@ -173,7 +174,9 @@ function App() {
                 selectedOS={selectedOS} setSelectedOS={setSelectedOS}
                 selectedIntents={selectedIntents} setSelectedIntents={setSelectedIntents}
                 selectedEditions={selectedEditions} setSelectedEditions={setSelectedEditions}
-                catalog={catalog} />;
+                catalog={catalog}
+                localIsoPaths={localIsoPaths}
+                setLocalIsoPaths={setLocalIsoPaths} />;
       case 3: return <StepDiskSpace
                 onNext={goNext} onBack={goBack}
                 selectedOS={selectedOS} 
@@ -200,7 +203,9 @@ function App() {
                 osSpace={osSpace}
                 backupEnabled={backupEnabled} catalog={catalog}
                 isInstalling={isInstalling} setIsInstalling={setIsInstalling}
-                userName={userName} userPassword={userPassword} hostName={hostName} />;
+                userName={userName} userPassword={userPassword} hostName={hostName}
+                localIsoPaths={localIsoPaths}
+                setLocalIsoPaths={setLocalIsoPaths} />;
       case 9: return <StepManageOS onNext={() => setCurrentStep(3)} onBack={() => setCurrentStep(2)} />;
       default: return null;
     }

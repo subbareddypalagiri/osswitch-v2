@@ -41,6 +41,8 @@ pub fn run() {
             engine::get_connected_usb_drives,
             engine::run_preflight_safety_check,
             engine::safe_carve_unallocated_space,
+            engine::pick_local_iso,
+            engine::scan_local_iso_cache,
             boot_switcher::get_boot_menu,
             boot_switcher::set_default_boot
         ])

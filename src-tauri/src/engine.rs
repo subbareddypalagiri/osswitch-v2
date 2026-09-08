@@ -123,6 +123,283 @@ pub struct DownloadTelemetry {
     pub stage_index: usize,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LocalIsoMeta {
+    pub path: String,
+    pub file_name: String,
+    pub size_mb: u64,
+    pub detected_os_id: String,
+    pub detected_os_name: String,
+    pub glyph: String,
+}
+
+pub fn detect_os_from_filename(filename: &str) -> (String, String, String) {
+    let lower = filename.to_lowercase();
+    if lower.contains("ubuntu") {
+        ("ubuntu".into(), "Ubuntu Desktop".into(), "🟠".into())
+    } else if lower.contains("kali") {
+        ("kali".into(), "Kali Linux".into(), "🛡️".into())
+    } else if lower.contains("blackarch") {
+        ("blackarch".into(), "BlackArch Linux".into(), "🏹".into())
+    } else if lower.contains("arch") {
+        ("arch".into(), "Arch Linux".into(), "🏔️".into())
+    } else if lower.contains("mint") {
+        ("mint".into(), "Linux Mint".into(), "🌿".into())
+    } else if lower.contains("fedora") {
+        ("fedora".into(), "Fedora Workstation".into(), "🎩".into())
+    } else if lower.contains("debian") {
+        ("debian".into(), "Debian GNU/Linux".into(), "🎯".into())
+    } else if lower.contains("pop") {
+        ("pop".into(), "Pop!_OS".into(), "🚀".into())
+    } else if lower.contains("manjaro") {
+        ("manjaro".into(), "Manjaro Linux".into(), "🌀".into())
+    } else if lower.contains("win11") || lower.contains("windows 11") {
+        ("win11".into(), "Windows 11".into(), "🪟".into())
+    } else if lower.contains("win10") || lower.contains("windows 10") {
+        ("win10".into(), "Windows 10".into(), "🪟".into())
+    } else if lower.contains("rocky") {
+        ("rocky".into(), "Rocky Linux".into(), "🏔️".into())
+    } else if lower.contains("alma") {
+        ("almalinux".into(), "AlmaLinux".into(), "💠".into())
+    } else if lower.contains("suse") {
+        ("opensuse".into(), "openSUSE".into(), "🦎".into())
+    } else if lower.contains("tails") {
+        ("tails".into(), "Tails OS".into(), "🕵️".into())
+    } else if lower.contains("parrot") {
+        ("parrot".into(), "Parrot Security OS".into(), "🦜".into())
+    } else if lower.contains("freebsd") {
+        ("freebsd".into(), "FreeBSD".into(), "😈".into())
+    } else {
+        let clean = filename.replace(".iso", "").replace(".img", "").replace('-', " ").replace('_', " ");
+        ("custom".into(), format!("Custom OS ({})", clean), "💿".into())
+    }
+}
+
+#[tauri::command]
+pub async fn pick_local_iso() -> Result<Option<LocalIsoMeta>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let ps_script = r#"
+        Add-Type -AssemblyName System.Windows.Forms
+        $dialog = New-Object System.Windows.Forms.OpenFileDialog
+        $dialog.Filter = "Disk Image Files (*.iso;*.img)|*.iso;*.img|All Files (*.*)|*.*"
+        $dialog.Title = "Select Local or Existing OS ISO (2024 or custom)"
+        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $dialog.FileName
+        }
+        "#;
+        let out = create_silent_powershell()
+            .args(["-NoProfile", "-NonInteractive", "-Command", ps_script])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if path_str.is_empty() || !std::path::Path::new(&path_str).exists() {
+            return Ok(None);
+        }
+        let p = std::path::Path::new(&path_str);
+        let file_name = p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "custom.iso".into());
+        let size_mb = std::fs::metadata(p).map(|m| m.len() / (1024 * 1024)).unwrap_or(0);
+        let (detected_id, detected_name, glyph) = detect_os_from_filename(&file_name);
+        Ok(Some(LocalIsoMeta {
+            path: path_str,
+            file_name,
+            size_mb,
+            detected_os_id: detected_id,
+            detected_os_name: detected_name,
+            glyph,
+        }))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let out = Command::new("zenity").args(["--file-selection", "--file-filter=*.iso *.img"]).output().await;
+        if let Ok(o) = out {
+            let path_str = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if !path_str.is_empty() && std::path::Path::new(&path_str).exists() {
+                let p = std::path::Path::new(&path_str);
+                let file_name = p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "custom.iso".into());
+                let size_mb = std::fs::metadata(p).map(|m| m.len() / (1024 * 1024)).unwrap_or(0);
+                let (detected_id, detected_name, glyph) = detect_os_from_filename(&file_name);
+                return Ok(Some(LocalIsoMeta {
+                    path: path_str,
+                    file_name,
+                    size_mb,
+                    detected_os_id: detected_id,
+                    detected_os_name: detected_name,
+                    glyph,
+                }));
+            }
+        }
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub async fn scan_local_iso_cache() -> Result<Vec<LocalIsoMeta>, String> {
+    let mut found = Vec::new();
+    let mut dirs_to_scan = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(user_profile) = std::env::var("USERPROFILE") {
+            dirs_to_scan.push(PathBuf::from(&user_profile).join("Downloads"));
+            dirs_to_scan.push(PathBuf::from(&user_profile).join("Desktop"));
+        }
+        dirs_to_scan.push(PathBuf::from("C:\\OSwitch"));
+        dirs_to_scan.push(PathBuf::from("D:\\"));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            dirs_to_scan.push(PathBuf::from(&home).join("Downloads"));
+            dirs_to_scan.push(PathBuf::from(&home).join("Desktop"));
+            dirs_to_scan.push(PathBuf::from(&home).join("OSwitch"));
+        }
+    }
+
+    for dir in dirs_to_scan {
+        if dir.exists() {
+            if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let path = entry.path();
+                    if path.is_file() {
+                        let fname = entry.file_name().to_string_lossy().to_string();
+                        let lower = fname.to_lowercase();
+                        if lower.ends_with(".iso") || lower.ends_with(".img") {
+                            if let Ok(meta) = tokio::fs::metadata(&path).await {
+                                let size_mb = meta.len() / (1024 * 1024);
+                                if size_mb >= 50 {
+                                    let (detected_id, detected_name, glyph) = detect_os_from_filename(&fname);
+                                    found.push(LocalIsoMeta {
+                                        path: path.to_string_lossy().to_string(),
+                                        file_name: fname,
+                                        size_mb,
+                                        detected_os_id: detected_id,
+                                        detected_os_name: detected_name,
+                                        glyph,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    found.sort_by(|a, b| b.size_mb.cmp(&a.size_mb));
+    let mut seen = std::collections::HashSet::new();
+    found.retain(|item| seen.insert(item.path.clone()));
+    found.truncate(8);
+    Ok(found)
+}
+
+pub async fn resolve_live_iso_from_directory(client: &reqwest::Client, failed_url: &str, os_id: &str) -> Option<String> {
+    let base_dir = if failed_url.contains("releases.ubuntu.com") {
+        if failed_url.contains("/24.04") {
+            "https://releases.ubuntu.com/24.04/"
+        } else if failed_url.contains("/22.04") {
+            "https://releases.ubuntu.com/22.04/"
+        } else {
+            "https://releases.ubuntu.com/"
+        }
+    } else if failed_url.contains("kali.org") {
+        "https://cdimage.kali.org/kali-images/current/"
+    } else if failed_url.contains("debian.org") {
+        "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/"
+    } else if failed_url.contains("fedoraproject.org") {
+        if failed_url.contains("Workstation") {
+            "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Workstation/x86_64/iso/"
+        } else {
+            "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/iso/"
+        }
+    } else if failed_url.contains("linuxmint") {
+        "https://mirrors.kernel.org/linuxmint/stable/22/"
+    } else if let Some(last_slash) = failed_url.rfind('/') {
+        &failed_url[..last_slash + 1]
+    } else {
+        return None;
+    };
+
+    if let Ok(resp) = client.get(base_dir).timeout(std::time::Duration::from_secs(8)).send().await {
+        if resp.status().is_success() {
+            if let Ok(html) = resp.text().await {
+                if let Ok(re) = regex::Regex::new(r#"href=["']?([^"'>\s]+\.iso)["']?"#) {
+                    let mut candidates: Vec<String> = Vec::new();
+                    for cap in re.captures_iter(&html) {
+                        if let Some(m) = cap.get(1) {
+                            let file_str = m.as_str().trim_start_matches("./");
+                            if !file_str.starts_with("http") {
+                                candidates.push(format!("{}{}", base_dir, file_str));
+                            } else {
+                                candidates.push(file_str.to_string());
+                            }
+                        }
+                    }
+
+                    let target_flavor = if failed_url.contains("desktop") {
+                        "desktop"
+                    } else if failed_url.contains("server") {
+                        "server"
+                    } else if failed_url.contains("installer") {
+                        "installer"
+                    } else if failed_url.contains("live") {
+                        "live"
+                    } else {
+                        os_id
+                    };
+
+                    for c in candidates.iter().rev() {
+                        if c.to_lowercase().contains(target_flavor) && (c.contains("amd64") || c.contains("x86_64")) {
+                            return Some(c.clone());
+                        }
+                    }
+                    if let Some(first) = candidates.into_iter().rev().next() {
+                        return Some(first);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn get_archive_mirrors_for_os(id: &str, failed_url: &str) -> Vec<String> {
+    let mut archives = Vec::new();
+    if failed_url.contains("releases.ubuntu.com") {
+        archives.push(failed_url.replace("releases.ubuntu.com", "old-releases.ubuntu.com/releases"));
+        archives.push(failed_url.replace("releases.ubuntu.com", "mirror.math.princeton.edu/pub/ubuntu-iso"));
+    } else if failed_url.contains("kali.org") {
+        archives.push(failed_url.replace("cdimage.kali.org", "archive.kali.org"));
+        archives.push(failed_url.replace("mirrors.ocf.berkeley.edu", "archive.kali.org"));
+    } else if failed_url.contains("debian.org") {
+        archives.push(failed_url.replace("debian-cd/current", "cd-image-archive"));
+    } else if failed_url.contains("fedoraproject.org") {
+        archives.push(failed_url.replace("download.fedoraproject.org/pub/fedora/linux/releases", "archives.fedoraproject.org/pub/archive/fedora/linux/releases"));
+    } else if failed_url.contains("archlinux") {
+        archives.push("https://archive.archlinux.org/iso/".into());
+    } else if failed_url.contains("linuxmint") {
+        archives.push(failed_url.replace("linuxmint/stable", "linuxmint-archive/stable"));
+    }
+    match id {
+        "ubuntu" => {
+            archives.push("http://old-releases.ubuntu.com/releases/24.04/ubuntu-24.04-desktop-amd64.iso".into());
+            archives.push("http://old-releases.ubuntu.com/releases/22.04/ubuntu-22.04.4-desktop-amd64.iso".into());
+        },
+        "kali" => {
+            archives.push("https://archive.kali.org/kali-images/kali-2024.2/kali-linux-2024.2-installer-amd64.iso".into());
+            archives.push("https://archive.kali.org/kali-images/kali-2024.1/kali-linux-2024.1-installer-amd64.iso".into());
+        },
+        "debian" => {
+            archives.push("https://cdimage.debian.org/cd-image-archive/12.6.0/amd64/iso-cd/debian-12.6.0-amd64-netinst.iso".into());
+        },
+        _ => {}
+    }
+    archives.dedup();
+    archives
+}
+
 fn get_mirrors_for_os(id: &str, primary_url: &str) -> Vec<String> {
     let mut mirrors = Vec::new();
     if !primary_url.is_empty() && primary_url.starts_with("http") {
@@ -131,34 +408,58 @@ fn get_mirrors_for_os(id: &str, primary_url: &str) -> Vec<String> {
     match id {
         "blackarch" => {
             mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
-            if primary_url.contains("full") {
-                mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-full-2023.04.01-x86_64.iso".into());
-            } else if primary_url.contains("netinst") {
-                mirrors.push("https://mirrors.dotsrc.org/blackarch/iso/blackarch-linux-netinst-2023.04.01-x86_64.iso".into());
-            }
+            mirrors.push("https://mirror.selfnet.de/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
+            mirrors.push("https://blackarch.org/blackarch/iso/blackarch-linux-slim-2023.05.01-x86_64.iso".into());
         },
         "kali" => {
+            mirrors.push("https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
             mirrors.push("https://mirrors.ocf.berkeley.edu/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
             mirrors.push("https://mirror.clarkson.edu/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
-            mirrors.push("https://cdimage.kali.org/kali-images/current/kali-linux-2024.2-installer-amd64.iso".into());
+            mirrors.push("https://archive.kali.org/kali-images/kali-2024.2/kali-linux-2024.2-installer-amd64.iso".into());
         },
         "ubuntu" => {
-            mirrors.push("https://mirrors.mit.edu/ubuntu-releases/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
+            mirrors.push("https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso".into());
             mirrors.push("https://mirror.math.princeton.edu/pub/ubuntu-iso/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
-            mirrors.push("https://releases.ubuntu.com/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
+            mirrors.push("https://mirrors.mit.edu/ubuntu-releases/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
+            mirrors.push("http://old-releases.ubuntu.com/releases/24.04.1/ubuntu-24.04.1-desktop-amd64.iso".into());
+            mirrors.push("http://old-releases.ubuntu.com/releases/24.04/ubuntu-24.04-desktop-amd64.iso".into());
         },
         "arch" => {
             mirrors.push("https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso".into());
             mirrors.push("https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso".into());
             mirrors.push("https://mirror.rackspace.com/archlinux/iso/latest/archlinux-x86_64.iso".into());
+            mirrors.push("https://archive.archlinux.org/iso/latest/archlinux-x86_64.iso".into());
         },
         "debian" => {
             mirrors.push("https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso".into());
             mirrors.push("https://mirrors.kernel.org/debian-cd/current/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso".into());
+            mirrors.push("https://cdimage.debian.org/cd-image-archive/12.6.0/amd64/iso-cd/debian-12.6.0-amd64-netinst.iso".into());
         },
         "fedora" => {
             mirrors.push("https://download.fedoraproject.org/pub/fedora/linux/releases/41/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-41-1.4.iso".into());
             mirrors.push("https://mirrors.mit.edu/fedora/linux/releases/41/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-41-1.4.iso".into());
+            mirrors.push("https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/40/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-40-1.14.iso".into());
+        },
+        "mint" => {
+            mirrors.push("https://mirrors.kernel.org/linuxmint/stable/22/linuxmint-22-cinnamon-64bit.iso".into());
+            mirrors.push("https://mirror.cs.uchicago.edu/linuxmint-images/stable/22/linuxmint-22-cinnamon-64bit.iso".into());
+            mirrors.push("https://mirrors.kernel.org/linuxmint-archive/stable/21.3/linuxmint-21.3-cinnamon-64bit.iso".into());
+        },
+        "rocky" => {
+            mirrors.push("https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.3-x86_64-dvd.iso".into());
+            mirrors.push("https://mirror.math.princeton.edu/pub/rocky/9/isos/x86_64/Rocky-9-latest-x86_64-dvd.iso".into());
+        },
+        "almalinux" => {
+            mirrors.push("https://repo.almalinux.org/almalinux/9/isos/x86_64/AlmaLinux-9.3-x86_64-dvd.iso".into());
+            mirrors.push("https://mirror.math.princeton.edu/pub/almalinux/9/isos/x86_64/AlmaLinux-9-latest-x86_64-dvd.iso".into());
+        },
+        "opensuse" => {
+            mirrors.push("https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-DVD-x86_64-Current.iso".into());
+            mirrors.push("https://download.opensuse.org/distribution/leap/15.6/iso/openSUSE-Leap-15.6-DVD-x86_64-Media.iso".into());
+        },
+        "manjaro" => {
+            mirrors.push("https://download.manjaro.org/kde/24.0.2/manjaro-kde-24.0.2-240618-linux69.iso".into());
+            mirrors.push("https://mirror.init7.net/manjaro/kde/24.0.2/manjaro-kde-24.0.2-240618-linux69.iso".into());
         },
         _ => {}
     }
@@ -684,10 +985,6 @@ pub async fn install_os(
         let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &defender_exclude_cmd]).output().await;
     }
 
-    // Determine if ISO is already 100% fully downloaded by verifying against expected file size
-    let mut already_downloaded = false;
-    let mirrors = get_mirrors_for_os(&id, &iso_url);
-    
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .redirect(reqwest::redirect::Policy::limited(10))
@@ -696,27 +993,44 @@ pub async fn install_os(
         .read_timeout(std::time::Duration::from_secs(3600))
         .build().unwrap_or_default();
 
-    if iso_path.exists() {
-        if let Ok(meta) = std::fs::metadata(&iso_path) {
-            let local_len = meta.len();
-            // Auto-clean corrupted/cached HTML redirect files under 20MB
-            if local_len < 20_000_000 {
-                let _ = std::fs::remove_file(&iso_path);
-            } else if iso_url.starts_with("http") {
-                // Verify against remote mirror Content-Length
-                if let Some(first_url) = mirrors.first() {
-                    if let Ok(resp) = client.head(first_url).send().await {
-                        if let Some(content_len) = resp.content_length() {
-                            if local_len >= content_len.saturating_sub(1_000_000) {
-                                already_downloaded = true;
-                            } else {
-                                let _ = app.emit("command-output", Payload { 
-                                    message: format!("⚠️ Detected incomplete/truncated ISO on SSD ({} MB / {} MB). Auto-cleaning and re-downloading complete image...\n", 
-                                        local_len / (1024 * 1024), 
-                                        content_len / (1024 * 1024)
-                                    ) 
-                                });
-                                let _ = std::fs::remove_file(&iso_path);
+    // Determine if ISO is already 100% fully downloaded or provided locally
+    let mut already_downloaded = false;
+
+    // If iso_url is a local path (doesn't start with http), use it directly with 0 download
+    if !iso_url.starts_with("http") && !iso_url.trim().is_empty() {
+        iso_path = PathBuf::from(&iso_url);
+        if !iso_path.exists() {
+            return Err(format!("The specified local ISO file does not exist: {}", iso_url));
+        }
+        already_downloaded = true;
+        let _ = app.emit("command-output", Payload { 
+            message: format!("⚡ Using verified local ISO from disk: {} (0 GB network download required!)\n", iso_path.display()) 
+        });
+    } else {
+        let mirrors = get_mirrors_for_os(&id, &iso_url);
+
+        if iso_path.exists() {
+            if let Ok(meta) = std::fs::metadata(&iso_path) {
+                let local_len = meta.len();
+                // Auto-clean corrupted/cached HTML redirect files under 20MB
+                if local_len < 20_000_000 {
+                    let _ = std::fs::remove_file(&iso_path);
+                } else if iso_url.starts_with("http") {
+                    // Verify against remote mirror Content-Length
+                    if let Some(first_url) = mirrors.first() {
+                        if let Ok(resp) = client.head(first_url).send().await {
+                            if let Some(content_len) = resp.content_length() {
+                                if local_len >= content_len.saturating_sub(1_000_000) {
+                                    already_downloaded = true;
+                                } else {
+                                    let _ = app.emit("command-output", Payload { 
+                                        message: format!("⚠️ Detected incomplete/truncated ISO on SSD ({} MB / {} MB). Auto-cleaning and re-downloading complete image...\n", 
+                                            local_len / (1024 * 1024), 
+                                            content_len / (1024 * 1024)
+                                        ) 
+                                    });
+                                    let _ = std::fs::remove_file(&iso_path);
+                                }
                             }
                         }
                     }
@@ -725,16 +1039,10 @@ pub async fn install_os(
         }
     }
 
-    // If iso_url is a local path (doesn't start with http), use it directly
-    if !iso_url.starts_with("http") {
-        iso_path = PathBuf::from(&iso_url);
-        if !iso_path.exists() {
-            return Err("The provided local ISO file does not exist.".into());
-        }
-        let _ = app.emit("command-output", Payload { message: format!("Using verified local ISO: {}\n", iso_path.display()) });
-    } else if already_downloaded {
+    if already_downloaded && iso_url.starts_with("http") {
         let _ = app.emit("command-output", Payload { message: format!("⚡ Found cached 100% verified ISO on SSD: {} (Skipping download!)...\n", iso_path.display()) });
-    } else if !iso_url.contains("fake-url") {
+    } else if !already_downloaded && !iso_url.contains("fake-url") {
+        let mirrors = get_mirrors_for_os(&id, &iso_url);
         let mut download_success = false;
         let mut last_download_err = String::new();
 
@@ -751,10 +1059,53 @@ pub async fn install_os(
                 stage: format!("Stage 2: 8-Stream Acceleration (Connecting to Mirror {}/{})", mirror_idx + 1, mirrors.len()),
                 stage_index: 2,
             });
-            let _ = app.emit("command-output", Payload { message: format!("⚡ Mirror [{}/{}]: Connecting to {}\n", mirror_idx + 1, mirrors.len(), current_url) });
+            let mut active_url = current_url.clone();
+            let _ = app.emit("command-output", Payload { message: format!("⚡ Mirror [{}/{}]: Connecting to {}\n", mirror_idx + 1, mirrors.len(), active_url) });
 
             // Probe server for Content-Length and Range support
-            let probe_res = client.head(current_url).send().await;
+            let mut probe_res = client.head(&active_url).send().await;
+
+            // 🌟 SELF-HEALING RESOLVER: If mirror returns 404 (due to point-release or relocation), auto-resolve live ISO!
+            let is_not_found = match &probe_res {
+                Ok(r) => r.status() == reqwest::StatusCode::NOT_FOUND || r.status() == reqwest::StatusCode::FORBIDDEN,
+                Err(_) => true,
+            };
+
+            if is_not_found {
+                let _ = app.emit("command-output", Payload { 
+                    message: format!("⚠️ Mirror returned 404 for {}. Activating Self-Healing Live Directory Resolver...\n", active_url) 
+                });
+
+                // 1. Try Directory Scraper to find updated release (e.g. 24.04.1 -> 24.04.2)
+                if let Some(resolved_url) = resolve_live_iso_from_directory(&client, &active_url, &id).await {
+                    let _ = app.emit("command-output", Payload { 
+                        message: format!("⚡ Upstream vendor update detected! Auto-resolved to active live release: {}\n", resolved_url) 
+                    });
+                    active_url = resolved_url;
+                    probe_res = client.head(&active_url).send().await;
+                }
+
+                // 2. If still failing, probe long-term archive mirrors (for older / 2024 models)
+                let still_failing = match &probe_res {
+                    Ok(r) => !r.status().is_success() && r.status() != reqwest::StatusCode::PARTIAL_CONTENT,
+                    Err(_) => true,
+                };
+                if still_failing {
+                    for archive_url in get_archive_mirrors_for_os(&id, &active_url) {
+                        if let Ok(ar_res) = client.head(&archive_url).send().await {
+                            if ar_res.status().is_success() || ar_res.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+                                let _ = app.emit("command-output", Payload { 
+                                    message: format!("🏛️ Fallback activated: Connecting to Long-Term Archive Mirror: {}\n", archive_url) 
+                                });
+                                active_url = archive_url;
+                                probe_res = Ok(ar_res);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
             let mut total_size = 0u64;
             let mut accept_ranges = false;
 
@@ -771,7 +1122,7 @@ pub async fn install_os(
 
             if total_size == 0 {
                 // Fallback probe with GET range 0-0
-                if let Ok(gr) = client.get(current_url).header("Range", "bytes=0-0").send().await {
+                if let Ok(gr) = client.get(&active_url).header("Range", "bytes=0-0").send().await {
                     if gr.status() == reqwest::StatusCode::PARTIAL_CONTENT {
                         accept_ranges = true;
                         if let Some(cr) = gr.headers().get(reqwest::header::CONTENT_RANGE) {
@@ -804,7 +1155,7 @@ pub async fn install_os(
                     part_paths.push(part_file.clone());
 
                     let c = client.clone();
-                    let url = current_url.clone();
+                    let url = active_url.clone();
                     let w_bytes = worker_bytes.clone();
 
                     let expected_chunk_len = end - start + 1;
@@ -943,7 +1294,7 @@ pub async fn install_os(
             }
 
             // Fallback: Standard Single-Stream Engine (if server doesn't support ranges)
-            let mut req = client.get(current_url);
+            let mut req = client.get(&active_url);
             let mut existing_bytes = 0u64;
             if iso_path.exists() {
                 if let Ok(meta) = std::fs::metadata(&iso_path) {

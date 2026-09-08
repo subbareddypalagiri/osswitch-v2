@@ -1,7 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { OSLogo } from "./Logo";
-import { Search, Play, Trash2, Layers, MonitorCheck } from "lucide-react";
+import { Search, Play, Trash2, Layers, MonitorCheck, FolderOpen, Sparkles, RefreshCw, X } from "lucide-react";
+
+export interface LocalIsoMeta {
+  path: string;
+  file_name: string;
+  size_mb: number;
+  detected_os_id?: string | null;
+  detected_os_name?: string | null;
+  glyph?: string | null;
+}
 
 export const OS_LIST = [
   {id:"windows", name:"Windows 11", sub:"Currently installed Microsoft OS", glyph:"🪟", locked:true},
@@ -85,7 +94,9 @@ export default function StepChooseOS({
   selectedIntents = {},
   setSelectedIntents,
   selectedEditions = {},
-  setSelectedEditions
+  setSelectedEditions,
+  localIsoPaths = {},
+  setLocalIsoPaths
 }: { 
   onNext: () => void, 
   onBack: () => void, 
@@ -95,12 +106,16 @@ export default function StepChooseOS({
   selectedIntents?: Record<string, string>,
   setSelectedIntents?: React.Dispatch<React.SetStateAction<Record<string, string>>>,
   selectedEditions?: Record<string, string>,
-  setSelectedEditions?: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  setSelectedEditions?: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+  localIsoPaths?: Record<string, string>,
+  setLocalIsoPaths?: React.Dispatch<React.SetStateAction<Record<string, string>>>
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"catalog" | "manage">("catalog");
   const [installedOSList, setInstalledOSList] = useState<any[]>([]);
   const [osMessage, setOsMessage] = useState<string | null>(null);
+  const [discoveredIsos, setDiscoveredIsos] = useState<LocalIsoMeta[]>([]);
+  const [isScanningCache, setIsScanningCache] = useState(false);
 
   useEffect(() => {
     invoke<any[]>("get_installed_os_list")
@@ -120,6 +135,54 @@ export default function StepChooseOS({
         ]);
       });
   }, []);
+
+  const scanCache = async () => {
+    if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) return;
+    try {
+      setIsScanningCache(true);
+      const res = await invoke<LocalIsoMeta[]>("scan_local_iso_cache");
+      if (res && res.length > 0) {
+        setDiscoveredIsos(res);
+      }
+    } catch (e) {
+      console.warn("Scan local iso cache error:", e);
+    } finally {
+      setIsScanningCache(false);
+    }
+  };
+
+  useEffect(() => {
+    scanCache();
+  }, []);
+
+  const handlePickCustomIso = async (targetOsId?: string) => {
+    try {
+      const meta = await invoke<LocalIsoMeta | null>("pick_local_iso");
+      if (meta && meta.path) {
+        const osIdToAssign = targetOsId || meta.detected_os_id || "ubuntu";
+        if (setLocalIsoPaths) {
+          setLocalIsoPaths(prev => ({ ...prev, [osIdToAssign]: meta.path }));
+        }
+        if (!selectedOS.includes(osIdToAssign)) {
+          setSelectedOS([...selectedOS, osIdToAssign]);
+        }
+        setOsMessage(`⚡ Linked local ISO (${meta.file_name} • ${meta.size_mb} MB) to ${meta.detected_os_name || osIdToAssign}! Zero network download required.`);
+      }
+    } catch (err: any) {
+      console.error("Failed to pick local ISO:", err);
+    }
+  };
+
+  const handleUseDiscoveredIso = (iso: LocalIsoMeta) => {
+    const osId = iso.detected_os_id || "ubuntu";
+    if (setLocalIsoPaths) {
+      setLocalIsoPaths(prev => ({ ...prev, [osId]: iso.path }));
+    }
+    if (!selectedOS.includes(osId)) {
+      setSelectedOS([...selectedOS, osId]);
+    }
+    setOsMessage(`⚡ Linked ${iso.file_name} to ${iso.detected_os_name || osId}! (0 GB download)`);
+  };
 
   const handleBootOS = async (osName: string) => {
     try {
@@ -298,22 +361,88 @@ export default function StepChooseOS({
           </div>
         ) : (
           <>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <p className="text-stone-600 dark:text-slate-400 text-sm">
                 Select your target operating system and choose the execution environment.
               </p>
               
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Search 101 OS Distributions..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-[#fbf8f3] dark:bg-black/30 border border-[#dcd2c4] dark:border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-stone-900 dark:text-white placeholder:text-stone-400 dark:placeholder-slate-400 focus:outline-none focus:border-amber-700 dark:focus:border-blue-500 focus:ring-1 focus:ring-amber-700 dark:focus:ring-blue-500 transition-all w-full sm:w-[280px]"
-                />
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => handlePickCustomIso()}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-700/10 hover:bg-amber-700/20 text-amber-900 border border-amber-700/30 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/30 transition-all shadow-sm shrink-0"
+                  title="Already have an ISO downloaded in 2024 or earlier? Select it directly to skip 3-5 GB network downloads!"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  <span>Select Local ISO (0 GB)</span>
+                </button>
+
+                <div className="relative flex-grow sm:flex-grow-0">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search 101 OS Distributions..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-[#fbf8f3] dark:bg-black/30 border border-[#dcd2c4] dark:border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-stone-900 dark:text-white placeholder:text-stone-400 dark:placeholder-slate-400 focus:outline-none focus:border-amber-700 dark:focus:border-blue-500 focus:ring-1 focus:ring-amber-700 dark:focus:ring-blue-500 transition-all w-full sm:w-[260px]"
+                  />
+                </div>
               </div>
             </div>
+
+            {discoveredIsos.length > 0 && (
+              <div className="mb-5 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-blue-500/10 border border-amber-500/30 dark:border-blue-500/30 animate-[fadeIn_0.3s_ease-out]">
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-700 dark:text-blue-400" />
+                    <span className="text-xs font-bold text-stone-900 dark:text-white uppercase tracking-wider">
+                      {discoveredIsos.length} Local ISO Images Detected on Your PC (Instant 0 GB Switch)
+                    </span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={scanCache}
+                    disabled={isScanningCache}
+                    className="text-[11px] font-mono text-stone-500 hover:text-stone-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isScanningCache ? 'animate-spin' : ''}`} />
+                    Rescan PC
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {discoveredIsos.map((iso, i) => {
+                    const isLinked = localIsoPaths[iso.detected_os_id || ""] === iso.path;
+                    return (
+                      <div 
+                        key={i}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                          isLinked 
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-900 dark:text-emerald-200 shadow-sm'
+                            : 'bg-white/80 dark:bg-black/40 border-stone-200 dark:border-white/10 text-stone-800 dark:text-slate-200 hover:border-amber-700/40 dark:hover:border-blue-500/40'
+                        }`}
+                      >
+                        <span>{iso.glyph || "💿"}</span>
+                        <div className="truncate max-w-[220px]" title={iso.path}>
+                          <span className="font-bold">{iso.detected_os_name || iso.file_name}</span>
+                          <span className="text-[10px] text-stone-500 dark:text-slate-400 ml-1 font-mono">({(iso.size_mb / 1024).toFixed(1)} GB)</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleUseDiscoveredIso(iso)}
+                          className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                            isLinked
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-amber-800 dark:bg-blue-600 text-white hover:opacity-90'
+                          }`}
+                        >
+                          {isLinked ? "✓ Linked" : "Use ISO"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
         
             <div className="flex-grow custom-scrollbar overflow-y-auto pr-2 -mr-2">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-8">
@@ -323,6 +452,7 @@ export default function StepChooseOS({
                   const editions = os.editions as any[] | undefined;
                   const currentEditionId = selectedEditions[os.id] || (editions && editions.length > 0 ? editions[0].id : undefined);
                   const activeEdition = editions?.find((e: any) => e.id === currentEditionId) || (editions && editions.length > 0 ? editions[0] : null);
+                  const isLocalLinked = !!localIsoPaths[os.id];
                   
                   return (
                     <div 
@@ -354,11 +484,18 @@ export default function StepChooseOS({
                               <span className="text-stone-900 dark:text-white font-bold text-base leading-tight">
                                 {os.name}
                               </span>
-                              {activeEdition && (
-                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/15 dark:bg-blue-500/15 text-amber-800 dark:text-blue-400 border border-amber-500/30 dark:border-blue-500/30 shrink-0">
-                                  {activeEdition.size}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {isLocalLinked && (
+                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                                    0 GB
+                                  </span>
+                                )}
+                                {activeEdition && (
+                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/15 dark:bg-blue-500/15 text-amber-800 dark:text-blue-400 border border-amber-500/30 dark:border-blue-500/30">
+                                    {activeEdition.size}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div className="text-stone-500 dark:text-slate-400 text-xs leading-relaxed mt-1 line-clamp-2">
                               {os.sub || (os as any).category || "Official Release"}
@@ -410,6 +547,46 @@ export default function StepChooseOS({
                                   {activeEdition.desc}
                                 </p>
                               )}
+                            </div>
+                          )}
+
+                          {isLocalLinked ? (
+                            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs flex items-center justify-between">
+                              <div className="truncate pr-2">
+                                <div className="font-bold flex items-center gap-1">
+                                  <span>⚡</span> Local ISO Linked (0 GB Download)
+                                </div>
+                                <div className="text-[10px] text-stone-500 dark:text-slate-400 truncate font-mono mt-0.5">
+                                  {localIsoPaths[os.id]}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (setLocalIsoPaths) {
+                                    setLocalIsoPaths(prev => {
+                                      const next = { ...prev };
+                                      delete next[os.id];
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                className="p-1 hover:bg-emerald-500/20 rounded-md text-stone-500 hover:text-stone-800 dark:text-slate-400 dark:hover:text-white shrink-0"
+                                title="Unlink local ISO and download official fresh release instead"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handlePickCustomIso(os.id)}
+                                className="text-[11px] font-mono text-amber-800 dark:text-blue-400 hover:underline flex items-center gap-1"
+                              >
+                                <FolderOpen className="w-3 h-3" />
+                                <span>Have an ISO for {os.name}? Link it</span>
+                              </button>
                             </div>
                           )}
                         </div>
