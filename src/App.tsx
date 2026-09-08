@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Home, Search, Disc, HardDrive, Package, Infinity as InfinityIcon, 
-  Power, ShieldCheck, TerminalSquare, Cpu
+  Power, ShieldCheck, TerminalSquare, Cpu, Usb
 } from "lucide-react";
 import StepWelcome from "./StepWelcome";
 import StepScan from "./StepScan";
 import StepChooseOS from "./StepChooseOS";
 import StepManageOS from "./StepManageOS";
+import StepMultiBootUSB from "./StepMultiBootUSB";
 import StepDiskSpace from "./StepDiskSpace";
 import StepConfigure from "./StepConfigure";
 import StepBundles from "./StepBundles";
@@ -37,6 +38,7 @@ const NAV_SECTIONS = [
     items: [
       { index: 2, label: "Install OS", icon: Disc },
       { index: 9, label: "Manage OS", icon: Cpu },
+      { index: 10, label: "Multi-Boot USB", icon: Usb },
       { index: 3, label: "Disk Partition", icon: HardDrive },
       { index: 6, label: "Boot Switcher", icon: Power }
     ]
@@ -207,6 +209,7 @@ function App() {
                 localIsoPaths={localIsoPaths}
                 setLocalIsoPaths={setLocalIsoPaths} />;
       case 9: return <StepManageOS onNext={() => setCurrentStep(3)} onBack={() => setCurrentStep(2)} />;
+      case 10: return <StepMultiBootUSB catalog={catalog} />;
       default: return null;
     }
   };

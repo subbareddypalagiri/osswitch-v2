@@ -1,5 +1,7 @@
 pub mod engine;
 pub mod boot_switcher;
+pub mod hardware_pci;
+pub mod multiboot_usb;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -44,7 +46,14 @@ pub fn run() {
             engine::pick_local_iso,
             engine::scan_local_iso_cache,
             boot_switcher::get_boot_menu,
-            boot_switcher::set_default_boot
+            boot_switcher::set_default_boot,
+            hardware_pci::run_deep_hardware_diagnostic,
+            hardware_pci::enable_safe_ahci_prestage,
+            hardware_pci::suspend_bitlocker_for_reboot,
+            multiboot_usb::get_multiboot_usb_status,
+            multiboot_usb::format_and_initialize_multiboot_usb,
+            multiboot_usb::copy_iso_to_multiboot_usb,
+            multiboot_usb::remove_iso_from_multiboot_usb
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
