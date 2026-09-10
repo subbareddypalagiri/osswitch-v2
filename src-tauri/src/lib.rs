@@ -2,6 +2,7 @@ pub mod engine;
 pub mod boot_switcher;
 pub mod hardware_pci;
 pub mod multiboot_usb;
+pub mod unattended;
 
 #[tauri::command]
 fn greet(name: &str) -> String {

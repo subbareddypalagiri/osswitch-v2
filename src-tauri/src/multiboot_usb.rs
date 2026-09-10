@@ -518,6 +518,23 @@ pub async fn copy_iso_to_multiboot_usb(
     let grub_file = root.join("boot").join("grub").join("grub.cfg");
     let _ = std::fs::write(&grub_file, new_cfg);
 
+    // Stage FAANG-grade zero-touch unattended answer files on USB root for automated installer detection
+    let fname_lower = fname.to_lowercase();
+    if fname_lower.contains("win") {
+        let xml = crate::unattended::generate_autounattend_xml("oswitch", "oswitch123", "oswitch-workstation");
+        let _ = std::fs::write(root.join("autounattend.xml"), xml);
+    } else if fname_lower.contains("fedora") || fname_lower.contains("rhel") || fname_lower.contains("centos") {
+        let ks = crate::unattended::generate_kickstart_cfg("oswitch", "oswitch123", "oswitch-workstation");
+        let _ = std::fs::write(root.join("ks.cfg"), ks);
+    } else {
+        let nocloud_dir = root.join("nocloud");
+        let _ = std::fs::create_dir_all(&nocloud_dir);
+        let user_data = crate::unattended::generate_cloud_init_user_data("oswitch", "oswitch123", "oswitch-workstation");
+        let meta_data = crate::unattended::generate_cloud_init_meta_data("oswitch-workstation");
+        let _ = std::fs::write(nocloud_dir.join("user-data"), user_data);
+        let _ = std::fs::write(nocloud_dir.join("meta-data"), meta_data);
+    }
+
     let _ = app.emit("multiboot-progress", MultiBootProgress {
         stage: "Complete".into(),
         percent: 100,

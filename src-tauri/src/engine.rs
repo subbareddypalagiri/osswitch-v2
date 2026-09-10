@@ -968,6 +968,32 @@ pub async fn install_os(
     };
     let mut iso_path = temp_dir.join(&iso_filename);
     
+    let unatted_user = username.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("oswitch");
+    let unatted_pass = password.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("oswitch123");
+    let unatted_host = hostname.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("oswitch-workstation");
+
+    // Stage FAANG-Grade Zero-Touch Unattended Automation Media
+    let _ = crate::unattended::stage_unattended_media(&temp_dir, &id, unatted_user, unatted_pass, unatted_host);
+
+    // Pre-stage First-Logon Developer Suite bootstrap scripts
+    let default_pkgs = vec!["git".to_string(), "curl".to_string(), "wget".to_string(), "vscode".to_string(), "docker".to_string()];
+    let dev_script_sh = generate_deterministic_installer_script(&id, &default_pkgs);
+    let dev_script_bat = generate_deterministic_installer_script("windows", &default_pkgs);
+
+    let _ = std::fs::write(temp_dir.join("OSwitch_setup_dev_env.sh"), &dev_script_sh);
+    let _ = std::fs::write(temp_dir.join("OSwitch_setup_dev_env.bat"), &dev_script_bat);
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::fs::write("C:\\OSwitch\\OSwitch_setup_dev_env.bat", &dev_script_bat);
+        let _ = std::fs::write("C:\\OSwitch\\OSwitch_setup_dev_env.sh", &dev_script_sh);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = std::fs::write("/tmp/OSwitch_setup_dev_env.sh", &dev_script_sh);
+        let _ = Command::new("chmod").args(["+x", "/tmp/OSwitch_setup_dev_env.sh"]).output().await;
+    }
+    
     // Pre-Flight Disk Capacity Guard: Ensure drive has enough free space before downloading/provisioning
     {
         let disks = sysinfo::Disks::new_with_refreshed_list();
@@ -1530,8 +1556,10 @@ pub async fn install_os(
                     & $vbox createmedium disk --filename $vdi --size {};\n\
                     & $vbox storageattach $vm --storagectl 'SATA' --port 0 --device 0 --type hdd --medium $vdi;\n\
                     & $vbox storageattach $vm --storagectl 'SATA' --port 1 --device 0 --type dvddrive --medium $iso;\n\
+                    & $vbox unattended install $vm --iso $iso --user '{}' --password '{}' --full-user-name '{}' --hostname '{}' 2>$null;\n\
                     & $vbox startvm $vm;",
-                    vm_name, vdi_path.display(), iso_path.display(), ostype, disk_size_mb
+                    vm_name, vdi_path.display(), iso_path.display(), ostype, disk_size_mb,
+                    unatted_user, unatted_pass, unatted_user, unatted_host
                 );
                 let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
             }
@@ -1562,6 +1590,14 @@ pub async fn install_os(
                 let _ = Command::new("VBoxManage").args(["createmedium", "disk", "--filename", &vdi_path.to_string_lossy(), "--size", &disk_size_mb.to_string()]).output().await;
                 let _ = Command::new("VBoxManage").args(["storageattach", &vm_name, "--storagectl", "SATA", "--port", "0", "--device", "0", "--type", "hdd", "--medium", &vdi_path.to_string_lossy()]).output().await;
                 let _ = Command::new("VBoxManage").args(["storageattach", &vm_name, "--storagectl", "SATA", "--port", "1", "--device", "0", "--type", "dvddrive", "--medium", &iso_path.to_string_lossy()]).output().await;
+                let _ = Command::new("VBoxManage").args([
+                    "unattended", "install", &vm_name,
+                    "--iso", &iso_path.to_string_lossy(),
+                    "--user", unatted_user,
+                    "--password", unatted_pass,
+                    "--full-user-name", unatted_user,
+                    "--hostname", unatted_host,
+                ]).output().await;
                 let _ = Command::new("VBoxManage").args(["startvm", &vm_name]).spawn();
             }
 
@@ -1656,12 +1692,21 @@ pub async fn install_os(
             let _ = tokio::fs::write(&vmdk_path, vmdk_content).await;
 
             let vmx_path = temp_dir.join(format!("OSwitch_{}.vmx", id));
+            let vmware_guest_os = if id.contains("win") {
+                "windows9-64"
+            } else if id.contains("ubuntu") || id.contains("mint") || id.contains("pop") {
+                "ubuntu-64"
+            } else if id.contains("fedora") || id.contains("rhel") || id.contains("centos") {
+                "fedora-64"
+            } else {
+                "other-64"
+            };
             let vmx_content = format!(
                 ".encoding = \"UTF-8\"\n\
                 config.version = \"8\"\n\
                 virtualHW.version = \"18\"\n\
                 displayName = \"OSwitch-{}-VM\"\n\
-                guestOS = \"other-64\"\n\
+                guestOS = \"{}\"\n\
                 memsize = \"4096\"\n\
                 numvcpus = \"2\"\n\
                 scsi0.present = \"TRUE\"\n\
@@ -1673,7 +1718,7 @@ pub async fn install_os(
                 sata0:0.present = \"TRUE\"\n\
                 sata0:0.fileName = \"{}\"\n\
                 sata0:0.deviceType = \"cdrom-image\"\n",
-                id, vmdk_path.display(), iso_path.display()
+                id, vmware_guest_os, vmdk_path.display(), iso_path.display()
             );
             let _ = tokio::fs::write(&vmx_path, vmx_content).await;
             
@@ -3151,20 +3196,18 @@ chmod +x /new_root/root/.zlogin
 
     // ─── 4. Fedora & RedHat (Kickstart ks.cfg) ───────────────────────────────
     if id_lower.contains("fedora") || id_lower.contains("rhel") || id_lower.contains("centos") {
-        let ks_content = format!(r#"
-# OSwitch Kickstart Configuration for {os_id}
-lang en_US.UTF-8
-keyboard us
-timezone UTC
-rootpw --plaintext {pass}
-user --name={user} --password={pass} --plaintext --gecos="{user}" --groups=wheel
-network --bootproto=dhcp --activate
-clearpart --none
-autopart --type=plain --nohome
-bootloader --location=mbr
-reboot
-"#);
+        let ks_content = crate::unattended::generate_kickstart_cfg(&user, &pass, &host);
         let _ = tokio::fs::write(usb_path.join("ks.cfg"), ks_content).await;
+        let dev_sh = generate_deterministic_installer_script(&os_id, &["git".into(), "curl".into(), "wget".into(), "vscode".into(), "docker".into()]);
+        let _ = tokio::fs::write(usb_path.join("OSwitch_setup_dev_env.sh"), dev_sh).await;
+    }
+
+    // ─── 4b. Windows 10 & 11 (Unattended autounattend.xml + WinPE TPM/SecureBoot Bypass) ───
+    if id_lower.contains("win") {
+        let xml_content = crate::unattended::generate_autounattend_xml(&user, &pass, &host);
+        let _ = tokio::fs::write(usb_path.join("autounattend.xml"), xml_content).await;
+        let dev_bat = generate_deterministic_installer_script("windows", &["git".into(), "curl".into(), "vscode".into(), "docker".into()]);
+        let _ = tokio::fs::write(usb_path.join("OSwitch_setup_dev_env.bat"), dev_bat).await;
     }
 
     // ─── 5. Universal GRUB2 Menu Injection ──────────────────────────────────
