@@ -136,7 +136,7 @@ pub fn set_default_boot(identifier: String) -> Result<String, String> {
     {
         // 1. If 4-digit hex (UEFI Boot Entry), use efibootmgr -n (BootNext)
         if identifier.len() == 4 && identifier.chars().all(|c| c.is_ascii_hexdigit()) {
-            let out = Command::new("efibootmgr").args(["-n", &identifier]).output();
+            let out = crate::engine::run_elevated_linux_command("efibootmgr", &["-n", &identifier]);
             if let Ok(o) = out {
                 if o.status.success() {
                     return Ok(format!("Successfully scheduled Boot{} for next system boot", identifier));
@@ -145,7 +145,7 @@ pub fn set_default_boot(identifier: String) -> Result<String, String> {
         }
 
         // 2. Try grub-reboot / grub-set-default
-        let out = Command::new("grub-reboot").arg(&identifier).output();
+        let out = crate::engine::run_elevated_linux_command("grub-reboot", &[&identifier]);
         if let Ok(o) = out {
             if o.status.success() {
                 return Ok(format!("Successfully set GRUB next-boot to '{}'", identifier));

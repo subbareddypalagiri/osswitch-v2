@@ -1507,6 +1507,21 @@ pub async fn install_os(
 
             #[cfg(not(target_os = "windows"))]
             {
+                let vbox_installed = Command::new("which").arg("VBoxManage").output().await.map(|o| o.status.success()).unwrap_or(false);
+                if !vbox_installed {
+                    let _ = app.emit("install-progress", InstallProgress { i: 2, text: "⚙️ VirtualBox not detected. Installing via Linux package manager...".into(), total: 3, done: false });
+                    let pkg_mgr = detect_linux_pkg_manager();
+                    let _ = match pkg_mgr.as_str() {
+                        "pacman" => run_elevated_linux_command("pacman", &["-S", "--noconfirm", "virtualbox", "virtualbox-host-modules-arch"]),
+                        "dnf" => run_elevated_linux_command("dnf", &["install", "-y", "VirtualBox"]),
+                        _ => run_elevated_linux_command("apt-get", &["install", "-y", "virtualbox"]),
+                    };
+                    let recheck = Command::new("which").arg("VBoxManage").output().await.map(|o| o.status.success()).unwrap_or(false);
+                    if !recheck {
+                        return Err("VirtualBox is not installed on this Linux system. Please run 'sudo apt install virtualbox' (or 'sudo pacman -S virtualbox') or select another mode.".into());
+                    }
+                }
+
                 let _ = Command::new("VBoxManage").args(["controlvm", &vm_name, "poweroff"]).output().await;
                 let _ = Command::new("VBoxManage").args(["unregistervm", &vm_name, "--delete"]).output().await;
                 let _ = tokio::fs::remove_file(&vdi_path).await;
@@ -1573,7 +1588,7 @@ pub async fn install_os(
                     }
                 }
                 if vmware_exe.is_none() {
-                    vmware_exe = Some("vmplayer".to_string());
+                    return Err("VMware Workstation or Player is not installed on this Linux system. Please install VMware or switch to VirtualBox mode.".into());
                 }
             }
 
@@ -1785,9 +1800,7 @@ pub async fn install_os(
             #[cfg(not(target_os = "windows"))]
             {
                 let _ = app.emit("command-output", Payload { message: format!("ℹ️ Elevating DD write stream to {} with sync...\n", target_path) });
-                let dd_out = Command::new("dd")
-                    .args([&format!("if={}", iso_path.display()), &format!("of={}", target_path), "bs=4M", "status=progress", "conv=fdatasync"])
-                    .output().await;
+                let dd_out = run_elevated_linux_command("dd", &[&format!("if={}", iso_path.display()), &format!("of={}", target_path), "bs=4M", "status=progress", "conv=fdatasync"]);
                 if let Ok(o) = dd_out {
                     if o.status.success() {
                         flash_success = true;
@@ -2487,6 +2500,36 @@ fn map_to_linux_pkg(id: &str) -> String {
     name_part
 }
 
+/// Helper to run privileged commands on Linux via pkexec or sudo when not root
+#[cfg_attr(target_os = "windows", allow(dead_code))]
+pub fn run_elevated_linux_command(cmd: &str, args: &[&str]) -> Result<std::process::Output, std::io::Error> {
+    let is_root = std::process::Command::new("id")
+        .arg("-u")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "0")
+        .unwrap_or(false);
+
+    if is_root {
+        std::process::Command::new(cmd).args(args).output()
+    } else {
+        let has_pkexec = std::process::Command::new("which")
+            .arg("pkexec")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+        if has_pkexec {
+            let mut full_args = vec![cmd];
+            full_args.extend_from_slice(args);
+            std::process::Command::new("pkexec").args(&full_args).output()
+        } else {
+            let mut sudo_args = vec![cmd];
+            sudo_args.extend_from_slice(args);
+            std::process::Command::new("sudo").args(&sudo_args).output()
+        }
+    }
+}
+
 /// Linux install engine: apt/pacman/dnf → flatpak → pip → snap cascade
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 async fn install_packages_linux(app: tauri::AppHandle, packages: Vec<PackageSpec>) -> Result<String, String> {
@@ -2516,7 +2559,7 @@ async fn install_packages_linux(app: tauri::AppHandle, packages: Vec<PackageSpec
 
         let mut installed_successfully = false;
 
-        // Tier 1: Native package manager (apt / pacman / dnf)
+        // Tier 1: Native package manager (apt / pacman / dnf) with PolicyKit elevation
         let (pm_cmd, pm_args): (&str, Vec<&str>) = match pkg_manager.as_str() {
             "pacman" => ("pacman", vec!["-S", "--noconfirm", &linux_pkg]),
             "dnf"    => ("dnf", vec!["install", "-y", &linux_pkg]),
@@ -2531,7 +2574,7 @@ async fn install_packages_linux(app: tauri::AppHandle, packages: Vec<PackageSpec
             sha256: "".into(), is_accelerated: true, eta_seconds: (total.saturating_sub(idx) * 4) as u64,
             stage: format!("Stage 2: {} install {}", pkg_manager, linux_pkg), stage_index: 2,
         });
-        if let Ok(out) = std::process::Command::new(pm_cmd).args(&pm_args).env("DEBIAN_FRONTEND", "noninteractive").output() {
+        if let Ok(out) = run_elevated_linux_command(pm_cmd, &pm_args) {
             let stdout = String::from_utf8_lossy(&out.stdout).to_string() + &String::from_utf8_lossy(&out.stderr);
             if out.status.success() || stdout.contains("already") || stdout.contains("up-to-date") {
                 installed_successfully = true;
@@ -2604,8 +2647,17 @@ async fn install_packages_linux(app: tauri::AppHandle, packages: Vec<PackageSpec
 pub async fn install_packages(app: tauri::AppHandle, packages: Vec<PackageSpec>, target_os: Option<String>, intent: Option<String>, api_key: Option<String>, ai_model: Option<String>) -> Result<String, String> {
     let pkg_ids: Vec<String> = packages.iter().map(|p| p.get_id()).filter(|s| !s.is_empty()).collect();
     if let (Some(os), Some(intnt)) = (&target_os, &intent) {
-        if intnt == "baremetal_grub" || intnt == "usb_flash" {
+        if intnt == "baremetal_grub" || intnt == "usb_flash" || intnt == "usb_installer" {
             return generate_and_inject_ai_script(app, os.clone(), pkg_ids, api_key, ai_model).await;
+        } else if intnt == "vbox_vm" || intnt == "vmware_vm" {
+            let res = generate_and_inject_ai_script(app.clone(), os.clone(), pkg_ids, api_key, ai_model).await?;
+            let _ = app.emit("install-progress", InstallProgress { 
+                i: 1, 
+                text: "📦 VM Developer Suite prepared: OSwitch_setup_dev_env.sh generated on your Desktop for guest VM.".into(), 
+                total: 1, 
+                done: true 
+            });
+            return Ok(format!("Developer suite packaged for VM: {}", res));
         }
     }
 
@@ -3133,53 +3185,181 @@ BOOT MODES AVAILABLE:
     Ok(())
 }
 
+pub fn generate_deterministic_installer_script(target_os: &str, packages: &[String]) -> String {
+    let lower_os = target_os.to_lowercase();
+    let is_arch = lower_os.contains("arch") || lower_os.contains("manjaro") || lower_os.contains("endeavour") || lower_os.contains("garuda");
+    let is_fedora = lower_os.contains("fedora") || lower_os.contains("rhel") || lower_os.contains("centos") || lower_os.contains("rocky");
+    let is_suse = lower_os.contains("suse") || lower_os.contains("zypper");
+    let is_alpine = lower_os.contains("alpine");
+    let is_windows = lower_os.contains("win");
+
+    let mut script = String::new();
+    if is_windows {
+        script.push_str("@echo off\r\necho ====================================================\r\necho   OSwitch Automated Developer Environment Provisioner\r\necho ====================================================\r\n\r\n");
+        for pkg in packages {
+            script.push_str(&format!("echo [+] Installing {} via Winget...\r\nwinget install --id \"{}\" -e --accept-package-agreements --accept-source-agreements --silent\r\n", pkg, pkg));
+        }
+        script.push_str("\r\necho [SUCCESS] All developer packages provisioned!\r\npause\r\n");
+        return script;
+    }
+
+    script.push_str("#!/usr/bin/env bash\n");
+    script.push_str("# ====================================================\n");
+    script.push_str("#   OSwitch Automated Developer Environment Provisioner\n");
+    script.push_str("#   Target Environment: ");
+    script.push_str(target_os);
+    script.push_str("\n# ====================================================\nset -e\n\n");
+    script.push_str("echo \"🚀 OSwitch: Provisioning Developer Suite for ");
+    script.push_str(target_os);
+    script.push_str("...\"\n\n");
+
+    if is_arch {
+        script.push_str("sudo pacman -Syu --noconfirm --needed\n\n");
+    } else if is_fedora {
+        script.push_str("sudo dnf check-update || true\n\n");
+    } else if is_suse {
+        script.push_str("sudo zypper refresh\n\n");
+    } else if is_alpine {
+        script.push_str("sudo apk update\n\n");
+    } else {
+        script.push_str("sudo apt-get update -y\n\n");
+    }
+
+    for pkg in packages {
+        let p = pkg.to_lowercase();
+        if p.contains("node") {
+            if is_arch {
+                script.push_str("sudo pacman -S --noconfirm --needed nodejs npm\n");
+            } else if is_fedora {
+                script.push_str("sudo dnf install -y nodejs npm\n");
+            } else if is_alpine {
+                script.push_str("sudo apk add nodejs npm\n");
+            } else {
+                script.push_str("sudo apt-get install -y nodejs npm || (curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs)\n");
+            }
+        } else if p.contains("code") || p.contains("vscode") {
+            if is_arch {
+                script.push_str("sudo pacman -S --noconfirm --needed code || true\n");
+            } else if is_fedora {
+                script.push_str("sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc && sudo sh -c 'echo -e \"[code]\\nname=Visual Studio Code\\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\\nenabled=1\\ngpgcheck=1\\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc\" > /etc/yum.repos.d/vscode.repo' && sudo dnf install -y code\n");
+            } else {
+                script.push_str("sudo apt-get install -y wget gpg && wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg && sudo install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg && sudo sh -c 'echo \"deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main\" > /etc/apt/sources.list.d/vscode.list' && rm -f packages.microsoft.gpg && sudo apt-get update && sudo apt-get install -y code || sudo snap install --classic code\n");
+            }
+        } else if p.contains("git") {
+            if is_arch { script.push_str("sudo pacman -S --noconfirm --needed git\n"); }
+            else if is_fedora { script.push_str("sudo dnf install -y git\n"); }
+            else if is_alpine { script.push_str("sudo apk add git\n"); }
+            else { script.push_str("sudo apt-get install -y git\n"); }
+        } else if p.contains("docker") {
+            if is_arch { script.push_str("sudo pacman -S --noconfirm --needed docker docker-compose && sudo systemctl enable --now docker\n"); }
+            else if is_fedora { script.push_str("sudo dnf install -y docker-ce docker-ce-cli containerd.io || sudo dnf install -y moby-engine\n"); }
+            else { script.push_str("sudo apt-get install -y docker.io docker-compose || curl -fsSL https://get.docker.com | sudo sh\n"); }
+        } else if p.contains("python") {
+            if is_arch { script.push_str("sudo pacman -S --noconfirm --needed python python-pip\n"); }
+            else if is_fedora { script.push_str("sudo dnf install -y python3 python3-pip\n"); }
+            else if is_alpine { script.push_str("sudo apk add python3 py3-pip\n"); }
+            else { script.push_str("sudo apt-get install -y python3 python3-pip python3-venv\n"); }
+        } else if p.contains("rust") {
+            script.push_str("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y\n");
+        } else if p.contains("go") || p.contains("golang") {
+            if is_arch { script.push_str("sudo pacman -S --noconfirm --needed go\n"); }
+            else if is_fedora { script.push_str("sudo dnf install -y golang\n"); }
+            else { script.push_str("sudo apt-get install -y golang-go || sudo snap install --classic go\n"); }
+        } else {
+            let clean_p = p.replace("microsoft.", "").replace("canonical.", "").replace("apache.", "").to_lowercase();
+            if is_arch {
+                script.push_str(&format!("sudo pacman -S --noconfirm --needed {} || true\n", clean_p));
+            } else if is_fedora {
+                script.push_str(&format!("sudo dnf install -y {} || true\n", clean_p));
+            } else if is_suse {
+                script.push_str(&format!("sudo zypper install -n {} || true\n", clean_p));
+            } else {
+                script.push_str(&format!("sudo apt-get install -y {} || true\n", clean_p));
+            }
+        }
+    }
+
+    script.push_str("\necho \"🎉 [SUCCESS] Developer Environment Provisioning Completed!\"\n");
+    script
+}
+
 async fn generate_and_inject_ai_script(app: tauri::AppHandle, target_os: String, packages: Vec<String>, api_key: Option<String>, ai_model: Option<String>) -> Result<String, String> {
     let key = api_key.unwrap_or_default();
-    if key.is_empty() {
-        return Err("Gemini API Key is required for Auto-Bundler.".into());
+    let mut clean_script = String::new();
+
+    if !key.is_empty() {
+        let _ = app.emit("install-progress", InstallProgress { i: 0, text: "AI generating custom Bash installer script...".into(), total: 1, done: false });
+        let prompt = format!("You are a master Linux sysadmin. Write a single, clean, robust Bash script to automatically install the following packages on '{}': {}. Use the correct package manager (apt, pacman, dnf, zypper, etc.). Include a #!/bin/bash header. Output ONLY the raw bash script without markdown formatting or code blocks.", target_os, packages.join(", "));
+
+        let client = reqwest::Client::new();
+        if let Ok(res) = client.post(format!("https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}", ai_model.unwrap_or("gemini-2.5-flash".to_string()), key))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "contents": [{
+                    "parts": [{"text": prompt}]
+                }]
+            }))
+            .send().await
+        {
+            if res.status().is_success() {
+                if let Ok(json) = res.json::<serde_json::Value>().await {
+                    let raw_script = json["candidates"][0]["content"]["parts"][0]["text"].as_str().unwrap_or("");
+                    if !raw_script.is_empty() {
+                        clean_script = raw_script.replace("```bash", "").replace("```", "").trim().to_string();
+                    }
+                }
+            }
+        }
     }
 
-    let _ = app.emit("install-progress", InstallProgress { i: 0, text: "AI generating custom Bash installer script...".into(), total: 1, done: false });
-
-    let prompt = format!("You are a master Linux sysadmin. Write a single, clean, robust Bash script to automatically install the following packages on '{}': {}. Use the correct package manager (apt, pacman, dnf, zypper, etc.). Include a #!/bin/bash header. Output ONLY the raw bash script without markdown formatting or code blocks.", target_os, packages.join(", "));
-
-    let client = reqwest::Client::new();
-    let res = client.post(format!("https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}", ai_model.unwrap_or("gemini-2.5-flash".to_string()), key))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }]
-        }))
-        .send().await.map_err(|e| format!("Network error connecting to Gemini: {}", e))?;
-
-    if !res.status().is_success() {
-        return Err(format!("Gemini API Error: {}", res.status()));
+    // Seamless offline fallback if API key is missing or AI request fails
+    if clean_script.is_empty() {
+        let _ = app.emit("install-progress", InstallProgress { i: 0, text: "📦 Synthesizing native offline Developer Environment script...".into(), total: 1, done: false });
+        clean_script = generate_deterministic_installer_script(&target_os, &packages);
     }
 
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    let raw_script = json["candidates"][0]["content"]["parts"][0]["text"].as_str().unwrap_or("#!/bin/bash\necho 'Failed to generate script'");
-    let clean_script = raw_script.replace("```bash", "").replace("```", "").trim().to_string();
+    let _ = app.emit("install-progress", InstallProgress { i: 0, text: "Provisioning setup_dev_env.sh into Motherboard EFI & Desktop...".into(), total: 1, done: false });
 
-    let _ = app.emit("install-progress", InstallProgress { i: 0, text: "Injecting AI Script into Motherboard EFI...".into(), total: 1, done: false });
+    // Windows EFI & Local paths
+    #[cfg(target_os = "windows")]
+    {
+        let _ = create_silent_std_cmd("cmd").args(["/c", "mountvol", "S:", "/S"]).output();
+        let _ = std::fs::create_dir_all("S:\\EFI\\oswitch");
+        let _ = std::fs::write("S:\\EFI\\oswitch\\setup_dev_env.sh", &clean_script);
+        let _ = std::fs::write("S:\\EFI\\oswitch\\auto-install.sh", &clean_script);
+        let _ = create_silent_std_cmd("cmd").args(["/c", "mountvol", "S:", "/D"]).output();
 
-    // Mount EFI & inject
-    let _ = create_silent_std_cmd("cmd").args(["/c", "mountvol", "S:", "/S"]).output();
-    let _ = std::fs::create_dir_all("S:\\EFI\\oswitch");
-    let write_res = std::fs::write("S:\\EFI\\oswitch\\auto-install.sh", &clean_script);
-    let _ = create_silent_std_cmd("cmd").args(["/c", "mountvol", "S:", "/D"]).output();
+        let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        let vm_script_dir = format!("{}\\OSwitch", local_app_data);
+        let _ = std::fs::create_dir_all(&vm_script_dir);
+        let _ = std::fs::write(format!("{}\\setup_dev_env.sh", vm_script_dir), &clean_script);
+        let _ = std::fs::write(format!("{}\\auto-install.sh", vm_script_dir), &clean_script);
 
-    // Also save to LOCALAPPDATA for VirtualBox/VMware auto-provisioning
-    let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
-    let vm_script_dir = format!("{}\\OSwitch", local_app_data);
-    let _ = std::fs::create_dir_all(&vm_script_dir);
-    let _ = std::fs::write(format!("{}\\auto-install.sh", vm_script_dir), &clean_script);
-
-    match write_res {
-        Ok(_) => Ok("Successfully injected Auto-Bundler script into EFI and VM provisioner.".into()),
-        Err(_) => Ok("Successfully injected Auto-Bundler script into VM provisioner.".into()),
+        if let Ok(userprofile) = std::env::var("USERPROFILE") {
+            let desktop_script = format!("{}\\Desktop\\OSwitch_setup_dev_env.sh", userprofile);
+            let _ = std::fs::write(desktop_script, &clean_script);
+        }
     }
+
+    // Linux paths
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = std::fs::write("/tmp/OSwitch_setup_dev_env.sh", &clean_script);
+        let _ = std::process::Command::new("chmod").args(["+x", "/tmp/OSwitch_setup_dev_env.sh"]).output();
+
+        if let Ok(home) = std::env::var("HOME") {
+            let desktop_script = format!("{}/Desktop/OSwitch_setup_dev_env.sh", home);
+            let _ = std::fs::write(&desktop_script, &clean_script);
+            let _ = std::process::Command::new("chmod").args(["+x", &desktop_script]).output();
+        }
+
+        if std::path::Path::new("/boot/efi/EFI").exists() {
+            let _ = run_elevated_linux_command("mkdir", &["-p", "/boot/efi/EFI/oswitch"]);
+            let _ = run_elevated_linux_command("cp", &["/tmp/OSwitch_setup_dev_env.sh", "/boot/efi/EFI/oswitch/setup_dev_env.sh"]);
+        }
+    }
+
+    Ok("Successfully generated and provisioned Developer Environment script.".into())
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]

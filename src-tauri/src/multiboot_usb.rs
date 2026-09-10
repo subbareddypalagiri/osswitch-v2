@@ -370,14 +370,12 @@ pub async fn format_and_initialize_multiboot_usb(
         });
 
         // 1. Unmount any active partitions on the target drive
-        let _ = Command::new("umount").args(["-f", &format!("{}*", drive_letter)]).output();
+        let _ = crate::engine::run_elevated_linux_command("umount", &["-f", &format!("{}*", drive_letter)]);
 
         // 2. Wipe existing signatures and create clean GPT partition table
-        let _ = Command::new("wipefs").args(["-a", &drive_letter]).output();
-        let parted_out = Command::new("parted")
-            .args(["-s", &drive_letter, "mklabel", "gpt", "mkpart", "primary", "exfat", "1MiB", "100%"])
-            .output()
-            .map_err(|e| format!("Failed to run parted: {}. (Ensure parted is installed and run with sudo if needed)", e))?;
+        let _ = crate::engine::run_elevated_linux_command("wipefs", &["-a", &drive_letter]);
+        let parted_out = crate::engine::run_elevated_linux_command("parted", &["-s", &drive_letter, "mklabel", "gpt", "mkpart", "primary", "exfat", "1MiB", "100%"])
+            .map_err(|e| format!("Failed to run parted: {}. (Ensure parted is installed)", e))?;
 
         if !parted_out.status.success() {
             let err = String::from_utf8_lossy(&parted_out.stderr);
@@ -400,10 +398,8 @@ pub async fn format_and_initialize_multiboot_usb(
             message: format!("Formatting {} as exFAT with label OSWITCH_DATA...", part_path),
         });
 
-        let mkfs_out = Command::new("mkfs.exfat")
-            .args(["-n", "OSWITCH_DATA", &part_path])
-            .output()
-            .or_else(|_| Command::new("mkfs.vfat").args(["-F", "32", "-n", "OSWITCH_DATA", &part_path]).output())
+        let mkfs_out = crate::engine::run_elevated_linux_command("mkfs.exfat", &["-n", "OSWITCH_DATA", &part_path])
+            .or_else(|_| crate::engine::run_elevated_linux_command("mkfs.vfat", &["-F", "32", "-n", "OSWITCH_DATA", &part_path]))
             .map_err(|e| format!("Failed to format filesystem: {}", e))?;
 
         if !mkfs_out.status.success() {
@@ -414,7 +410,7 @@ pub async fn format_and_initialize_multiboot_usb(
         // 4. Mount partition to temporary deployment folder
         let mount_target = PathBuf::from("/tmp/oswitch_usb_mnt");
         let _ = std::fs::create_dir_all(&mount_target);
-        let _ = Command::new("mount").args([&part_path, "/tmp/oswitch_usb_mnt"]).output();
+        let _ = crate::engine::run_elevated_linux_command("mount", &[&part_path, "/tmp/oswitch_usb_mnt"]);
 
         let iso_dir = mount_target.join("oswitch_isos");
         let boot_dir = mount_target.join("boot").join("grub");
