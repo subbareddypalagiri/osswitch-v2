@@ -265,6 +265,14 @@ menuentry "⚡ OSwitch Boot Switcher (Back to Windows)" --class windows {
     initrd (loop)/images/pxeboot/initrd.img
 }}
 "#, name, fname, fname));
+        } else if lower.contains("win") || lower.contains("windows") {
+            cfg.push_str(&format!(r#"menuentry "{} [{}]" --class windows {{
+    set isofile="/oswitch_isos/{}"
+    search --no-floppy --label OSWITCH_DATA --set=root
+    loopback loop $isofile
+    chainloader (loop)/efi/boot/bootx64.efi
+}}
+"#, name, fname, fname));
         } else {
             cfg.push_str(&format!(r#"menuentry "{} [{}]" --class generic {{
     set isofile="/oswitch_isos/{}"
@@ -420,6 +428,8 @@ pub async fn format_and_initialize_multiboot_usb(
         let initial_cfg = generate_grub_config(&[]);
         let cfg_path = boot_dir.join("grub.cfg");
         let _ = std::fs::write(&cfg_path, initial_cfg);
+        let _ = crate::engine::run_elevated_linux_command("sync", &[]);
+        let _ = crate::engine::run_elevated_linux_command("umount", &["/tmp/oswitch_usb_mnt"]);
 
         let _ = app.emit("multiboot-progress", MultiBootProgress {
             stage: "Complete".into(),
