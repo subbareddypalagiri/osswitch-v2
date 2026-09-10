@@ -72,11 +72,53 @@ fn detect_distro_meta(filename: &str) -> (String, String) {
     }
 }
 
+pub fn resolve_usb_root(drive_str: &str) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        PathBuf::from(format!("{}:\\", drive_str.trim_end_matches([':', '\\', '/'])))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let p = PathBuf::from(drive_str);
+        if p.is_dir() {
+            return p;
+        }
+        // Check /proc/mounts to see if drive_str is mounted
+        if let Ok(mounts) = std::fs::read_to_string("/proc/mounts") {
+            for line in mounts.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    if parts[0] == drive_str || parts[0].starts_with(drive_str) {
+                        let mountpoint = PathBuf::from(parts[1]);
+                        if mountpoint.is_dir() {
+                            return mountpoint;
+                        }
+                    }
+                }
+            }
+        }
+        // Check typical removable mount locations
+        let user = std::env::var("USER").unwrap_or_default();
+        let candidates = [
+            PathBuf::from(format!("/media/{}/OSWITCH_DATA", user)),
+            PathBuf::from(format!("/run/media/{}/OSWITCH_DATA", user)),
+            PathBuf::from("/mnt/OSWITCH_DATA"),
+            PathBuf::from("/tmp/oswitch_usb_mnt"),
+        ];
+        for c in &candidates {
+            if c.exists() && c.is_dir() {
+                return c.clone();
+            }
+        }
+        candidates[0].clone()
+    }
+}
+
 /// Scans a USB drive to check if it has the OSwitch Multi-Boot structure and lists all ISOs
 #[tauri::command]
 pub async fn get_multiboot_usb_status(drive_letter: String) -> Result<MultiBootUsbStatus, String> {
-    let root = format!("{}:\\", drive_letter.trim_end_matches([':', '\\', '/']));
-    let iso_dir = PathBuf::from(&root).join("oswitch_isos");
+    let root = resolve_usb_root(&drive_letter);
+    let iso_dir = root.join("oswitch_isos");
 
     let mut is_multiboot = false;
     let mut isos = Vec::new();
@@ -107,21 +149,38 @@ pub async fn get_multiboot_usb_status(drive_letter: String) -> Result<MultiBootU
         }
     }
 
-    // Query drive capacity via PowerShell
+    // Query drive capacity via cross-platform sysinfo::Disks
     let mut total_gb = 0.0;
     let mut free_gb = 0.0;
 
-    #[cfg(target_os = "windows")]
-    {
-        let ps = format!(
-            "Get-PSDrive -Name '{}' | Select-Object -Property @{{Name='Free';Expression={{[math]::Round($_.Free/1GB, 2)}}}}, @{{Name='Total';Expression={{[math]::Round(($_.Used + $_.Free)/1GB, 2)}}}} | ConvertTo-Json -Compress",
-            drive_letter.trim_end_matches([':', '\\', '/'])
-        );
-        if let Ok(out) = create_silent_cmd("powershell").args(["-NoProfile", "-NonInteractive", "-Command", &ps]).output() {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
-                free_gb = v["Free"].as_f64().unwrap_or(0.0);
-                total_gb = v["Total"].as_f64().unwrap_or(0.0);
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    for d in disks.list() {
+        let mp = d.mount_point();
+        #[cfg(target_os = "windows")]
+        let matches = mp.to_string_lossy().to_uppercase().starts_with(&drive_letter.to_uppercase().chars().take(1).collect::<String>());
+        #[cfg(not(target_os = "windows"))]
+        let matches = mp == root.as_path() || d.name().to_string_lossy().contains(&drive_letter);
+
+        if matches {
+            free_gb = (d.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+            total_gb = (d.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+            break;
+        }
+    }
+
+    if total_gb == 0.0 {
+        #[cfg(target_os = "windows")]
+        {
+            let ps = format!(
+                "Get-PSDrive -Name '{}' | Select-Object -Property @{{Name='Free';Expression={{[math]::Round($_.Free/1GB, 2)}}}}, @{{Name='Total';Expression={{[math]::Round(($_.Used + $_.Free)/1GB, 2)}}}} | ConvertTo-Json -Compress",
+                drive_letter.trim_end_matches([':', '\\', '/'])
+            );
+            if let Ok(out) = create_silent_cmd("powershell").args(["-NoProfile", "-NonInteractive", "-Command", &ps]).output() {
+                let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
+                    free_gb = v["Free"].as_f64().unwrap_or(0.0);
+                    total_gb = v["Total"].as_f64().unwrap_or(0.0);
+                }
             }
         }
     }
@@ -129,8 +188,8 @@ pub async fn get_multiboot_usb_status(drive_letter: String) -> Result<MultiBootU
     Ok(MultiBootUsbStatus {
         is_oswitch_multiboot: is_multiboot,
         drive_letter,
-        total_gb,
-        free_gb,
+        total_gb: (total_gb * 10.0).round() / 10.0,
+        free_gb: (free_gb * 10.0).round() / 10.0,
         iso_count: isos.len(),
         isos,
     })
@@ -279,9 +338,9 @@ pub async fn format_and_initialize_multiboot_usb(
         // Wait 3 seconds for Windows Explorer to mount the partition
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
-        let root = format!("{}:\\", drive_letter.trim_end_matches([':', '\\', '/']));
-        let iso_dir = PathBuf::from(&root).join("oswitch_isos");
-        let boot_dir = PathBuf::from(&root).join("boot").join("grub");
+        let root = resolve_usb_root(&drive_letter);
+        let iso_dir = root.join("oswitch_isos");
+        let boot_dir = root.join("boot").join("grub");
 
         std::fs::create_dir_all(&iso_dir).map_err(|e| format!("Failed to create oswitch_isos directory: {}", e))?;
         std::fs::create_dir_all(&boot_dir).map_err(|e| format!("Failed to create boot/grub directory: {}", e))?;
@@ -302,7 +361,79 @@ pub async fn format_and_initialize_multiboot_usb(
     }
 
     #[cfg(not(target_os = "windows"))]
-    Err("Multi-boot USB initialization is currently supported on Windows host.".into())
+    {
+        let _ = app.emit("multiboot-progress", MultiBootProgress {
+            stage: "Initializing USB Drive".into(),
+            percent: 10,
+            speed_mbps: 0.0,
+            message: format!("Preparing Linux block device {} for GPT partitioning...", drive_letter),
+        });
+
+        // 1. Unmount any active partitions on the target drive
+        let _ = Command::new("umount").args(["-f", &format!("{}*", drive_letter)]).output();
+
+        // 2. Wipe existing signatures and create clean GPT partition table
+        let _ = Command::new("wipefs").args(["-a", &drive_letter]).output();
+        let parted_out = Command::new("parted")
+            .args(["-s", &drive_letter, "mklabel", "gpt", "mkpart", "primary", "exfat", "1MiB", "100%"])
+            .output()
+            .map_err(|e| format!("Failed to run parted: {}. (Ensure parted is installed and run with sudo if needed)", e))?;
+
+        if !parted_out.status.success() {
+            let err = String::from_utf8_lossy(&parted_out.stderr);
+            return Err(format!("Parted formatting failed: {}", err));
+        }
+
+        // 3. Format as exFAT with label OSWITCH_DATA
+        let part_path = if drive_letter.chars().last().unwrap_or(' ').is_numeric() {
+            format!("{}p1", drive_letter)
+        } else {
+            format!("{}1", drive_letter)
+        };
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        let _ = app.emit("multiboot-progress", MultiBootProgress {
+            stage: "Formatting Partition".into(),
+            percent: 40,
+            speed_mbps: 0.0,
+            message: format!("Formatting {} as exFAT with label OSWITCH_DATA...", part_path),
+        });
+
+        let mkfs_out = Command::new("mkfs.exfat")
+            .args(["-n", "OSWITCH_DATA", &part_path])
+            .output()
+            .or_else(|_| Command::new("mkfs.vfat").args(["-F", "32", "-n", "OSWITCH_DATA", &part_path]).output())
+            .map_err(|e| format!("Failed to format filesystem: {}", e))?;
+
+        if !mkfs_out.status.success() {
+            let err = String::from_utf8_lossy(&mkfs_out.stderr);
+            return Err(format!("Filesystem creation failed: {}", err));
+        }
+
+        // 4. Mount partition to temporary deployment folder
+        let mount_target = PathBuf::from("/tmp/oswitch_usb_mnt");
+        let _ = std::fs::create_dir_all(&mount_target);
+        let _ = Command::new("mount").args([&part_path, "/tmp/oswitch_usb_mnt"]).output();
+
+        let iso_dir = mount_target.join("oswitch_isos");
+        let boot_dir = mount_target.join("boot").join("grub");
+        let _ = std::fs::create_dir_all(&iso_dir);
+        let _ = std::fs::create_dir_all(&boot_dir);
+
+        let initial_cfg = generate_grub_config(&[]);
+        let cfg_path = boot_dir.join("grub.cfg");
+        let _ = std::fs::write(&cfg_path, initial_cfg);
+
+        let _ = app.emit("multiboot-progress", MultiBootProgress {
+            stage: "Complete".into(),
+            percent: 100,
+            speed_mbps: 0.0,
+            message: "OSwitch Multi-Boot USB initialized successfully on Linux! Ready for ISOs.".into(),
+        });
+
+        Ok("OSwitch Multi-Boot Master Drive initialized successfully on Linux!".into())
+    }
 }
 
 /// Adds an ISO to the Multi-Boot USB and auto-updates the dynamic GRUB boot menu
@@ -318,8 +449,8 @@ pub async fn copy_iso_to_multiboot_usb(
     }
 
     let fname = src.file_name().and_then(|s| s.to_str()).ok_or("Invalid source ISO filename")?.to_string();
-    let root = format!("{}:\\", drive_letter.trim_end_matches([':', '\\', '/']));
-    let target_dir = PathBuf::from(&root).join("oswitch_isos");
+    let root = resolve_usb_root(&drive_letter);
+    let target_dir = root.join("oswitch_isos");
     let target_file = target_dir.join(&fname);
 
     if !target_dir.exists() {
@@ -378,7 +509,7 @@ pub async fn copy_iso_to_multiboot_usb(
     // Refresh dynamic GRUB config
     let status = get_multiboot_usb_status(drive_letter.clone()).await?;
     let new_cfg = generate_grub_config(&status.isos);
-    let grub_file = PathBuf::from(&root).join("boot").join("grub").join("grub.cfg");
+    let grub_file = root.join("boot").join("grub").join("grub.cfg");
     let _ = std::fs::write(&grub_file, new_cfg);
 
     let _ = app.emit("multiboot-progress", MultiBootProgress {
@@ -397,8 +528,8 @@ pub async fn remove_iso_from_multiboot_usb(
     iso_filename: String,
     drive_letter: String
 ) -> Result<String, String> {
-    let root = format!("{}:\\", drive_letter.trim_end_matches([':', '\\', '/']));
-    let target = PathBuf::from(&root).join("oswitch_isos").join(&iso_filename);
+    let root = resolve_usb_root(&drive_letter);
+    let target = root.join("oswitch_isos").join(&iso_filename);
 
     if target.exists() {
         std::fs::remove_file(&target).map_err(|e| format!("Failed to delete ISO: {}", e))?;
@@ -407,7 +538,7 @@ pub async fn remove_iso_from_multiboot_usb(
     // Refresh dynamic GRUB config
     let status = get_multiboot_usb_status(drive_letter.clone()).await?;
     let new_cfg = generate_grub_config(&status.isos);
-    let grub_file = PathBuf::from(&root).join("boot").join("grub").join("grub.cfg");
+    let grub_file = root.join("boot").join("grub").join("grub.cfg");
     let _ = std::fs::write(&grub_file, new_cfg);
 
     Ok(format!("Removed {} from Multi-Boot USB. Boot menu updated.", iso_filename))

@@ -141,6 +141,80 @@ fn probe_gpus() -> Vec<GpuInfo> {
             }
         }
     }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(out) = Command::new("lspci").args(["-nn"]).output() {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            for line in stdout.lines() {
+                let lower = line.to_lowercase();
+                if lower.contains("vga compatible controller") || lower.contains("3d controller") || lower.contains("display controller") {
+                    let is_nvidia = lower.contains("nvidia") || lower.contains("[10de:");
+                    let is_amd = lower.contains("amd") || lower.contains("ati") || lower.contains("radeon") || lower.contains("[1002:");
+                    let is_intel = lower.contains("intel") || lower.contains("[8086:");
+
+                    let vendor = if is_nvidia {
+                        "NVIDIA".to_string()
+                    } else if is_amd {
+                        "AMD".to_string()
+                    } else if is_intel {
+                        "Intel".to_string()
+                    } else {
+                        "Other".to_string()
+                    };
+
+                    let pci_id = if let Some(start) = line.rfind('[') {
+                        if let Some(end) = line.rfind(']') {
+                            line[start..=end].to_string()
+                        } else {
+                            "".to_string()
+                        }
+                    } else {
+                        "".to_string()
+                    };
+
+                    let name = line.split(':').nth(2).unwrap_or(line).trim().to_string();
+
+                    let (recommended_args, notes) = if is_nvidia {
+                        (
+                            "nouveau.modeset=0 rd.driver.blacklist=nouveau nvidia-drm.modeset=1".to_string(),
+                            "Proprietary NVIDIA GPU detected. Open-source Nouveau driver blacklisted to prevent display freeze on boot.".to_string()
+                        )
+                    } else if is_amd {
+                        (
+                            "amdgpu.dc=1".to_string(),
+                            "AMD Radeon GPU natively supported in mainline Linux kernel (amdgpu driver).".to_string()
+                        )
+                    } else if is_intel {
+                        (
+                            "i915.enable_psr=0".to_string(),
+                            "Intel Integrated Graphics natively supported. Panel Self Refresh tweak applied for fluid Wayland display.".to_string()
+                        )
+                    } else {
+                        ("".to_string(), "Standard generic VGA/Display controller.".to_string())
+                    };
+
+                    gpus.push(GpuInfo {
+                        name,
+                        vendor,
+                        pci_id,
+                        is_nvidia,
+                        is_hybrid: false,
+                        recommended_kernel_args: recommended_args,
+                        driver_notes: notes,
+                    });
+                }
+            }
+        }
+
+        let has_multiple = gpus.len() > 1;
+        for g in &mut gpus {
+            if has_multiple && g.is_nvidia {
+                g.is_hybrid = true;
+            }
+        }
+    }
+
     gpus
 }
 
@@ -224,6 +298,81 @@ fn probe_wifi() -> Option<WifiInfo> {
             }
         }
     }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(out) = Command::new("lspci").args(["-nn"]).output() {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            for line in stdout.lines() {
+                let lower = line.to_lowercase();
+                if lower.contains("network controller") || lower.contains("wireless") || lower.contains("802.11") || lower.contains("wi-fi") {
+                    let is_intel = lower.contains("intel") || lower.contains("[8086:");
+                    let is_mediatek = lower.contains("mediatek") || lower.contains("mt79");
+                    let is_realtek = lower.contains("realtek") || lower.contains("rtl");
+                    let is_broadcom = lower.contains("broadcom") || lower.contains("bcm");
+
+                    let (vendor, status, packages, warning) = if is_intel {
+                        (
+                            "Intel".to_string(),
+                            "native_supported".to_string(),
+                            vec!["linux-firmware".to_string(), "iwlwifi".to_string()],
+                            None
+                        )
+                    } else if is_mediatek {
+                        (
+                            "MediaTek".to_string(),
+                            "requires_firmware".to_string(),
+                            vec!["linux-firmware".to_string(), "firmware-misc-nonfree".to_string()],
+                            Some("MediaTek Wi-Fi (MT7921/MT7922) requires Linux kernel 5.18+ or non-free firmware pack for full speed.".to_string())
+                        )
+                    } else if is_realtek {
+                        (
+                            "Realtek".to_string(),
+                            "requires_firmware".to_string(),
+                            vec!["firmware-realtek".to_string(), "dkms".to_string()],
+                            Some("Realtek Wi-Fi detected. Firmware auto-pack will be queued to ensure Wi-Fi connects on first desktop launch.".to_string())
+                        )
+                    } else if is_broadcom {
+                        (
+                            "Broadcom".to_string(),
+                            "requires_dkms".to_string(),
+                            vec!["broadcom-sta-dkms".to_string(), "bcmwl-kernel-source".to_string()],
+                            Some("Broadcom Wi-Fi requires proprietary broadcom-sta driver.".to_string())
+                        )
+                    } else {
+                        (
+                            "Other".to_string(),
+                            "native_supported".to_string(),
+                            vec!["linux-firmware".to_string()],
+                            None
+                        )
+                    };
+
+                    let pci_id = if let Some(start) = line.rfind('[') {
+                        if let Some(end) = line.rfind(']') {
+                            line[start..=end].to_string()
+                        } else {
+                            "".to_string()
+                        }
+                    } else {
+                        "".to_string()
+                    };
+
+                    let name = line.split(':').nth(2).unwrap_or(line).trim().to_string();
+
+                    return Some(WifiInfo {
+                        name,
+                        vendor,
+                        pci_id,
+                        driver_status: status,
+                        recommended_packages: packages,
+                        warning,
+                    });
+                }
+            }
+        }
+    }
+
     None
 }
 
@@ -260,6 +409,23 @@ fn probe_storage_controller() -> StorageControllerInfo {
         if let Ok(out) = reg_out {
             let start_val = String::from_utf8_lossy(&out.stdout).trim().parse::<i32>().unwrap_or(-1);
             if start_val == 0 {
+                is_ahci_ready = true;
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(out) = Command::new("lspci").args(["-nn"]).output() {
+            let s = String::from_utf8_lossy(&out.stdout).to_lowercase();
+            if s.contains("volume management device") || s.contains("vmd") || s.contains("8086:9a0b") || s.contains("8086:28c0") {
+                is_vmd = true;
+                name = "Intel Volume Management Device (VMD / RST)".to_string();
+            } else if s.contains("non-volatile memory") || s.contains("nvme") {
+                name = "Direct PCI-e NVMe Storage Controller".to_string();
+                is_ahci_ready = true;
+            } else if s.contains("sata") || s.contains("ahci") {
+                name = "AHCI SATA Controller".to_string();
                 is_ahci_ready = true;
             }
         }
@@ -331,6 +497,35 @@ fn probe_firmware_security() -> FirmwareSecurityInfo {
         }
     }
 
+    #[cfg(not(target_os = "windows"))]
+    {
+        // 1. UEFI check
+        let is_uefi = std::path::Path::new("/sys/firmware/efi").exists();
+
+        // 2. Secure Boot check
+        if is_uefi {
+            if let Ok(out) = Command::new("mokutil").arg("--sb-state").output() {
+                let s = String::from_utf8_lossy(&out.stdout).to_lowercase();
+                secure_boot = s.contains("secureboot enabled");
+            } else if let Ok(bytes) = std::fs::read("/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c") {
+                if let Some(&last) = bytes.last() {
+                    secure_boot = last == 1;
+                }
+            }
+        }
+
+        // 3. TPM check
+        if std::path::Path::new("/dev/tpmrm0").exists() || std::path::Path::new("/dev/tpm0").exists() {
+            tpm_version = "2.0".to_string();
+        } else {
+            tpm_version = "None".to_string();
+        }
+
+        fast_startup = false; // Fast Startup is a Windows-only feature
+        bitlocker = false;    // BitLocker is Windows-only
+        bitlocker_pcr7 = false;
+    }
+
     FirmwareSecurityInfo {
         secure_boot_enabled: secure_boot,
         bitlocker_active: bitlocker,
@@ -362,7 +557,7 @@ pub async fn enable_safe_ahci_prestage() -> Result<String, String> {
         return Ok(res);
     }
     #[cfg(not(target_os = "windows"))]
-    Ok("Not applicable on non-Windows host.".into())
+    Ok("Host system is running Linux. AHCI/NVMe drivers are natively loaded in kernel.".into())
 }
 
 /// Temporarily suspends BitLocker for 1 reboot to prevent 48-digit Recovery Key prompts when modifying EFI boot entries
@@ -379,11 +574,11 @@ pub async fn suspend_bitlocker_for_reboot() -> Result<String, String> {
         if out.status.success() {
             Ok("BitLocker protection safely suspended for 1 reboot cycle. TPM PCR lock bypass active.".into())
         } else {
-            Err(format!("BitLocker suspend warning: {}", res))
+            Err(format!("BitLocker suspension error: {}", res))
         }
     }
     #[cfg(not(target_os = "windows"))]
-    Ok("BitLocker not applicable.".into())
+    Ok("Host system is running Linux. BitLocker is Windows-specific and not locking your EFI partition.".into())
 }
 
 /// Main God-Mode Hardware Diagnostic Command

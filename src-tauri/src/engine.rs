@@ -1471,7 +1471,7 @@ pub async fn install_os(
                 sha256: "".into(),
                 is_accelerated: true,
                 eta_seconds: 0,
-                stage: "Stage 4: Automated Virtual Machine Provisioning".into(),
+                stage: "Stage 4: Configuring Virtual Machine Hypervisor".into(),
                 stage_index: 4,
             });
             let _ = app.emit("install-progress", InstallProgress { i: 2, text: "⚙️ Stage 4: Provisioning VirtualBox VM...".into(), total: 3, done: false });
@@ -1480,27 +1480,44 @@ pub async fn install_os(
             let ostype = if id.contains("win") { "Windows10_64" } else { "Linux26_64" };
             let disk_size_mb = os_space.unwrap_or(30) * 1024;
             
-            let ps_script = format!(
-                "$vbox = 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe';\n\
-                $vm = '{}';\n\
-                $vdi = '{}';\n\
-                $iso = '{}';\n\
-                Stop-Process -Name 'VirtualBoxVM' -Force -ErrorAction SilentlyContinue;\n\
-                Start-Sleep -Seconds 1;\n\
-                & $vbox controlvm $vm poweroff 2>$null;\n\
-                & $vbox unregistervm $vm --delete 2>$null;\n\
-                & $vbox closemedium disk $vdi --delete 2>$null;\n\
-                if (Test-Path $vdi) {{ Remove-Item $vdi -Force -ErrorAction SilentlyContinue; }}\n\
-                & $vbox createvm --name $vm --ostype '{}' --register;\n\
-                & $vbox modifyvm $vm --memory 4096 --cpus 2 --vram 128;\n\
-                & $vbox storagectl $vm --name 'SATA' --add sata --controller IntelAhci;\n\
-                & $vbox createmedium disk --filename $vdi --size {};\n\
-                & $vbox storageattach $vm --storagectl 'SATA' --port 0 --device 0 --type hdd --medium $vdi;\n\
-                & $vbox storageattach $vm --storagectl 'SATA' --port 1 --device 0 --type dvddrive --medium $iso;\n\
-                & $vbox startvm $vm;",
-                vm_name, vdi_path.display(), iso_path.display(), ostype, disk_size_mb
-            );
-            let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
+            #[cfg(target_os = "windows")]
+            {
+                let ps_script = format!(
+                    "$vbox = 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe';\n\
+                    $vm = '{}';\n\
+                    $vdi = '{}';\n\
+                    $iso = '{}';\n\
+                    Stop-Process -Name 'VirtualBoxVM' -Force -ErrorAction SilentlyContinue;\n\
+                    Start-Sleep -Seconds 1;\n\
+                    & $vbox controlvm $vm poweroff 2>$null;\n\
+                    & $vbox unregistervm $vm --delete 2>$null;\n\
+                    & $vbox closemedium disk $vdi --delete 2>$null;\n\
+                    if (Test-Path $vdi) {{ Remove-Item $vdi -Force -ErrorAction SilentlyContinue; }}\n\
+                    & $vbox createvm --name $vm --ostype '{}' --register;\n\
+                    & $vbox modifyvm $vm --memory 4096 --cpus 2 --vram 128;\n\
+                    & $vbox storagectl $vm --name 'SATA' --add sata --controller IntelAhci;\n\
+                    & $vbox createmedium disk --filename $vdi --size {};\n\
+                    & $vbox storageattach $vm --storagectl 'SATA' --port 0 --device 0 --type hdd --medium $vdi;\n\
+                    & $vbox storageattach $vm --storagectl 'SATA' --port 1 --device 0 --type dvddrive --medium $iso;\n\
+                    & $vbox startvm $vm;",
+                    vm_name, vdi_path.display(), iso_path.display(), ostype, disk_size_mb
+                );
+                let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = Command::new("VBoxManage").args(["controlvm", &vm_name, "poweroff"]).output().await;
+                let _ = Command::new("VBoxManage").args(["unregistervm", &vm_name, "--delete"]).output().await;
+                let _ = tokio::fs::remove_file(&vdi_path).await;
+                let _ = Command::new("VBoxManage").args(["createvm", "--name", &vm_name, "--ostype", ostype, "--register"]).output().await;
+                let _ = Command::new("VBoxManage").args(["modifyvm", &vm_name, "--memory", "4096", "--cpus", "2", "--vram", "128"]).output().await;
+                let _ = Command::new("VBoxManage").args(["storagectl", &vm_name, "--name", "SATA", "--add", "sata", "--controller", "IntelAhci"]).output().await;
+                let _ = Command::new("VBoxManage").args(["createmedium", "disk", "--filename", &vdi_path.to_string_lossy(), "--size", &disk_size_mb.to_string()]).output().await;
+                let _ = Command::new("VBoxManage").args(["storageattach", &vm_name, "--storagectl", "SATA", "--port", "0", "--device", "0", "--type", "hdd", "--medium", &vdi_path.to_string_lossy()]).output().await;
+                let _ = Command::new("VBoxManage").args(["storageattach", &vm_name, "--storagectl", "SATA", "--port", "1", "--device", "0", "--type", "dvddrive", "--medium", &iso_path.to_string_lossy()]).output().await;
+                let _ = Command::new("VBoxManage").args(["startvm", &vm_name]).spawn();
+            }
 
             let _ = app.emit("download-telemetry", DownloadTelemetry {
                 mbps: 0.0,
@@ -1516,43 +1533,106 @@ pub async fn install_os(
             });
             let _ = app.emit("install-progress", InstallProgress { i: 2, text: "🚀 Stage 5: Virtual Machine Online".into(), total: 3, done: true });
         } else if intent == "vmware_vm" {
-            let vmware_paths = [
-                std::path::Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmplayer.exe"),
-                std::path::Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmware.exe"),
-                std::path::Path::new("C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmplayer.exe"),
-            ];
-            let vmware_exists = vmware_paths.iter().any(|p| p.exists());
-            if !vmware_exists {
-                let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VMware via Winget...".into(), total: 3, done: false });
-                let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
-                let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
-                let output = create_silent_cmd(&winget_path).args(["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--source", "winget"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
-                let code = output.status.code().unwrap_or(-1);
-                if code != 0 && code != 3010 {
-                    return Err(format!("VMware installation failed (exit code {}).", code));
+            #[allow(unused_assignments)]
+            let mut vmware_exe: Option<String> = None;
+
+            #[cfg(target_os = "windows")]
+            {
+                let vmware_paths = [
+                    std::path::Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmplayer.exe"),
+                    std::path::Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmware.exe"),
+                    std::path::Path::new("C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmplayer.exe"),
+                ];
+                if let Some(p) = vmware_paths.iter().find(|p| p.exists()) {
+                    vmware_exe = Some(p.to_string_lossy().to_string());
+                } else {
+                    let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VMware via Winget...".into(), total: 3, done: false });
+                    let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+                    let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+                    let output = create_silent_cmd(&winget_path).args(["install", "-e", "--id", "VMware.WorkstationPro", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--source", "winget"]).output().await.map_err(|e| format!("Failed to run winget: {}", e))?;
+                    let code = output.status.code().unwrap_or(-1);
+                    if code != 0 && code != 3010 {
+                        return Err(format!("VMware installation failed (exit code {}).", code));
+                    }
+                    vmware_exe = vmware_paths.iter().find(|p| p.exists()).map(|p| p.to_string_lossy().to_string());
                 }
             }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                if let Ok(out) = Command::new("which").arg("vmplayer").output().await {
+                    if out.status.success() {
+                        vmware_exe = Some("vmplayer".to_string());
+                    }
+                }
+                if vmware_exe.is_none() {
+                    if let Ok(out) = Command::new("which").arg("vmware").output().await {
+                        if out.status.success() {
+                            vmware_exe = Some("vmware".to_string());
+                        }
+                    }
+                }
+                if vmware_exe.is_none() {
+                    vmware_exe = Some("vmplayer".to_string());
+                }
+            }
+
+            let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Generating VMware VM & Virtual Hard Disk (40GB)...".into(), total: 3, done: false });
             
-            let _ = app.emit("install-progress", InstallProgress { i: 2, text: "VMware provisioning ready...".into(), total: 3, done: false });
+            // 🌟 1-CLICK FIX: Create a 40GB virtual hard disk (VMDK) so installer finds a target drive!
+            let vmdk_path = temp_dir.join(format!("OSwitch_{}_disk.vmdk", id));
+            let vmdk_flat_path = temp_dir.join(format!("OSwitch_{}_disk-flat.vmdk", id));
+
+            if !vmdk_flat_path.exists() {
+                if let Ok(file) = std::fs::File::create(&vmdk_flat_path) {
+                    let _ = file.set_len(40 * 1024 * 1024 * 1024); // 40GB sparse virtual disk
+                }
+            }
+
+            let vmdk_content = format!(
+                "# Disk DescriptorFile\n\
+                version=1\n\
+                CID=fffffffe\n\
+                parentCID=ffffffff\n\
+                createType=\"monolithicFlat\"\n\
+                \n\
+                # Extent description\n\
+                RW 83886080 FLAT \"{}\" 0\n\
+                \n\
+                # The Disk Data Base\n\
+                #DDB\n\
+                ddb.adapterType = \"lsilogic\"\n\
+                ddb.geometry.sectors = \"63\"\n\
+                ddb.geometry.heads = \"255\"\n\
+                ddb.geometry.cylinders = \"5221\"\n",
+                vmdk_flat_path.file_name().and_then(|s| s.to_str()).unwrap_or("OSwitch_disk-flat.vmdk")
+            );
+            let _ = tokio::fs::write(&vmdk_path, vmdk_content).await;
+
             let vmx_path = temp_dir.join(format!("OSwitch_{}.vmx", id));
             let vmx_content = format!(
-                ".encoding = \"windows-1252\"\n\
+                ".encoding = \"UTF-8\"\n\
                 config.version = \"8\"\n\
                 virtualHW.version = \"18\"\n\
                 displayName = \"OSwitch-{}-VM\"\n\
                 guestOS = \"other-64\"\n\
                 memsize = \"4096\"\n\
                 numvcpus = \"2\"\n\
+                scsi0.present = \"TRUE\"\n\
+                scsi0.virtualDev = \"lsilogic\"\n\
+                scsi0:0.present = \"TRUE\"\n\
+                scsi0:0.fileName = \"{}\"\n\
+                scsi0:0.deviceType = \"scsi-hardDisk\"\n\
                 sata0.present = \"TRUE\"\n\
                 sata0:0.present = \"TRUE\"\n\
                 sata0:0.fileName = \"{}\"\n\
                 sata0:0.deviceType = \"cdrom-image\"\n",
-                id, iso_path.display()
+                id, vmdk_path.display(), iso_path.display()
             );
             let _ = tokio::fs::write(&vmx_path, vmx_content).await;
             
-            let vmware_exe = vmware_paths.iter().find(|p| p.exists()).map(|p| p.to_str().unwrap()).unwrap_or("vmplayer.exe");
-            let _ = create_silent_cmd(vmware_exe).arg(vmx_path.to_str().unwrap()).spawn();
+            let exe = vmware_exe.unwrap_or_else(|| "vmplayer".to_string());
+            let _ = create_silent_cmd(&exe).arg(vmx_path.to_str().unwrap()).spawn();
             let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
         }
     } else if intent == "usb_flash" || intent == "usb_live" || intent == "usb_installer" {
@@ -1586,18 +1666,27 @@ pub async fn install_os(
         });
 
         // 🌟 NATIVE HIGH-SPEED RAW DD SECTOR FLASHER
-        // 1. Clean & Dismount USB partitions to prevent Windows volume-lock collisions
-        let prep_ps = format!(
-            "$diskNum = {};\n\
-            try {{\n\
-                Get-Disk -Number $diskNum | Set-Disk -IsOffline $false -ErrorAction SilentlyContinue;\n\
-                Get-Disk -Number $diskNum | Set-Disk -IsReadOnly $false -ErrorAction SilentlyContinue;\n\
-                Clear-Disk -Number $diskNum -RemoveData -RemoveOEM -Confirm:$false -ErrorAction SilentlyContinue;\n\
-                Update-Disk -Number $diskNum -ErrorAction SilentlyContinue;\n\
-            }} catch {{}}\n",
-            disk_num
-        );
-        let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &prep_ps]).output().await;
+        // 1. Clean & Dismount USB partitions to prevent volume-lock collisions
+        #[cfg(target_os = "windows")]
+        {
+            let prep_ps = format!(
+                "$diskNum = {};\n\
+                try {{\n\
+                    Get-Disk -Number $diskNum | Set-Disk -IsOffline $false -ErrorAction SilentlyContinue;\n\
+                    Get-Disk -Number $diskNum | Set-Disk -IsReadOnly $false -ErrorAction SilentlyContinue;\n\
+                    Clear-Disk -Number $diskNum -RemoveData -RemoveOEM -Confirm:$false -ErrorAction SilentlyContinue;\n\
+                    Update-Disk -Number $diskNum -ErrorAction SilentlyContinue;\n\
+                }} catch {{}}\n",
+                disk_num
+            );
+            let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &prep_ps]).output().await;
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = Command::new("umount").args(["-f", &format!("{}*", target_path)]).output().await;
+            let _ = Command::new("wipefs").args(["-a", &target_path]).output().await;
+        }
 
         // 2. Stream Raw ISO bytes directly to physical drive using native Win32 FileStream in 4MB blocks
         let mut flash_success = false;
@@ -1652,6 +1741,11 @@ pub async fn install_os(
                             }
                         }
                         let _ = raw_disk.flush();
+                        #[cfg(not(target_os = "windows"))]
+                        {
+                            let _ = Command::new("sync").output().await;
+                        }
+
                         if written_bytes >= (total_bytes * 95 / 100) {
                             flash_success = true;
                         } else {
@@ -1664,25 +1758,41 @@ pub async fn install_os(
                 }
             },
             Err(e) => {
-                flash_error_msg = format!("Failed to open physical drive {} for writing (Win32 Lock Error): {}. Please ensure no other app is using the USB drive.", target_path, e);
+                flash_error_msg = format!("Failed to open physical drive {} for writing (Lock Error): {}. Please ensure no other app is using the USB drive.", target_path, e);
                 let _ = app.emit("command-output", Payload { message: format!("⚠️ {}\n", flash_error_msg) });
             }
         }
 
-        // Fallback: If raw direct stream was blocked by Windows security, launch Rufus with automated DD Image mode
+        // Fallback: If raw direct stream was blocked
         if !flash_success {
-            let rufus_path = temp_dir.join("rufus.exe");
-            if !rufus_path.exists() {
-                if let Ok(r) = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().unwrap_or_default().get("https://github.com/pbatard/rufus/releases/download/v4.4/rufus-4.4.exe").send().await {
-                    if let Ok(b) = r.bytes().await {
-                        let _ = tokio::fs::write(&rufus_path, b).await;
+            #[cfg(target_os = "windows")]
+            {
+                let rufus_path = temp_dir.join("rufus.exe");
+                if !rufus_path.exists() {
+                    if let Ok(r) = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().unwrap_or_default().get("https://github.com/pbatard/rufus/releases/download/v4.4/rufus-4.4.exe").send().await {
+                        if let Ok(b) = r.bytes().await {
+                            let _ = tokio::fs::write(&rufus_path, b).await;
+                        }
                     }
                 }
+                if rufus_path.exists() {
+                    let _ = app.emit("command-output", Payload { message: "ℹ️ Launching Rufus: Please select 'Write in DD Image mode' for 100% genuine sector copy.\n".into() });
+                    let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-Command", &format!("Start-Process '{}' -ArgumentList '-i \"{}\"' -Wait", rufus_path.display(), iso_path.display())]).output().await;
+                    flash_success = true;
+                }
             }
-            if rufus_path.exists() {
-                let _ = app.emit("command-output", Payload { message: "ℹ️ Launching Rufus: Please select 'Write in DD Image mode' for 100% genuine sector copy.\n".into() });
-                let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-Command", &format!("Start-Process '{}' -ArgumentList '-i \"{}\"' -Wait", rufus_path.display(), iso_path.display())]).output().await;
-                flash_success = true;
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = app.emit("command-output", Payload { message: format!("ℹ️ Elevating DD write stream to {} with sync...\n", target_path) });
+                let dd_out = Command::new("dd")
+                    .args([&format!("if={}", iso_path.display()), &format!("of={}", target_path), "bs=4M", "status=progress", "conv=fdatasync"])
+                    .output().await;
+                if let Ok(o) = dd_out {
+                    if o.status.success() {
+                        flash_success = true;
+                    }
+                }
             }
         }
 
@@ -1693,16 +1803,31 @@ pub async fn install_os(
         // Universal Multi-Distro 2-in-1 EFI Injection
         let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Scanning & Injecting 2-in-1 Dual-Boot Automation onto USB...".into(), total: 2, done: false });
         let mut target_usb = None;
-        for c in 68..=90 { // D to Z
-            let letter = (c as u8 as char).to_string();
-            let efi_path = format!("{}:\\EFI\\BOOT\\BOOTx64.EFI", letter);
-            let grub_path = format!("{}:\\boot\\grub\\grub.cfg", letter);
-            let live_path = format!("{}:\\live", letter);
-            let casper_path = format!("{}:\\casper", letter);
-            let arch_path = format!("{}:\\arch", letter);
-            if std::path::Path::new(&efi_path).exists() || std::path::Path::new(&grub_path).exists() || std::path::Path::new(&live_path).exists() || std::path::Path::new(&casper_path).exists() || std::path::Path::new(&arch_path).exists() {
-                target_usb = Some(format!("{}:\\", letter));
-                break;
+
+        #[cfg(target_os = "windows")]
+        {
+            for c in 68..=90 { // D to Z
+                let letter = (c as u8 as char).to_string();
+                let efi_path = format!("{}:\\EFI\\BOOT\\BOOTx64.EFI", letter);
+                let grub_path = format!("{}:\\boot\\grub\\grub.cfg", letter);
+                let live_path = format!("{}:\\live", letter);
+                let casper_path = format!("{}:\\casper", letter);
+                let arch_path = format!("{}:\\arch", letter);
+                if std::path::Path::new(&efi_path).exists() || std::path::Path::new(&grub_path).exists() || std::path::Path::new(&live_path).exists() || std::path::Path::new(&casper_path).exists() || std::path::Path::new(&arch_path).exists() {
+                    target_usb = Some(format!("{}:\\", letter));
+                    break;
+                }
+            }
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let candidates = ["/tmp/oswitch_usb_mnt", "/mnt/OSWITCH_DATA"];
+            for c in &candidates {
+                if std::path::Path::new(c).exists() {
+                    target_usb = Some(c.to_string());
+                    break;
+                }
             }
         }
         if let Some(usb) = target_usb {
