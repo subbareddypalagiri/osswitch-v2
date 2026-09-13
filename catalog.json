@@ -27,7 +27,7 @@
   "debian": {
     "name": "Debian 13",
     "category": "Linux",
-    "isoUrl": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso"
+    "isoUrl": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.7.0-amd64-netinst.iso"
   },
   "arch": {
     "name": "Arch Linux",
