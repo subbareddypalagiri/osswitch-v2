@@ -3651,3 +3651,98 @@ pub async fn get_host_platform() -> String {
         "linux".to_string()
     }
 }
+
+/// Triggers Windows UAC elevation by re-launching the current executable with 'RunAs' verb
+#[tauri::command]
+pub async fn relaunch_as_admin() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let current_exe = std::env::current_exe().map_err(|e| format!("Failed to get executable path: {}", e))?;
+        let ps_cmd = format!("Start-Process -FilePath '{}' -Verb RunAs", current_exe.to_string_lossy());
+        
+        let _ = create_silent_powershell()
+            .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
+            .spawn()
+            .map_err(|e| format!("Failed to spawn elevated process: {}", e))?;
+        
+        std::process::exit(0);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let _ = Command::new("pkexec").arg(&current_exe).spawn().map_err(|e| e.to_string())?;
+        std::process::exit(0);
+    }
+}
+
+/// Commands the motherboard to reboot straight into the UEFI / BIOS firmware setup
+#[tauri::command]
+pub async fn reboot_to_bios() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let out = create_silent_cmd("shutdown")
+            .args(["/r", "/fw", "/t", "2"])
+            .output()
+            .await
+            .map_err(|e| format!("Failed to execute shutdown command: {}", e))?;
+
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            return Err(format!("Direct BIOS reboot failed: {}. Ensure your system uses UEFI firmware.", stderr.trim()));
+        }
+        Ok("Rebooting straight into UEFI / BIOS Setup in 2 seconds...".into())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let out = Command::new("systemctl")
+            .args(["reboot", "--firmware-setup"])
+            .output()
+            .await
+            .map_err(|e| format!("Failed to execute systemctl reboot: {}", e))?;
+
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            return Err(format!("Direct BIOS reboot failed: {}. Ensure your system uses UEFI firmware.", stderr.trim()));
+        }
+        Ok("Rebooting straight into UEFI Setup...".into())
+    }
+}
+
+/// Automatically enables Windows Hypervisor Platform and Virtual Machine Platform for WHPX / WSL2
+#[tauri::command]
+pub async fn enable_windows_hypervisor() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let dism_out = create_silent_cmd("dism")
+            .args([
+                "/online",
+                "/enable-feature",
+                "/featurename:VirtualMachinePlatform",
+                "/all",
+                "/norestart",
+            ])
+            .output()
+            .await
+            .map_err(|e| format!("DISM execution failed: {}", e))?;
+
+        let _ = create_silent_cmd("bcdedit")
+            .args(["/set", "hypervisorlaunchtype", "auto"])
+            .output()
+            .await;
+
+        if !dism_out.status.success() {
+            let err = String::from_utf8_lossy(&dism_out.stderr);
+            return Err(format!("Failed to enable Virtual Machine Platform: {}", err.trim()));
+        }
+
+        Ok("Windows Hypervisor Platform successfully enabled. Active on next restart.".into())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok("Hypervisor features are natively handled by Linux KVM modules.".into())
+    }
+}
+

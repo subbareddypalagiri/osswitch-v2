@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { 
   Cpu, HardDrive, Layers, ShieldCheck, CheckCircle2, ArrowRight, ArrowLeft, 
   RefreshCw, Monitor, Wifi, KeyRound, Wrench, AlertTriangle, 
-  Terminal, Shield, Zap, Check
+  Terminal, Shield, Check, Settings2, RotateCcw, X
 } from "lucide-react";
 
 export default function StepScan({ 
@@ -21,6 +21,10 @@ export default function StepScan({
   const [isSuspendingBitLocker, setIsSuspendingBitLocker] = useState(false);
   const [bitlockerSuccessMsg, setBitlockerSuccessMsg] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showBiosModal, setShowBiosModal] = useState(false);
+  const [isRebootingBios, setIsRebootingBios] = useState(false);
+  const [isEnablingHypervisor, setIsEnablingHypervisor] = useState(false);
+  const [hypervisorSuccessMsg, setHypervisorSuccessMsg] = useState<string | null>(null);
 
   const fetchAllDiagnostics = async () => {
     try {
@@ -70,6 +74,31 @@ export default function StepScan({
     }
   };
 
+  const handleRebootToBios = async () => {
+    setIsRebootingBios(true);
+    setActionError(null);
+    try {
+      await invoke("reboot_to_bios");
+    } catch (e: any) {
+      setActionError(e.toString());
+      setIsRebootingBios(false);
+    }
+  };
+
+  const handleEnableHypervisor = async () => {
+    setIsEnablingHypervisor(true);
+    setActionError(null);
+    setHypervisorSuccessMsg(null);
+    try {
+      const res: string = await invoke("enable_windows_hypervisor");
+      setHypervisorSuccessMsg(res);
+      setIsEnablingHypervisor(false);
+    } catch (e: any) {
+      setActionError(e.toString());
+      setIsEnablingHypervisor(false);
+    }
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -89,7 +118,7 @@ export default function StepScan({
             <span className="text-amber-800 dark:text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">Step 2 of 7</span>
           </div>
           <span className="text-xs px-2.5 py-1 bg-amber-500/10 dark:bg-blue-500/10 text-amber-700 dark:text-blue-400 border border-amber-500/20 dark:border-blue-500/20 rounded-full font-mono font-medium flex items-center gap-1.5">
-            <Zap className="w-3 h-3" /> God-Mode PCI Diagnostics Active
+            <ShieldCheck className="w-3 h-3" /> God-Mode PCI Diagnostics Active
           </span>
         </div>
         
@@ -157,12 +186,30 @@ export default function StepScan({
                 </div>
 
                 {/* Virtualization Card */}
-                <div className="bg-[#fbf8f3] dark:bg-white/[0.02] border border-[#ebe3d5] dark:border-white/10 p-4 rounded-2xl flex flex-col justify-between hover:border-amber-700/30 dark:hover:border-white/20 transition-colors shadow-sm">
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-700 dark:text-cyan-400 flex items-center justify-center">
-                      <ShieldCheck className="w-3.5 h-3.5" />
+                <div 
+                  onClick={() => !sysInfo.virtualization && setShowBiosModal(true)}
+                  className={`bg-[#fbf8f3] dark:bg-white/[0.02] border p-4 rounded-2xl flex flex-col justify-between transition-all shadow-sm ${
+                    sysInfo.virtualization 
+                      ? 'border-[#ebe3d5] dark:border-white/10 hover:border-amber-700/30 dark:hover:border-white/20' 
+                      : 'border-amber-500/30 hover:border-amber-500/60 cursor-pointer bg-amber-500/[0.03] dark:bg-amber-500/[0.05]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                        sysInfo.virtualization 
+                          ? 'bg-teal-500/10 border border-teal-500/20 text-teal-700 dark:text-cyan-400' 
+                          : 'bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400'
+                      }`}>
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-stone-500 dark:text-slate-400 text-[11px] font-mono font-semibold uppercase tracking-wider">VT-x / AMD-V</span>
                     </div>
-                    <span className="text-stone-500 dark:text-slate-400 text-[11px] font-mono font-semibold uppercase tracking-wider">VT-x / AMD-V</span>
+                    {!sysInfo.virtualization && (
+                      <span className="text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
+                        <Settings2 className="w-3 h-3" /> Setup
+                      </span>
+                    )}
                   </div>
                   <span className="text-xs font-bold">
                     {sysInfo.virtualization ? (
@@ -170,8 +217,8 @@ export default function StepScan({
                         <CheckCircle2 className="w-3.5 h-3.5" /> Enabled
                       </span>
                     ) : (
-                      <span className="text-amber-700 dark:text-amber-400">
-                        Disabled (Bare-Metal)
+                      <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <span>Disabled (Click for Assistant)</span>
                       </span>
                     )}
                   </span>
@@ -183,6 +230,13 @@ export default function StepScan({
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-xs font-mono flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>{actionError}</span>
+                </div>
+              )}
+
+              {hypervisorSuccessMsg && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-700 dark:text-emerald-400 text-xs font-mono flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{hypervisorSuccessMsg}</span>
                 </div>
               )}
 
@@ -425,6 +479,112 @@ export default function StepScan({
             Continue <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Smart BIOS Virtualization Assistant Modal */}
+        {showBiosModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#090b10]/95 backdrop-blur-xl p-4 animate-[fadeIn_0.2s_ease-out]">
+            <div className="bg-[#12161f] border border-amber-500/20 rounded-3xl p-6 md:p-8 max-w-[620px] w-full shadow-[0_25px_70px_rgba(0,0,0,0.8)] flex flex-col relative text-left">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <Cpu className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white tracking-tight">
+                      Hardware Virtualization Assistant
+                    </h3>
+                    <p className="text-xs text-slate-400 font-mono">
+                      Motherboard Firmware Configuration & Hypervisor Setup
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowBiosModal(false)}
+                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Hardware Detection Box */}
+              <div className="bg-[#181d28] border border-white/5 rounded-2xl p-4 mb-4 space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-400">Detected Processor:</span>
+                  <span className="text-white font-bold">{sysInfo?.cpu_brand || "x86_64 Processor"}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-400">Target Feature Flag:</span>
+                  <span className="text-amber-400 font-bold">
+                    {sysInfo?.cpu_brand?.toLowerCase().includes("intel")
+                      ? "Intel VT-x (VMX) Technology"
+                      : "AMD SVM Mode (Secure Virtual Machine)"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Guided BIOS Instructions */}
+              <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 mb-5 text-xs text-slate-300 space-y-2 font-mono">
+                <div className="text-amber-400 font-bold uppercase tracking-wider text-[11px] mb-1">
+                  How to Enable in BIOS Setup:
+                </div>
+                <div className="text-slate-300 leading-relaxed">
+                  1. Click <strong>"Reboot to UEFI Setup"</strong> below to enter BIOS automatically without pressing hotkeys.
+                </div>
+                <div className="text-slate-300 leading-relaxed">
+                  2. Navigate to:{" "}
+                  <span className="text-emerald-400 font-semibold">
+                    {sysInfo?.cpu_brand?.toLowerCase().includes("intel")
+                      ? "Advanced → CPU Configuration → Intel Virtualization Technology → [Enabled]"
+                      : "Advanced → CPU Configuration / OC → SVM Mode → [Enabled]"}
+                  </span>
+                </div>
+                <div className="text-slate-300 leading-relaxed">
+                  3. Press <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">F10</kbd> (Save & Exit). Your system will restart with hardware virtualization active.
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  onClick={handleRebootToBios}
+                  disabled={isRebootingBios}
+                  className="w-full sm:flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-semibold py-3 px-5 rounded-xl transition-all shadow-[0_4px_16px_rgba(245,158,11,0.25)] flex items-center justify-center gap-2 text-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isRebootingBios ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Rebooting to Firmware...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reboot to UEFI Setup Now</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleEnableHypervisor}
+                  disabled={isEnablingHypervisor}
+                  className="w-full sm:flex-1 bg-white/5 hover:bg-white/10 text-slate-200 font-semibold py-3 px-5 rounded-xl transition-colors border border-white/10 flex items-center justify-center gap-2 text-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isEnablingHypervisor ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Enabling Hypervisor...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Layers className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Enable Windows Hypervisor</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
