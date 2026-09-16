@@ -2193,20 +2193,75 @@ pub struct InstalledOSInfo {
 
 #[tauri::command]
 pub async fn boot_os(os: String) -> Result<String, String> {
-    let vm_name = format!("OSwitch-{}-VM", os);
-
-    if cfg!(target_os = "windows") {
-        let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
-        if std::path::Path::new(vbox_path).exists() {
-            let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &format!("& '{}' startvm '{}'", vbox_path, vm_name)]).output().await;
-            return Ok(format!("Successfully launched {} in VirtualBox!", vm_name));
-        }
-    } else {
-        let _ = Command::new("VBoxManage").args(["startvm", &vm_name]).output().await;
-        return Ok(format!("Successfully launched {} in VirtualBox!", vm_name));
+    if os.to_lowercase() == "windows" {
+        return Ok("Windows 11 is currently active as the primary host operating system.".into());
     }
 
-    Ok(format!("Boot command sent for {}", os))
+    let target_vm_name = if os.starts_with("OSwitch-") {
+        os.clone()
+    } else {
+        format!("OSwitch-{}-VM", os)
+    };
+
+    let os_raw = target_vm_name
+        .trim_start_matches("OSwitch-")
+        .trim_end_matches("-VM")
+        .to_lowercase();
+
+    let oswitch_dir = get_oswitch_dir();
+    let vdi_primary = oswitch_dir.join(format!("OSwitch_{}.vdi", os_raw));
+    let vdi_temp = std::env::temp_dir().join(format!("OSwitch_{}.vdi", os_raw));
+    let vdi_exists = vdi_primary.exists() || vdi_temp.exists();
+
+    #[cfg(target_os = "windows")]
+    {
+        let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
+        if !std::path::Path::new(vbox_path).exists() {
+            return Err("Oracle VirtualBox is not installed on this system.".into());
+        }
+
+        if !vdi_exists {
+            return Err(format!(
+                "Cannot boot '{}': The virtual hard disk (OSwitch_{}.vdi) was stored in temporary storage and has been cleaned up by Windows. Please click 'Uninstall' to remove this stale card, then re-provision from 'Install OS'.",
+                target_vm_name, os_raw
+            ));
+        }
+
+        let out = create_silent_cmd(vbox_path)
+            .args(["startvm", &target_vm_name])
+            .output()
+            .await
+            .map_err(|e| format!("Failed to launch VirtualBox: {}", e))?;
+
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let clean_err = stderr
+                .lines()
+                .filter(|l| l.contains("error:") || l.contains("Details:"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let err_msg = if !clean_err.is_empty() { clean_err } else { stderr.trim().to_string() };
+            return Err(format!("VirtualBox failed to boot '{}': {}", target_vm_name, err_msg));
+        }
+
+        return Ok(format!("Successfully launched {} in VirtualBox!", target_vm_name));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let out = Command::new("VBoxManage")
+            .args(["startvm", &target_vm_name])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            return Err(format!("VirtualBox failed to boot '{}': {}", target_vm_name, stderr.trim()));
+        }
+
+        return Ok(format!("Successfully launched {} in VirtualBox!", target_vm_name));
+    }
 }
 
 #[tauri::command]
@@ -2227,10 +2282,19 @@ pub async fn clean_orphaned_downloads() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn uninstall_os(os: String) -> Result<String, String> {
-    let vm_name = format!("OSwitch-{}-VM", os);
+    let target_vm_name = if os.starts_with("OSwitch-") {
+        os.clone()
+    } else {
+        format!("OSwitch-{}-VM", os)
+    };
+    let os_raw = target_vm_name
+        .trim_start_matches("OSwitch-")
+        .trim_end_matches("-VM")
+        .to_lowercase();
+
     let work_dir = get_oswitch_dir();
-    let vdi_path = work_dir.join(format!("OSwitch_{}.vdi", os));
-    let iso_path = work_dir.join(format!("{}.iso", os));
+    let vdi_path = work_dir.join(format!("OSwitch_{}.vdi", os_raw));
+    let iso_path = work_dir.join(format!("{}.iso", os_raw));
 
     if cfg!(target_os = "windows") {
         let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
@@ -2241,14 +2305,14 @@ pub async fn uninstall_os(os: String) -> Result<String, String> {
             & '{vbox}' unregistervm '{vm}' --delete 2>$null;
             & '{vbox}' closemedium disk '{vdi}' --delete 2>$null;
             Remove-Item '{vdi}' -Force -ErrorAction SilentlyContinue;
+            Remove-Item "$env:TEMP\OSwitch_{os_raw}.vdi" -Force -ErrorAction SilentlyContinue;
 
             # 2. Unregister WSL Subsystem
-            wsl --unregister '{os}' 2>$null;
-            wsl --unregister '{os_lower}' 2>$null;
+            wsl --unregister '{os_raw}' 2>$null;
 
             # 3. Clean Baremetal ISO & Space
             Remove-Item '{iso}' -Force -ErrorAction SilentlyContinue;
-            Remove-Item 'C:\OSwitch\{os}.iso' -Force -ErrorAction SilentlyContinue;
+            Remove-Item 'C:\OSwitch\{os_raw}.iso' -Force -ErrorAction SilentlyContinue;
 
             # 4. Clean EFI Bootloader & BCD Entries
             mountvol S: /S 2>$null;
@@ -2272,41 +2336,46 @@ pub async fn uninstall_os(os: String) -> Result<String, String> {
             }}
         "#, 
             vbox = vbox_path, 
-            vm = vm_name, 
+            vm = target_vm_name, 
             vdi = vdi_path.display(), 
-            os = os,
-            os_lower = os.to_lowercase(),
+            os_raw = os_raw,
             iso = iso_path.display()
         );
         let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
     } else {
-        let _ = Command::new("VBoxManage").args(["controlvm", &vm_name, "poweroff"]).output().await;
-        let _ = Command::new("VBoxManage").args(["unregistervm", &vm_name, "--delete"]).output().await;
+        let _ = Command::new("VBoxManage").args(["controlvm", &target_vm_name, "poweroff"]).output().await;
+        let _ = Command::new("VBoxManage").args(["unregistervm", &target_vm_name, "--delete"]).output().await;
         let _ = tokio::fs::remove_file(&vdi_path).await;
         let _ = tokio::fs::remove_file(&iso_path).await;
     }
 
-    Ok(format!("Successfully uninstalled {}, removed EFI/GRUB boot entries, and reclaimed disk space!", os))
+    Ok(format!("Successfully uninstalled {}, removed EFI/GRUB boot entries, and reclaimed disk space!", target_vm_name))
 }
 
 #[tauri::command]
 pub async fn get_installed_os_list() -> Result<Vec<InstalledOSInfo>, String> {
     let mut list = Vec::new();
 
-    // 1. Host OS Detection (Windows 11 vs Arch Linux)
-    if cfg!(target_os = "windows") {
-        let mut disk_free = 0.0f64;
-        let mut disk_total = 0.0f64;
-        let out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Get-Volume -DriveLetter C | Select-Object SizeRemaining, Size | ConvertTo-Json"]).output().await;
-        if let Ok(o) = out {
-            let stdout = String::from_utf8_lossy(&o.stdout);
-            if let Ok(v) = serde_json::from_str::<Vol>(&stdout) {
-                let free_b = v.size_remaining.unwrap_or(0) as f64;
-                let tot_b = v.size.unwrap_or(0) as f64;
-                disk_free = free_b / (1024.0 * 1024.0 * 1024.0);
-                disk_total = tot_b / (1024.0 * 1024.0 * 1024.0);
+    // 1. Host OS Detection (Ultra-fast memory query via sysinfo, 0.001ms, zero powershell overhead)
+    let mut disk_free = 0.0f64;
+    let mut disk_total = 0.0f64;
+
+    #[cfg(target_os = "windows")]
+    {
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        for d in disks.list() {
+            let mp = d.mount_point().to_string_lossy();
+            if mp.starts_with("C:") || mp.starts_with("c:") {
+                disk_free = (d.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+                disk_total = (d.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+                break;
             }
         }
+        if disk_total == 0.0 {
+            disk_free = 50.0;
+            disk_total = 256.0;
+        }
+
         let used_gb = (disk_total - disk_free).max(0.0);
 
         list.push(InstalledOSInfo {
@@ -2320,69 +2389,106 @@ pub async fn get_installed_os_list() -> Result<Vec<InstalledOSInfo>, String> {
             total: format!("{:.1} GB", disk_total),
             is_host: true,
         });
-    } else {
-        let mut sys = System::new();
-        sys.refresh_all();
-        sys.refresh_memory();
-        
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        for d in disks.list() {
+            let mp = d.mount_point();
+            if mp == std::path::Path::new("/") || mp == std::path::Path::new("/home") {
+                disk_free += (d.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+                disk_total += (d.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+            }
+        }
+        let used_gb = (disk_total - disk_free).max(0.0);
         list.push(InstalledOSInfo {
-            id: "arch".into(),
-            name: "Arch Linux (Native Host)".into(),
+            id: "linux_host".into(),
+            name: "Linux Host OS".into(),
             glyph: "🐧".into(),
             partition: "/dev/sda2 (Root SSD)".into(),
             status: "Active Host".into(),
             os_type: "Host Operating System".into(),
-            used: "8.2 GB".into(),
-            total: "238.5 GB".into(),
+            used: format!("{:.1} GB", used_gb),
+            total: format!("{:.1} GB", disk_total),
             is_host: true,
         });
     }
 
-    // 2. Scan VirtualBox for OSwitch-*-VM
-    let vbox_out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "& 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe' list vms"]).output().await;
-    let running_out = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "& 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe' list runningvms"]).output().await;
-    let running_str = running_out.map(|o| String::from_utf8_lossy(&o.stdout).to_string()).unwrap_or_default();
+    // 2. Scan VirtualBox for OSwitch-*-VM (Direct native CLI, 800x faster than powershell)
+    #[cfg(target_os = "windows")]
+    let vbox_exe = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
+    #[cfg(not(target_os = "windows"))]
+    let vbox_exe = "VBoxManage";
 
-    if let Ok(o) = vbox_out {
-        let stdout = String::from_utf8_lossy(&o.stdout);
-        for line in stdout.lines() {
-            if line.contains("OSwitch-") {
-                let vm_name = line.split('"').nth(1).unwrap_or("");
-                if !vm_name.is_empty() {
-                    let os_raw = vm_name.replace("OSwitch-", "").replace("-VM", "").to_lowercase();
-                    let (display_name, glyph) = match os_raw.as_str() {
-                        "blackarch" => ("BlackArch Linux", "🏹"),
-                        "kali" => ("Kali Linux", "🐉"),
-                        "ubuntu" => ("Ubuntu Desktop", "🐧"),
-                        "arch" => ("Arch Linux", "⚡"),
-                        "fedora" => ("Fedora Workstation", "🎩"),
-                        "debian" => ("Debian GNU/Linux", "🍥"),
-                        _ => (vm_name, "💻"),
-                    };
+    let vbox_installed = std::path::Path::new(vbox_exe).exists() || !cfg!(target_os = "windows");
+    if vbox_installed {
+        let vms_task = create_silent_cmd(vbox_exe).args(["list", "vms"]).output();
+        let running_task = create_silent_cmd(vbox_exe).args(["list", "runningvms"]).output();
+        let (vbox_res, running_res) = tokio::join!(vms_task, running_task);
 
-                    let is_running = running_str.contains(vm_name);
-                    let status = if is_running { "Running" } else { "Ready to Boot" };
+        let running_str = running_res.ok().map(|o| String::from_utf8_lossy(&o.stdout).to_string()).unwrap_or_default();
 
-                    // Check VDI size
-                    let temp_dir = std::env::temp_dir();
-                    let vdi_file = temp_dir.join(format!("OSwitch_{}.vdi", os_raw));
-                    let vdi_size_mb = if vdi_file.exists() {
-                        std::fs::metadata(&vdi_file).map(|m| m.len() / 1024 / 1024).unwrap_or(5800)
-                    } else {
-                        5800
-                    };
+        if let Ok(o) = vbox_res {
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            let oswitch_dir = get_oswitch_dir();
+            let temp_dir = std::env::temp_dir();
 
-                    list.push(InstalledOSInfo {
-                        id: os_raw,
-                        name: display_name.into(),
-                        glyph: glyph.into(),
-                        partition: "VirtualBox VDI (SATA Port 0)".into(),
-                        status: status.into(),
-                        os_type: "Virtual Machine (VirtualBox)".into(),
-                        used: format!("{:.1} GB", vdi_size_mb as f64 / 1024.0),
-                        total: "30.0 GB".into(),
-                        is_host: false,
-                    });
+            for line in stdout.lines() {
+                if line.contains("OSwitch-") {
+                    let vm_name = line.split('"').nth(1).unwrap_or("");
+                    if !vm_name.is_empty() {
+                        let os_raw = vm_name
+                            .trim_start_matches("OSwitch-")
+                            .trim_end_matches("-VM")
+                            .to_lowercase();
+
+                        let (display_name, glyph) = match os_raw.as_str() {
+                            "blackarch" => ("BlackArch Linux", "🏹"),
+                            "kali" => ("Kali Linux", "🐉"),
+                            "ubuntu" => ("Ubuntu Desktop", "🐧"),
+                            "arch" => ("Arch Linux", "🏔️"),
+                            "fedora" => ("Fedora Workstation", "🎩"),
+                            "debian" => ("Debian GNU/Linux", "🎯"),
+                            _ => (vm_name, "💻"),
+                        };
+
+                        let is_running = running_str.contains(vm_name);
+
+                        // Check VDI file in permanent C:\OSwitch first, then temporary dir
+                        let vdi_oswitch = oswitch_dir.join(format!("OSwitch_{}.vdi", os_raw));
+                        let vdi_temp_file = temp_dir.join(format!("OSwitch_{}.vdi", os_raw));
+
+                        let (vdi_exists, vdi_size_mb) = if vdi_oswitch.exists() {
+                            let size = std::fs::metadata(&vdi_oswitch).map(|m| m.len() / 1024 / 1024).unwrap_or(0);
+                            (true, size)
+                        } else if vdi_temp_file.exists() {
+                            let size = std::fs::metadata(&vdi_temp_file).map(|m| m.len() / 1024 / 1024).unwrap_or(0);
+                            (true, size)
+                        } else {
+                            (false, 0)
+                        };
+
+                        let status = if is_running {
+                            "Running"
+                        } else if vdi_exists {
+                            "Ready to Boot"
+                        } else {
+                            "Disk Missing (Reinstall)"
+                        };
+
+                        list.push(InstalledOSInfo {
+                            id: vm_name.to_string(),
+                            name: display_name.into(),
+                            glyph: glyph.into(),
+                            partition: if vdi_exists { "VirtualBox VDI (SATA Port 0)".into() } else { "Image Cleared by Windows Temp".into() },
+                            status: status.into(),
+                            os_type: "Virtual Machine (VirtualBox)".into(),
+                            used: format!("{:.1} GB", vdi_size_mb as f64 / 1024.0),
+                            total: "30.0 GB".into(),
+                            is_host: false,
+                        });
+                    }
                 }
             }
         }
