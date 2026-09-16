@@ -1667,7 +1667,14 @@ pub async fn install_os(
 
             if !vmdk_flat_path.exists() {
                 if let Ok(file) = std::fs::File::create(&vmdk_flat_path) {
-                    let _ = file.set_len(40 * 1024 * 1024 * 1024); // 40GB sparse virtual disk
+                    let _ = file.set_len(40 * 1024 * 1024 * 1024); // 40GB virtual disk
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = create_silent_cmd("fsutil")
+                        .args(["sparse", "setflag", &vmdk_flat_path.to_string_lossy()])
+                        .output()
+                        .await;
                 }
             }
 
@@ -1723,7 +1730,16 @@ pub async fn install_os(
             let _ = tokio::fs::write(&vmx_path, vmx_content).await;
             
             let exe = vmware_exe.unwrap_or_else(|| "vmplayer".to_string());
-            let _ = create_silent_cmd(&exe).arg(vmx_path.to_str().unwrap()).spawn();
+            #[cfg(target_os = "windows")]
+            {
+                let _ = std::process::Command::new("cmd")
+                    .args(["/c", "start", "", &exe, &vmx_path.to_string_lossy()])
+                    .spawn();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = Command::new(&exe).arg(&vmx_path).spawn();
+            }
             let _ = app.emit("install-progress", InstallProgress { i: 2, text: "".into(), total: 3, done: true });
         }
     } else if intent == "usb_flash" || intent == "usb_live" || intent == "usb_installer" {
@@ -1984,10 +2000,14 @@ pub async fn install_os(
             let _ = create_silent_cmd("cmd").args(["/c", "mkdir", "C:\\OSwitch_BCD_Backup"]).output().await;
             let _ = create_silent_cmd("bcdedit").args(["/export", "C:\\OSwitch_BCD_Backup\\bcd_backup"]).output().await;
 
+            // 🛡️ Disable Windows Fast Startup / Hibernation to prevent NTFS disk lock collisions
+            let _ = create_silent_cmd("powercfg").args(["/h", "off"]).output().await;
+
             let ps_script = format!(
-                "$id = '{}';\n\
-                $name = '{}';\n\
+                "$id = '{id}';\n\
+                $name = '{display_name}';\n\
                 $isoName = \"$id.iso\";\n\
+                $targetIsoPath = '{iso_path}';\n\
                 mountvol S: /S 2>$null;\n\
                 if (Test-Path 'S:\\') {{\n\
                     New-Item -ItemType Directory -Force -Path 'S:\\EFI\\OSwitch' | Out-Null;\n\
@@ -2013,7 +2033,27 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
 }}\n\
 \"@;\n\
                     Set-Content -Path 'S:\\EFI\\OSwitch\\grub.cfg' -Value $grubCfg -Force;\n\
-                    if (Test-Path 'S:\\EFI\\Boot\\bootx64.efi') {{\n\
+                    $extractedEfi = $false;\n\
+                    try {{\n\
+                        $m = Mount-DiskImage -ImagePath $targetIsoPath -PassThru -ErrorAction SilentlyContinue;\n\
+                        $vol = ($m | Get-Volume -ErrorAction SilentlyContinue).DriveLetter;\n\
+                        if ($vol) {{\n\
+                            $candidates = @(\n\
+                                \"$($vol):\\EFI\\BOOT\\BOOTX64.EFI\",\n\
+                                \"$($vol):\\EFI\\boot\\bootx64.efi\",\n\
+                                \"$($vol):\\EFI\\BOOT\\grubx64.efi\"\n\
+                            );\n\
+                            foreach ($c in $candidates) {{\n\
+                                if (Test-Path $c) {{\n\
+                                    Copy-Item -Path $c -Destination 'S:\\EFI\\OSwitch\\bootx64.efi' -Force;\n\
+                                    $extractedEfi = $true;\n\
+                                    break;\n\
+                                }}\n\
+                            }}\n\
+                        }}\n\
+                        Dismount-DiskImage -ImagePath $targetIsoPath -ErrorAction SilentlyContinue | Out-Null;\n\
+                    }} catch {{}}\n\
+                    if (-not $extractedEfi -and (Test-Path 'S:\\EFI\\Boot\\bootx64.efi')) {{\n\
                         Copy-Item -Path 'S:\\EFI\\Boot\\bootx64.efi' -Destination 'S:\\EFI\\OSwitch\\bootx64.efi' -Force;\n\
                     }}\n\
                     mountvol S: /D 2>$null;\n\
@@ -2027,7 +2067,9 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
                     bcdedit /displayorder $guid /addlast;\n\
                     bcdedit /timeout 10;\n\
                 }}",
-                id, display_name
+                id = id,
+                display_name = display_name,
+                iso_path = target_iso.display()
             );
 
             let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
@@ -2209,6 +2251,40 @@ pub async fn boot_os(os: String) -> Result<String, String> {
         .to_lowercase();
 
     let oswitch_dir = get_oswitch_dir();
+    let vmx_candidate = if os.starts_with("vmware:") {
+        oswitch_dir.join(os.trim_start_matches("vmware:"))
+    } else {
+        oswitch_dir.join(format!("OSwitch_{}.vmx", os_raw))
+    };
+
+    // ─── 1. VMware Workstation / Player Execution Path ───
+    if vmx_candidate.exists() {
+        #[cfg(target_os = "windows")]
+        {
+            let vmware_paths = [
+                std::path::Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmplayer.exe"),
+                std::path::Path::new("C:\\Program Files\\VMware\\VMware Workstation\\vmware.exe"),
+                std::path::Path::new("C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmplayer.exe"),
+            ];
+            let exe = vmware_paths.iter().find(|p| p.exists())
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| "vmplayer.exe".to_string());
+
+            let _ = std::process::Command::new("cmd")
+                .args(["/c", "start", "", &exe, &vmx_candidate.to_string_lossy()])
+                .spawn()
+                .map_err(|e| format!("Failed to launch VMware: {}", e))?;
+
+            return Ok(format!("Successfully launched {} in VMware Workstation!", vmx_candidate.file_name().unwrap_or_default().to_string_lossy()));
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = Command::new("vmplayer").arg(&vmx_candidate).spawn().map_err(|e| e.to_string())?;
+            return Ok("Successfully launched VMware!".into());
+        }
+    }
+
+    // ─── 2. Oracle VirtualBox Execution Path ───
     let vdi_primary = oswitch_dir.join(format!("OSwitch_{}.vdi", os_raw));
     let vdi_temp = std::env::temp_dir().join(format!("OSwitch_{}.vdi", os_raw));
     let vdi_exists = vdi_primary.exists() || vdi_temp.exists();
@@ -2285,7 +2361,36 @@ pub async fn stop_os(os: String) -> Result<String, String> {
     } else {
         format!("OSwitch-{}-VM", os)
     };
+    let os_raw = target_vm_name
+        .trim_start_matches("OSwitch-")
+        .trim_end_matches("-VM")
+        .to_lowercase();
 
+    let oswitch_dir = get_oswitch_dir();
+    let vmx_candidate = if os.starts_with("vmware:") {
+        oswitch_dir.join(os.trim_start_matches("vmware:"))
+    } else {
+        oswitch_dir.join(format!("OSwitch_{}.vmx", os_raw))
+    };
+
+    // 1. If VMware VM
+    if vmx_candidate.exists() {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = create_silent_powershell()
+                .args(["-NoProfile", "-NonInteractive", "-Command", "Stop-Process -Name 'vmware-vmx','vmplayer','vmware' -Force -ErrorAction SilentlyContinue"])
+                .output()
+                .await;
+            return Ok(format!("Stopped VMware VM {}.", target_vm_name));
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = Command::new("killall").args(["-9", "vmplayer"]).output().await;
+            return Ok("Stopped VMware VM.".into());
+        }
+    }
+
+    // 2. If VirtualBox VM
     #[cfg(target_os = "windows")]
     let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
     #[cfg(not(target_os = "windows"))]
@@ -2329,6 +2434,9 @@ pub async fn uninstall_os(os: String) -> Result<String, String> {
 
     let work_dir = get_oswitch_dir();
     let vdi_path = work_dir.join(format!("OSwitch_{}.vdi", os_raw));
+    let vmx_path = work_dir.join(format!("OSwitch_{}.vmx", os_raw));
+    let vmdk_path = work_dir.join(format!("OSwitch_{}_disk.vmdk", os_raw));
+    let vmdk_flat_path = work_dir.join(format!("OSwitch_{}_disk-flat.vmdk", os_raw));
     let iso_path = work_dir.join(format!("{}.iso", os_raw));
 
     if cfg!(target_os = "windows") {
@@ -2342,7 +2450,15 @@ pub async fn uninstall_os(os: String) -> Result<String, String> {
             Remove-Item '{vdi}' -Force -ErrorAction SilentlyContinue;
             Remove-Item "$env:TEMP\OSwitch_{os_raw}.vdi" -Force -ErrorAction SilentlyContinue;
 
-            # 2. Unregister WSL Subsystem
+            # 2. Terminate & Delete VMware VM
+            Stop-Process -Name 'vmware-vmx','vmplayer' -Force -ErrorAction SilentlyContinue;
+            Remove-Item 'C:\OSwitch\OSwitch_{os_raw}.vmx' -Force -ErrorAction SilentlyContinue;
+            Remove-Item 'C:\OSwitch\OSwitch_{os_raw}_disk.vmdk' -Force -ErrorAction SilentlyContinue;
+            Remove-Item 'C:\OSwitch\OSwitch_{os_raw}_disk-flat.vmdk' -Force -ErrorAction SilentlyContinue;
+            Remove-Item "$env:TEMP\OSwitch_{os_raw}.vmx" -Force -ErrorAction SilentlyContinue;
+            Remove-Item "$env:TEMP\OSwitch_{os_raw}_disk.vmdk" -Force -ErrorAction SilentlyContinue;
+
+            # 3. Unregister WSL Subsystem
             wsl --unregister '{os_raw}' 2>$null;
 
             # 3. Clean Baremetal ISO & Space
@@ -2381,6 +2497,9 @@ pub async fn uninstall_os(os: String) -> Result<String, String> {
         let _ = Command::new("VBoxManage").args(["controlvm", &target_vm_name, "poweroff"]).output().await;
         let _ = Command::new("VBoxManage").args(["unregistervm", &target_vm_name, "--delete"]).output().await;
         let _ = tokio::fs::remove_file(&vdi_path).await;
+        let _ = tokio::fs::remove_file(&vmx_path).await;
+        let _ = tokio::fs::remove_file(&vmdk_path).await;
+        let _ = tokio::fs::remove_file(&vmdk_flat_path).await;
         let _ = tokio::fs::remove_file(&iso_path).await;
     }
 
@@ -2525,6 +2644,68 @@ pub async fn get_installed_os_list() -> Result<Vec<InstalledOSInfo>, String> {
                         });
                     }
                 }
+            }
+        }
+    }
+
+    // 3. Scan for VMware Workstation / Player VMs (*.vmx) in C:\OSwitch
+    let oswitch_dir = get_oswitch_dir();
+    if let Ok(mut entries) = tokio::fs::read_dir(&oswitch_dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let fname = entry.file_name().to_string_lossy().to_string();
+            if fname.starts_with("OSwitch_") && fname.ends_with(".vmx") {
+                let os_raw = fname
+                    .trim_start_matches("OSwitch_")
+                    .trim_end_matches(".vmx")
+                    .to_lowercase();
+                
+                let (display_name, glyph) = match os_raw.as_str() {
+                    "blackarch" => ("BlackArch Linux", "🏹"),
+                    "kali" => ("Kali Linux", "🐉"),
+                    "ubuntu" => ("Ubuntu Desktop", "🐧"),
+                    "arch" => ("Arch Linux", "🏔️"),
+                    "fedora" => ("Fedora Workstation", "🎩"),
+                    "debian" => ("Debian GNU/Linux", "🎯"),
+                    _ => (os_raw.as_str(), "💻"),
+                };
+
+                let vmdk_flat = oswitch_dir.join(format!("OSwitch_{}_disk-flat.vmdk", os_raw));
+                let vmdk_exists = vmdk_flat.exists();
+                let vmdk_size_mb = if vmdk_exists {
+                    std::fs::metadata(&vmdk_flat).map(|m| m.len() / 1024 / 1024).unwrap_or(0)
+                } else {
+                    0
+                };
+
+                #[cfg(target_os = "windows")]
+                let is_running = {
+                    let s = create_silent_powershell()
+                        .args(["-NoProfile", "-NonInteractive", "-Command", "Get-Process | Where-Object { $_.ProcessName -like '*vmware*' -or $_.ProcessName -like '*vmplayer*' } | Measure-Object | Select-Object -ExpandProperty Count"])
+                        .output().await;
+                    s.ok().map(|o| String::from_utf8_lossy(&o.stdout).trim() != "0").unwrap_or(false)
+                };
+                #[cfg(not(target_os = "windows"))]
+                let is_running = false;
+
+                let status = if is_running {
+                    "Running"
+                } else if vmdk_exists {
+                    "Ready to Boot"
+                } else {
+                    "Disk Missing (Reinstall)"
+                };
+
+                list.push(InstalledOSInfo {
+                    id: format!("vmware:{}", fname),
+                    name: format!("{} (VMware)", display_name),
+                    glyph: glyph.into(),
+                    partition: if vmdk_exists { "VMware SCSI-0:0 (VMDK)".into() } else { "VMDK File Missing".into() },
+                    status: status.into(),
+                    os_type: "Virtual Machine (VMware)".into(),
+                    used: format!("{:.1} GB", vmdk_size_mb as f64 / 1024.0),
+                    total: "40.0 GB".into(),
+                    is_host: false,
+                });
             }
         }
     }
