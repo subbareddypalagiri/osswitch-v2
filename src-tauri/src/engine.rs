@@ -2227,14 +2227,25 @@ pub async fn boot_os(os: String) -> Result<String, String> {
             ));
         }
 
+        // Check if VM is already running
+        if let Ok(r) = create_silent_cmd(vbox_path).args(["list", "runningvms"]).output().await {
+            let running_str = String::from_utf8_lossy(&r.stdout);
+            if running_str.contains(&target_vm_name) {
+                return Ok(format!("'{}' is already active and running in VirtualBox! Check your Windows taskbar.", target_vm_name));
+            }
+        }
+
         let out = create_silent_cmd(vbox_path)
-            .args(["startvm", &target_vm_name])
+            .args(["startvm", &target_vm_name, "--type", "gui"])
             .output()
             .await
             .map_err(|e| format!("Failed to launch VirtualBox: {}", e))?;
 
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr);
+            if stderr.contains("already locked by a session") {
+                return Ok(format!("'{}' is already active and running in VirtualBox! Check your Windows taskbar.", target_vm_name));
+            }
             let clean_err = stderr
                 .lines()
                 .filter(|l| l.contains("error:") || l.contains("Details:"))
@@ -2250,18 +2261,42 @@ pub async fn boot_os(os: String) -> Result<String, String> {
     #[cfg(not(target_os = "windows"))]
     {
         let out = Command::new("VBoxManage")
-            .args(["startvm", &target_vm_name])
+            .args(["startvm", &target_vm_name, "--type", "gui"])
             .output()
             .await
             .map_err(|e| e.to_string())?;
 
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr);
+            if stderr.contains("already locked by a session") {
+                return Ok(format!("'{}' is already active and running in VirtualBox!", target_vm_name));
+            }
             return Err(format!("VirtualBox failed to boot '{}': {}", target_vm_name, stderr.trim()));
         }
 
         return Ok(format!("Successfully launched {} in VirtualBox!", target_vm_name));
     }
+}
+
+#[tauri::command]
+pub async fn stop_os(os: String) -> Result<String, String> {
+    let target_vm_name = if os.starts_with("OSwitch-") {
+        os.clone()
+    } else {
+        format!("OSwitch-{}-VM", os)
+    };
+
+    #[cfg(target_os = "windows")]
+    let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
+    #[cfg(not(target_os = "windows"))]
+    let vbox_path = "VBoxManage";
+
+    let _ = create_silent_cmd(vbox_path)
+        .args(["controlvm", &target_vm_name, "poweroff"])
+        .output()
+        .await;
+
+    Ok(format!("Successfully stopped {}.", target_vm_name))
 }
 
 #[tauri::command]

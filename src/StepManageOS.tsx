@@ -12,7 +12,8 @@ import {
   ArrowLeft, 
   ArrowRight, 
   X,
-  Laptop
+  Laptop,
+  Square
 } from "lucide-react";
 
 interface InstalledOS {
@@ -35,7 +36,6 @@ export default function StepManageOS({ onNext, onBack }: { onNext: () => void; o
   const [confirmUninstallTarget, setConfirmUninstallTarget] = useState<{ id: string; name: string; partition: string } | null>(null);
 
   const fetchOS = async () => {
-    setIsLoading(true);
     try {
       const list = await invoke<InstalledOS[]>("get_installed_os_list");
       setInstalledOSList(list);
@@ -48,7 +48,10 @@ export default function StepManageOS({ onNext, onBack }: { onNext: () => void; o
   };
 
   useEffect(() => {
+    setIsLoading(true);
     fetchOS();
+    const timer = setInterval(fetchOS, 4000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleBootOS = async (osName: string, osId: string) => {
@@ -62,6 +65,26 @@ export default function StepManageOS({ onNext, onBack }: { onNext: () => void; o
     } catch (e) {
       console.error("Boot error:", e);
       setOsMessage(null);
+      const errStr = String(e);
+      if (errStr.includes("already locked by a session") || errStr.includes("0x80bb0007")) {
+        setOsMessage(`${osName} is already running in VirtualBox! Check your Windows taskbar.`);
+        setTimeout(() => setOsMessage(null), 6000);
+      } else {
+        setBootError(errStr);
+      }
+    }
+  };
+
+  const handleStopOS = async (osName: string, osId: string) => {
+    setBootError(null);
+    setOsMessage(`Stopping ${osName}...`);
+    try {
+      const res = await invoke<string>("stop_os", { os: osId });
+      setOsMessage(res || `Successfully stopped ${osName}.`);
+      setTimeout(() => setOsMessage(null), 5000);
+      await fetchOS();
+    } catch (e) {
+      console.error("Stop error:", e);
       setBootError(String(e));
     }
   };
@@ -240,20 +263,31 @@ export default function StepManageOS({ onNext, onBack }: { onNext: () => void; o
 
                   {/* Actions */}
                   <div className="flex gap-3 pt-4 border-t border-[#ebe3d5] dark:border-white/10">
-                    <button
-                      onClick={() => handleBootOS(os.name, os.id)}
-                      disabled={isDiskMissing || os.isHost}
-                      className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm ${
-                        os.isHost
-                          ? "bg-stone-200 dark:bg-white/5 text-stone-400 dark:text-slate-500 cursor-not-allowed border border-transparent"
-                          : isDiskMissing
-                          ? "bg-stone-200 dark:bg-white/5 text-stone-400 dark:text-slate-500 cursor-not-allowed border border-transparent"
-                          : "bg-amber-800 hover:bg-amber-900 dark:bg-cyan-500/20 dark:hover:bg-cyan-500/30 border border-amber-800 dark:border-cyan-500/40 text-white dark:text-cyan-300 hover:shadow-md hover:shadow-cyan-950/20 active:scale-[0.98]"
-                      }`}
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>{os.isHost ? "Active Host OS" : "Boot OS"}</span>
-                    </button>
+                    {isRunning ? (
+                      <button
+                        onClick={() => handleStopOS(os.name, os.id)}
+                        className="flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-700 dark:text-rose-300 hover:shadow-md active:scale-[0.98]"
+                        title="Power off and stop this virtual machine"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                        <span>Stop VM</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleBootOS(os.name, os.id)}
+                        disabled={isDiskMissing || os.isHost}
+                        className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm ${
+                          os.isHost
+                            ? "bg-stone-200 dark:bg-white/5 text-stone-400 dark:text-slate-500 cursor-not-allowed border border-transparent"
+                            : isDiskMissing
+                            ? "bg-stone-200 dark:bg-white/5 text-stone-400 dark:text-slate-500 cursor-not-allowed border border-transparent"
+                            : "bg-amber-800 hover:bg-amber-900 dark:bg-cyan-500/20 dark:hover:bg-cyan-500/30 border border-amber-800 dark:border-cyan-500/40 text-white dark:text-cyan-300 hover:shadow-md hover:shadow-cyan-950/20 active:scale-[0.98]"
+                        }`}
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>{os.isHost ? "Active Host OS" : "Boot OS"}</span>
+                      </button>
+                    )}
                     
                     {!os.isHost && (
                       <button
