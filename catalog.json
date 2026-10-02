@@ -92,7 +92,7 @@
   "blackarch": {
     "name": "BlackArch Linux",
     "category": "Security",
-    "isoUrl": "https://blackarch.org/blackarch-linux-live-2023.12.01-x86_64.iso"
+    "isoUrl": "https://blackarch.org/blackarch-linux-live-2023.12.4-x86_64.iso"
   },
   "win10": {
     "name": "Windows 10 Pro",
