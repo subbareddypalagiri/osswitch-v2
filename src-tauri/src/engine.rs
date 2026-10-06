@@ -1927,7 +1927,9 @@ pub async fn install_os(
                 format!(
                     "sata0:1.present = \"TRUE\"\n\
                     sata0:1.fileName = \"{}\"\n\
-                    sata0:1.deviceType = \"cdrom-image\"\n",
+                    sata0:1.deviceType = \"cdrom-image\"\n\
+                    sata0:1.startConnected = \"TRUE\"\n\
+                    sata0:1.autodetect = \"TRUE\"\n",
                     cidata_iso.display()
                 )
             } else {
@@ -1956,6 +1958,8 @@ pub async fn install_os(
                 sata0:0.present = \"TRUE\"\n\
                 sata0:0.fileName = \"{}\"\n\
                 sata0:0.deviceType = \"cdrom-image\"\n\
+                sata0:0.startConnected = \"TRUE\"\n\
+                sata0:0.autodetect = \"TRUE\"\n\
                 {}\
                 ethernet0.present = \"TRUE\"\n\
                 ethernet0.connectionType = \"nat\"\n\
@@ -2029,7 +2033,19 @@ pub async fn install_os(
         if is_installer_mode {
             let target_drive_letter = usb_info.as_ref()
                 .and_then(|d| d.drive_letter.clone())
-                .unwrap_or_else(|| "E:".to_string());
+                .unwrap_or_else(|| {
+                    #[cfg(target_os = "windows")]
+                    {
+                        for c in (b'D'..=b'Z').rev() {
+                            let candidate = format!("{}:", c as char);
+                            let test_path = format!("{}\\", candidate);
+                            if !std::path::Path::new(&test_path).exists() {
+                                return candidate;
+                            }
+                        }
+                    }
+                    "E:".to_string()
+                });
             let disk_number_u32 = disk_num.parse::<u32>().unwrap_or(1);
 
             let _ = app.emit("command-output", Payload { 
@@ -2311,6 +2327,57 @@ pub async fn install_os(
             // 🛡️ Disable Windows Fast Startup / Hibernation to prevent NTFS disk lock collisions
             let _ = create_silent_cmd("powercfg").args(["/h", "off"]).output().await;
 
+            let lower_id = id.to_lowercase();
+            let grub_entries = if lower_id.contains("arch") {
+                format!(
+                    "menuentry \"OSwitch - {name} (Arch Linux Native Auto-Login)\" {{\n\
+    search --no-floppy --file --set=root /OSwitch/$isoName\n\
+    loopback loop /OSwitch/$isoName\n\
+    linux (loop)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch img_loop=/OSwitch/$isoName earlymodules=loop cow_spacesize={allocated_space}G hostname={host} username={user}\n\
+    initrd (loop)/arch/boot/x86_64/initramfs-linux.img\n\
+}}\n\n\
+menuentry \"OSwitch - Ubuntu/Debian (Fallback Live)\" {{\n\
+    search --no-floppy --file --set=root /OSwitch/$isoName\n\
+    loopback loop /OSwitch/$isoName\n\
+    linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=/OSwitch/$isoName username={user} hostname={host}\n\
+    initrd (loop)/casper/initrd\n\
+}}",
+                    name = display_name, allocated_space = allocated_space, host = host, user = user
+                )
+            } else if lower_id.contains("fedora") || lower_id.contains("rhel") || lower_id.contains("centos") {
+                format!(
+                    "menuentry \"OSwitch - {name} (Fedora Workstation Auto-Kickstart)\" {{\n\
+    search --no-floppy --file --set=root /OSwitch/$isoName\n\
+    loopback loop /OSwitch/$isoName\n\
+    linux (loop)/images/pxeboot/vmlinuz root=live:CDLABEL=Fedora iso-scan/filename=/OSwitch/$isoName rd.live.image quiet inst.ks=hd:LABEL=OSWITCH:/OSwitch/ks.cfg hostname={host}\n\
+    initrd (loop)/images/pxeboot/initrd.img\n\
+}}\n\n\
+menuentry \"OSwitch - Ubuntu/Debian (Fallback Live)\" {{\n\
+    search --no-floppy --file --set=root /OSwitch/$isoName\n\
+    loopback loop /OSwitch/$isoName\n\
+    linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=/OSwitch/$isoName username={user} hostname={host}\n\
+    initrd (loop)/casper/initrd\n\
+}}",
+                    name = display_name, host = host, user = user
+                )
+            } else {
+                format!(
+                    "menuentry \"OSwitch - {name} (Zero-Touch Auto-Login)\" {{\n\
+    search --no-floppy --file --set=root /OSwitch/$isoName\n\
+    loopback loop /OSwitch/$isoName\n\
+    linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=/OSwitch/$isoName username={user} user-fullname=\"{user}\" hostname={host} noprompt noeject cow_spacesize={allocated_space}G autoinstall ds=nocloud;s=/OSwitch/nocloud/\n\
+    initrd (loop)/casper/initrd\n\
+}}\n\n\
+menuentry \"OSwitch - Arch/Fedora (Fallback)\" {{\n\
+    search --no-floppy --file --set=root /OSwitch/$isoName\n\
+    loopback loop /OSwitch/$isoName\n\
+    linux (loop)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch img_loop=/OSwitch/$isoName hostname={host}\n\
+    initrd (loop)/arch/boot/x86_64/initramfs-linux.img\n\
+}}",
+                    name = display_name, allocated_space = allocated_space, host = host, user = user
+                )
+            };
+
             let ps_script = format!(
                 "$id = '{id}';\n\
                 $name = '{display_name}';\n\
@@ -2326,26 +2393,7 @@ insmod gpt\n\
 insmod ntfs\n\
 insmod loopback\n\
 \n\
-menuentry \"OSwitch - $name (Zero-Touch Auto-Login)\" {{\n\
-    search --no-floppy --file --set=root /OSwitch/$isoName\n\
-    loopback loop /OSwitch/$isoName\n\
-    linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=/OSwitch/$isoName username={user} user-fullname=\"{user}\" hostname={host} noprompt noeject cow_spacesize={allocated_space}G autoinstall ds=nocloud;s=/OSwitch/nocloud/\n\
-    initrd (loop)/casper/initrd\n\
-}}\n\
-\n\
-menuentry \"OSwitch - $name (Arch Linux Native)\" {{\n\
-    search --no-floppy --file --set=root /OSwitch/$isoName\n\
-    loopback loop /OSwitch/$isoName\n\
-    linux (loop)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch img_loop=/OSwitch/$isoName earlymodules=loop cow_spacesize={allocated_space}G hostname={host} username={user}\n\
-    initrd (loop)/arch/boot/x86_64/initramfs-linux.img\n\
-}}\n\
-\n\
-menuentry \"OSwitch - $name (Fedora Workstation)\" {{\n\
-    search --no-floppy --file --set=root /OSwitch/$isoName\n\
-    loopback loop /OSwitch/$isoName\n\
-    linux (loop)/images/pxeboot/vmlinuz root=live:CDLABEL=Fedora iso-scan/filename=/OSwitch/$isoName rd.live.image quiet inst.ks=hd:LABEL=OSWITCH:/OSwitch/ks.cfg hostname={host}\n\
-    initrd (loop)/images/pxeboot/initrd.img\n\
-}}\n\
+{grub_entries}\n\
 \"@;\n\
                     Set-Content -Path 'S:\\EFI\\OSwitch\\grub.cfg' -Value $grubCfg -Force;\n\
                     $extractedEfi = $false;\n\
@@ -2382,7 +2430,8 @@ menuentry \"OSwitch - $name (Fedora Workstation)\" {{\n\
                 }}",
                 id = id,
                 display_name = display_name,
-                iso_path = target_iso.display()
+                iso_path = target_iso.display(),
+                grub_entries = grub_entries
             );
 
             let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script]).output().await;
@@ -2598,7 +2647,7 @@ pub async fn boot_os(os: String) -> Result<String, String> {
                         q_args.push(format!("file={},media=cdrom,readonly=on", cidata_iso.display()));
                     }
                     q_args.extend_from_slice(&[
-                        "-boot".to_string(), "menu=on,order=dc".to_string(),
+                        "-boot".to_string(), "menu=on,order=cd".to_string(),
                         "-nic".to_string(), "user,model=virtio".to_string(),
                         "-device".to_string(), "virtio-tablet-pci".to_string(),
                         "-vga".to_string(), "std".to_string(),
@@ -2626,7 +2675,7 @@ pub async fn boot_os(os: String) -> Result<String, String> {
                         q_args.push(format!("file={},media=cdrom,readonly=on", cidata_iso.display()));
                     }
                     q_args.extend_from_slice(&[
-                        "-boot".to_string(), "menu=on,order=dc".to_string(),
+                        "-boot".to_string(), "menu=on,order=cd".to_string(),
                         "-nic".to_string(), "user,model=virtio".to_string(),
                         "-device".to_string(), "virtio-tablet-pci".to_string(),
                         "-vga".to_string(), "std".to_string(),

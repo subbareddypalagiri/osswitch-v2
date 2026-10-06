@@ -42,6 +42,13 @@ fn create_silent_cmd(program: &str) -> Command {
     cmd
 }
 
+#[cfg(target_os = "windows")]
+fn create_silent_powershell() -> Command {
+    let mut cmd = Command::new("powershell");
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 /// Detects distro name and icon glyph from ISO file name
 fn detect_distro_meta(filename: &str) -> (String, String) {
     let f = filename.to_lowercase();
@@ -360,9 +367,11 @@ pub async fn format_and_initialize_multiboot_usb(
         let root = resolve_usb_root(&drive_letter);
         let iso_dir = root.join("oswitch_isos");
         let boot_dir = root.join("boot").join("grub");
+        let efi_boot_dir = root.join("EFI").join("BOOT");
 
         std::fs::create_dir_all(&iso_dir).map_err(|e| format!("Failed to create oswitch_isos directory: {}", e))?;
         std::fs::create_dir_all(&boot_dir).map_err(|e| format!("Failed to create boot/grub directory: {}", e))?;
+        std::fs::create_dir_all(&efi_boot_dir).map_err(|e| format!("Failed to create EFI/BOOT directory: {}", e))?;
 
         // Pre-seed netboot.xyz.iso as the default universal cloud rescue system if available
         let netboot_candidates = [
@@ -374,11 +383,48 @@ pub async fn format_and_initialize_multiboot_usb(
             if nb.exists() {
                 let target_nb = iso_dir.join("netboot.xyz.iso");
                 let _ = std::fs::copy(nb, &target_nb);
+                
+                #[cfg(target_os = "windows")]
+                {
+                    let extract_ps = format!(
+                        "$m = Mount-DiskImage -ImagePath '{}' -PassThru -ErrorAction SilentlyContinue;\n\
+                        $vol = ($m | Get-Volume -ErrorAction SilentlyContinue).DriveLetter;\n\
+                        if ($vol) {{\n\
+                            $cEfi = \"$($vol):\\EFI\\BOOT\";\n\
+                            if (Test-Path \"$cEfi\\BOOTX64.EFI\") {{ Copy-Item \"$cEfi\\BOOTX64.EFI\" '{}' -Force; }}\n\
+                            if (Test-Path \"$cEfi\\grubx64.efi\") {{ Copy-Item \"$cEfi\\grubx64.efi\" '{}' -Force; }}\n\
+                            if (Test-Path \"$cEfi\\mmx64.efi\") {{ Copy-Item \"$cEfi\\mmx64.efi\" '{}' -Force; }}\n\
+                        }}\n\
+                        Dismount-DiskImage -ImagePath '{}' -ErrorAction SilentlyContinue | Out-Null;\n",
+                        nb.display(),
+                        efi_boot_dir.join("BOOTX64.EFI").display(),
+                        efi_boot_dir.join("grubx64.efi").display(),
+                        efi_boot_dir.join("mmx64.efi").display(),
+                        nb.display()
+                    );
+                    let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &extract_ps]).output();
+                }
                 break;
             }
         }
 
-        // Write initial grub.cfg with any pre-seeded ISOs
+        // Fallback: Copy EFI bootloader from local system EFI partition if available
+        if !efi_boot_dir.join("BOOTX64.EFI").exists() && !efi_boot_dir.join("bootx64.efi").exists() {
+            let esp_candidates = [
+                PathBuf::from("S:\\EFI\\OSwitch\\bootx64.efi"),
+                PathBuf::from("S:\\EFI\\Boot\\bootx64.efi"),
+                PathBuf::from("C:\\OSwitch\\bootx64.efi"),
+            ];
+            for ec in &esp_candidates {
+                if ec.exists() {
+                    let _ = std::fs::copy(ec, efi_boot_dir.join("BOOTX64.EFI"));
+                    let _ = std::fs::copy(ec, efi_boot_dir.join("bootx64.efi"));
+                    break;
+                }
+            }
+        }
+
+        // Write initial grub.cfg to both /boot/grub/grub.cfg and /EFI/BOOT/grub.cfg
         let current_isos = if let Ok(st) = get_multiboot_usb_status(drive_letter.clone()).await {
             st.isos
         } else {
@@ -386,7 +432,8 @@ pub async fn format_and_initialize_multiboot_usb(
         };
         let initial_cfg = generate_grub_config(&current_isos);
         let cfg_path = boot_dir.join("grub.cfg");
-        std::fs::write(&cfg_path, initial_cfg).map_err(|e| format!("Failed to write initial grub.cfg: {}", e))?;
+        std::fs::write(&cfg_path, &initial_cfg).map_err(|e| format!("Failed to write initial grub.cfg: {}", e))?;
+        let _ = std::fs::write(efi_boot_dir.join("grub.cfg"), &initial_cfg);
 
         let _ = app.emit("multiboot-progress", MultiBootProgress {
             stage: "Complete".into(),
@@ -542,11 +589,39 @@ pub async fn copy_iso_to_multiboot_usb(
 
     writer.flush().await.map_err(|e| e.to_string())?;
 
-    // Refresh dynamic GRUB config
+    // Refresh dynamic GRUB config in both /boot/grub/ and /EFI/BOOT/
     let status = get_multiboot_usb_status(drive_letter.clone()).await?;
     let new_cfg = generate_grub_config(&status.isos);
     let grub_file = root.join("boot").join("grub").join("grub.cfg");
-    let _ = std::fs::write(&grub_file, new_cfg);
+    let _ = std::fs::write(&grub_file, &new_cfg);
+
+    let efi_boot_dir = root.join("EFI").join("BOOT");
+    let _ = std::fs::create_dir_all(&efi_boot_dir);
+    let _ = std::fs::write(efi_boot_dir.join("grub.cfg"), &new_cfg);
+
+    // Extract genuine EFI binaries from this source ISO if missing on USB
+    if !efi_boot_dir.join("BOOTX64.EFI").exists() && !efi_boot_dir.join("bootx64.efi").exists() {
+        #[cfg(target_os = "windows")]
+        {
+            let extract_ps = format!(
+                "$m = Mount-DiskImage -ImagePath '{}' -PassThru -ErrorAction SilentlyContinue;\n\
+                $vol = ($m | Get-Volume -ErrorAction SilentlyContinue).DriveLetter;\n\
+                if ($vol) {{\n\
+                    $cEfi = \"$($vol):\\EFI\\BOOT\";\n\
+                    if (Test-Path \"$cEfi\\BOOTX64.EFI\") {{ Copy-Item \"$cEfi\\BOOTX64.EFI\" '{}' -Force; }}\n\
+                    if (Test-Path \"$cEfi\\grubx64.efi\") {{ Copy-Item \"$cEfi\\grubx64.efi\" '{}' -Force; }}\n\
+                    if (Test-Path \"$cEfi\\mmx64.efi\") {{ Copy-Item \"$cEfi\\mmx64.efi\" '{}' -Force; }}\n\
+                }}\n\
+                Dismount-DiskImage -ImagePath '{}' -ErrorAction SilentlyContinue | Out-Null;\n",
+                src.display(),
+                efi_boot_dir.join("BOOTX64.EFI").display(),
+                efi_boot_dir.join("grubx64.efi").display(),
+                efi_boot_dir.join("mmx64.efi").display(),
+                src.display()
+            );
+            let _ = create_silent_powershell().args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &extract_ps]).output();
+        }
+    }
 
     // Stage FAANG-grade zero-touch unattended answer files on USB root for automated installer detection
     let fname_lower = fname.to_lowercase();
