@@ -169,6 +169,8 @@ pub fn detect_os_from_filename(filename: &str) -> (String, String, String) {
         ("parrot".into(), "Parrot Security OS".into(), "🦜".into())
     } else if lower.contains("freebsd") {
         ("freebsd".into(), "FreeBSD".into(), "😈".into())
+    } else if lower.contains("netboot") {
+        ("netboot".into(), "netboot.xyz Universal Cloud OS".into(), "🌐".into())
     } else {
         let clean = filename.replace(".iso", "").replace(".img", "").replace('-', " ").replace('_', " ");
         ("custom".into(), format!("Custom OS ({})", clean), "💿".into())
@@ -1549,6 +1551,7 @@ pub async fn install_os(
             "arch" => "Arch Linux",
             "fedora" => "Fedora Workstation",
             "debian" => "Debian GNU/Linux",
+            "netboot" => "netboot.xyz Universal Cloud OS",
             _ => id.as_str(),
         };
 
@@ -1635,7 +1638,9 @@ pub async fn install_os(
                         "-accel", "tcg",
                         "-drive", &format!("file={},format=raw,if=virtio", micro_disk.display()),
                         "-cdrom", &iso_path.to_string_lossy(),
-                        "-boot", "d",
+                        "-boot", "menu=on,order=dc",
+                        "-nic", "user,model=virtio",
+                        "-device", "virtio-tablet-pci",
                         "-vga", "std",
                         "-name", &format!("OSwitch Standalone Micro-Engine - {}", display_name),
                     ])
@@ -1650,7 +1655,9 @@ pub async fn install_os(
                         "-enable-kvm",
                         "-drive", &format!("file={},format=raw,if=virtio", micro_disk.display()),
                         "-cdrom", &iso_path.to_string_lossy(),
-                        "-boot", "d",
+                        "-boot", "menu=on,order=dc",
+                        "-nic", "user,model=virtio",
+                        "-device", "virtio-tablet-pci",
                         "-vga", "std",
                         "-name", &format!("OSwitch Standalone Micro-Engine - {}", display_name),
                     ])
@@ -2443,7 +2450,9 @@ pub async fn boot_os(os: String) -> Result<String, String> {
                             "-accel", "tcg",
                             "-drive", &format!("file={},format=raw,if=virtio", disk_path),
                             "-cdrom", iso_path,
-                            "-boot", "d",
+                            "-boot", "menu=on,order=dc",
+                            "-nic", "user,model=virtio",
+                            "-device", "virtio-tablet-pci",
                             "-vga", "std",
                             "-name", &format!("OSwitch Standalone Micro-Engine - {}", os_raw),
                         ])
@@ -2461,7 +2470,9 @@ pub async fn boot_os(os: String) -> Result<String, String> {
                             "-enable-kvm",
                             "-drive", &format!("file={},format=raw,if=virtio", disk_path),
                             "-cdrom", iso_path,
-                            "-boot", "d",
+                            "-boot", "menu=on,order=dc",
+                            "-nic", "user,model=virtio",
+                            "-device", "virtio-tablet-pci",
                             "-vga", "std",
                         ])
                         .spawn().map_err(|e| e.to_string())?;
@@ -2977,6 +2988,7 @@ pub async fn get_installed_os_list() -> Result<Vec<InstalledOSInfo>, String> {
                     "arch" => ("Arch Linux", "🏔️"),
                     "fedora" => ("Fedora Workstation", "🎩"),
                     "debian" => ("Debian GNU/Linux", "🎯"),
+                    "netboot" => ("netboot.xyz Universal Cloud OS", "🌐"),
                     _ => (os_raw.as_str(), "💻"),
                 };
 

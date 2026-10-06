@@ -67,6 +67,8 @@ fn detect_distro_meta(filename: &str) -> (String, String) {
         ("Windows 11 / 10 Installer".into(), "🪟".into())
     } else if f.contains("proxmox") {
         ("Proxmox VE".into(), "⚡".into())
+    } else if f.contains("netboot") {
+        ("netboot.xyz Universal Cloud OS".into(), "🌐".into())
     } else {
         ("Generic Operating System".into(), "💿".into())
     }
@@ -273,6 +275,15 @@ menuentry "⚡ OSwitch Boot Switcher (Back to Windows)" --class windows {
     chainloader (loop)/efi/boot/bootx64.efi
 }}
 "#, name, fname, fname));
+        } else if lower.contains("netboot") {
+            cfg.push_str(&format!(r#"menuentry "{} [{}]" --class gnu-linux {{
+    set isofile="/oswitch_isos/{}"
+    search --no-floppy --label OSWITCH_DATA --set=root
+    loopback loop $isofile
+    linux16 (loop)/netboot_xyz.lkrn
+    initrd16 (loop)/autoexec.ipxe
+}}
+"#, name, fname, fname));
         } else {
             cfg.push_str(&format!(r#"menuentry "{} [{}]" --class generic {{
     set isofile="/oswitch_isos/{}"
@@ -353,8 +364,27 @@ pub async fn format_and_initialize_multiboot_usb(
         std::fs::create_dir_all(&iso_dir).map_err(|e| format!("Failed to create oswitch_isos directory: {}", e))?;
         std::fs::create_dir_all(&boot_dir).map_err(|e| format!("Failed to create boot/grub directory: {}", e))?;
 
-        // Write initial grub.cfg
-        let initial_cfg = generate_grub_config(&[]);
+        // Pre-seed netboot.xyz.iso as the default universal cloud rescue system if available
+        let netboot_candidates = [
+            PathBuf::from("scratch_netboot.iso"),
+            PathBuf::from("C:\\OSwitch\\netboot.xyz.iso"),
+            PathBuf::from("C:\\OSwitch\\scratch_netboot.iso"),
+        ];
+        for nb in &netboot_candidates {
+            if nb.exists() {
+                let target_nb = iso_dir.join("netboot.xyz.iso");
+                let _ = std::fs::copy(nb, &target_nb);
+                break;
+            }
+        }
+
+        // Write initial grub.cfg with any pre-seeded ISOs
+        let current_isos = if let Ok(st) = get_multiboot_usb_status(drive_letter.clone()).await {
+            st.isos
+        } else {
+            Vec::new()
+        };
+        let initial_cfg = generate_grub_config(&current_isos);
         let cfg_path = boot_dir.join("grub.cfg");
         std::fs::write(&cfg_path, initial_cfg).map_err(|e| format!("Failed to write initial grub.cfg: {}", e))?;
 

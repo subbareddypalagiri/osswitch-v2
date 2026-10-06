@@ -22,6 +22,19 @@ export interface OSConfig {
 
 export const OS_CATALOG: OSConfig[] = [
   { 
+    id: "netboot", 
+    name: "netboot.xyz (Universal Cloud OS)", 
+    category: "Linux", 
+    isoUrl: "https://boot.netboot.xyz/ipxe/netboot.xyz.iso", 
+    officialSite: "https://netboot.xyz/", 
+    frugalKernel: "/netboot_xyz.lkrn", 
+    frugalInitrd: "/autoexec.ipxe", 
+    frugalAppend: "", 
+    editions: [
+      { id: "cloud", name: "Universal Live Cloud Stream (2.4 MB)", size: "2.4 MB", desc: "Instant 3-Sec Boot • Stream 50+ Linux Distros directly from RAM", isoUrl: "https://boot.netboot.xyz/ipxe/netboot.xyz.iso", recommended: true }
+    ]
+  },
+  { 
     id: "ubuntu", 
     name: "Ubuntu 24.04 LTS", 
     category: "Linux", 

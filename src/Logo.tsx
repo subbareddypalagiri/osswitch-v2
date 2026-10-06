@@ -48,6 +48,19 @@ export const OSLogo = ({ id, className = "", size = 32 }: { id: string; classNam
     );
   }
 
+  // 1b. netboot.xyz (Universal Cloud OS)
+  if (normId.includes("netboot")) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+        <rect width="100" height="100" rx="22" fill="#0b1728" stroke="#38bdf8" strokeWidth="3" />
+        <circle cx="50" cy="50" r="30" stroke="#38bdf8" strokeWidth="4" strokeDasharray="6 3" />
+        <path d="M50 20V80M20 50H80" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
+        <ellipse cx="50" cy="50" rx="15" ry="30" stroke="#38bdf8" strokeWidth="3" />
+        <circle cx="50" cy="50" r="6" fill="#38bdf8" />
+      </svg>
+    );
+  }
+
   // 2. Ubuntu (Circle of Friends)
   if (normId.includes("ubuntu")) {
     return (

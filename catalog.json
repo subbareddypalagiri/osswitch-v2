@@ -1,4 +1,9 @@
 {
+  "netboot": {
+    "name": "netboot.xyz (Universal Cloud OS)",
+    "category": "Linux",
+    "isoUrl": "https://boot.netboot.xyz/ipxe/netboot.xyz.iso"
+  },
   "ubuntu": {
     "name": "Ubuntu 24.04 LTS",
     "category": "Linux",
