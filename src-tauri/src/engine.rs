@@ -933,6 +933,32 @@ fn get_oswitch_dir() -> PathBuf {
     }
 }
 
+fn base64_encode(data: &[u8]) -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in data.chunks(3) {
+        let b = match chunk.len() {
+            3 => ((chunk[0] as u32) << 16) | ((chunk[1] as u32) << 8) | (chunk[2] as u32),
+            2 => ((chunk[0] as u32) << 16) | ((chunk[1] as u32) << 8),
+            1 => (chunk[0] as u32) << 16,
+            _ => 0,
+        };
+        out.push(CHARSET[((b >> 18) & 63) as usize] as char);
+        out.push(CHARSET[((b >> 12) & 63) as usize] as char);
+        if chunk.len() > 1 {
+            out.push(CHARSET[((b >> 6) & 63) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        if chunk.len() > 2 {
+            out.push(CHARSET[(b & 63) as usize] as char);
+        } else {
+            out.push('=');
+        }
+    }
+    out
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn install_os(
@@ -1622,45 +1648,62 @@ pub async fn install_os(
             let _ = tokio::fs::write(&microvm_json, meta.to_string()).await;
 
             // Spawn Standalone Micro-Engine detached in Win32
+            let cidata_iso = temp_dir.join("cidata.iso");
             #[cfg(target_os = "windows")]
             {
                 let exe_str = micro_exe
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|| "qemu-system-x86_64.exe".to_string());
 
+                let mut q_args = vec![
+                    "/c".to_string(), "start".to_string(), "".to_string(),
+                    exe_str,
+                    "-m".to_string(), "3072".to_string(),
+                    "-smp".to_string(), "2".to_string(),
+                    "-accel".to_string(), "whpx,kernel-irqchip=off".to_string(),
+                    "-accel".to_string(), "tcg".to_string(),
+                    "-drive".to_string(), format!("file={},format=raw,if=virtio", micro_disk.display()),
+                    "-cdrom".to_string(), iso_path.to_string_lossy().to_string(),
+                ];
+                if cidata_iso.exists() {
+                    q_args.push("-drive".to_string());
+                    q_args.push(format!("file={},media=cdrom,readonly=on", cidata_iso.display()));
+                }
+                q_args.extend_from_slice(&[
+                    "-boot".to_string(), "menu=on,order=dc".to_string(),
+                    "-nic".to_string(), "user,model=virtio".to_string(),
+                    "-device".to_string(), "virtio-tablet-pci".to_string(),
+                    "-vga".to_string(), "std".to_string(),
+                    "-name".to_string(), format!("OSwitch Standalone Micro-Engine - {}", display_name),
+                ]);
+
                 let _ = std::process::Command::new("cmd")
-                    .args([
-                        "/c", "start", "",
-                        &exe_str,
-                        "-m", "3072",
-                        "-smp", "2",
-                        "-accel", "whpx,kernel-irqchip=off",
-                        "-accel", "tcg",
-                        "-drive", &format!("file={},format=raw,if=virtio", micro_disk.display()),
-                        "-cdrom", &iso_path.to_string_lossy(),
-                        "-boot", "menu=on,order=dc",
-                        "-nic", "user,model=virtio",
-                        "-device", "virtio-tablet-pci",
-                        "-vga", "std",
-                        "-name", &format!("OSwitch Standalone Micro-Engine - {}", display_name),
-                    ])
+                    .args(&q_args)
                     .spawn();
             }
             #[cfg(not(target_os = "windows"))]
             {
+                let mut q_args = vec![
+                    "-m".to_string(), "3072".to_string(),
+                    "-smp".to_string(), "2".to_string(),
+                    "-enable-kvm".to_string(),
+                    "-drive".to_string(), format!("file={},format=raw,if=virtio", micro_disk.display()),
+                    "-cdrom".to_string(), iso_path.to_string_lossy().to_string(),
+                ];
+                if cidata_iso.exists() {
+                    q_args.push("-drive".to_string());
+                    q_args.push(format!("file={},media=cdrom,readonly=on", cidata_iso.display()));
+                }
+                q_args.extend_from_slice(&[
+                    "-boot".to_string(), "menu=on,order=dc".to_string(),
+                    "-nic".to_string(), "user,model=virtio".to_string(),
+                    "-device".to_string(), "virtio-tablet-pci".to_string(),
+                    "-vga".to_string(), "std".to_string(),
+                    "-name".to_string(), format!("OSwitch Standalone Micro-Engine - {}", display_name),
+                ]);
+
                 let _ = Command::new("qemu-system-x86_64")
-                    .args([
-                        "-m", "3072",
-                        "-smp", "2",
-                        "-enable-kvm",
-                        "-drive", &format!("file={},format=raw,if=virtio", micro_disk.display()),
-                        "-cdrom", &iso_path.to_string_lossy(),
-                        "-boot", "menu=on,order=dc",
-                        "-nic", "user,model=virtio",
-                        "-device", "virtio-tablet-pci",
-                        "-vga", "std",
-                        "-name", &format!("OSwitch Standalone Micro-Engine - {}", display_name),
-                    ])
+                    .args(&q_args)
                     .spawn();
             }
 
@@ -1879,6 +1922,23 @@ pub async fn install_os(
             } else {
                 "other-64"
             };
+            let cidata_iso = temp_dir.join("cidata.iso");
+            let cidata_vmx = if cidata_iso.exists() {
+                format!(
+                    "sata0:1.present = \"TRUE\"\n\
+                    sata0:1.fileName = \"{}\"\n\
+                    sata0:1.deviceType = \"cdrom-image\"\n",
+                    cidata_iso.display()
+                )
+            } else {
+                String::new()
+            };
+
+            let user_data = crate::unattended::generate_cloud_init_user_data(unatted_user, unatted_pass, unatted_host);
+            let meta_data = crate::unattended::generate_cloud_init_meta_data(unatted_host);
+            let user_data_b64 = base64_encode(user_data.as_bytes());
+            let meta_data_b64 = base64_encode(meta_data.as_bytes());
+
             let vmx_content = format!(
                 ".encoding = \"UTF-8\"\n\
                 config.version = \"8\"\n\
@@ -1895,8 +1955,28 @@ pub async fn install_os(
                 sata0.present = \"TRUE\"\n\
                 sata0:0.present = \"TRUE\"\n\
                 sata0:0.fileName = \"{}\"\n\
-                sata0:0.deviceType = \"cdrom-image\"\n",
-                id, vmware_guest_os, vmdk_path.display(), iso_path.display()
+                sata0:0.deviceType = \"cdrom-image\"\n\
+                {}\
+                ethernet0.present = \"TRUE\"\n\
+                ethernet0.connectionType = \"nat\"\n\
+                ethernet0.virtualDev = \"e1000e\"\n\
+                ethernet0.wakeOnPdc = \"FALSE\"\n\
+                ethernet0.addressType = \"generated\"\n\
+                sound.present = \"TRUE\"\n\
+                sound.virtualDev = \"hdaudio\"\n\
+                usb.present = \"TRUE\"\n\
+                ehci.present = \"TRUE\"\n\
+                guestinfo.userdata = \"{}\"\n\
+                guestinfo.userdata.encoding = \"base64\"\n\
+                guestinfo.metadata = \"{}\"\n\
+                guestinfo.metadata.encoding = \"base64\"\n\
+                guestinfo.oswitch.username = \"{}\"\n\
+                guestinfo.oswitch.password = \"{}\"\n\
+                guestinfo.oswitch.hostname = \"{}\"\n",
+                id, vmware_guest_os, vmdk_path.display(), iso_path.display(),
+                cidata_vmx,
+                user_data_b64, meta_data_b64,
+                unatted_user, unatted_pass, unatted_host
             );
             let _ = tokio::fs::write(&vmx_path, vmx_content).await;
             
@@ -1942,6 +2022,60 @@ pub async fn install_os(
                 if is_installer_mode { "1-Click Dual-Boot Auto-Installer" } else { "Live Portable Drive" }
             ) 
         });
+
+        // 🌟 1-CLICK DUAL-BOOT USB AUTO-INSTALLER:
+        // Instead of destructive raw DD that turns the USB into a read-only ISO9660 drive,
+        // format as GPT + exFAT (OSWITCH_DATA) and inject zero-touch unattended answers + ISO.
+        if is_installer_mode {
+            let target_drive_letter = usb_info.as_ref()
+                .and_then(|d| d.drive_letter.clone())
+                .unwrap_or_else(|| "E:".to_string());
+            let disk_number_u32 = disk_num.parse::<u32>().unwrap_or(1);
+
+            let _ = app.emit("command-output", Payload { 
+                message: format!("⚡ Partitioning USB Flash Device (PhysicalDrive{} / {}) with GPT + exFAT persistent storage...\n", disk_number_u32, target_drive_letter) 
+            });
+
+            // 1. Format USB with GPT layout & exFAT partition
+            let _ = crate::multiboot_usb::format_and_initialize_multiboot_usb(
+                app.clone(),
+                disk_number_u32,
+                target_drive_letter.clone()
+            ).await;
+
+            // 2. Transfer ISO into oswitch_isos folder
+            let _ = crate::multiboot_usb::copy_iso_to_multiboot_usb(
+                app.clone(),
+                iso_path.to_string_lossy().to_string(),
+                target_drive_letter.clone()
+            ).await;
+
+            // 3. Inject universal unattended answers onto writable partition
+            let usb_clean = format!("{}:\\", target_drive_letter.trim_end_matches([':', '\\', '/']));
+            let _ = inject_universal_usb_unattended(
+                &usb_clean,
+                &id,
+                os_space.unwrap_or(50),
+                username.clone(),
+                password.clone(),
+                hostname.clone(),
+                &app
+            ).await;
+
+            // 4. Also copy cidata.iso to root for NoCloud/Kickstart detection
+            let cidata_iso = temp_dir.join("cidata.iso");
+            if cidata_iso.exists() {
+                let _ = std::fs::copy(&cidata_iso, format!("{}cidata.iso", usb_clean));
+            }
+
+            let _ = app.emit("install-progress", InstallProgress { 
+                i: 2, 
+                text: "✅ 1-Click Dual-Boot USB Auto-Installer Ready! (Plug & Boot to auto-login)".into(), 
+                total: 2, 
+                done: true 
+            });
+            return Ok(format!("Successfully created 1-Click Dual-Boot USB Auto-Installer for {}!", id));
+        }
 
         // 🌟 NATIVE HIGH-SPEED RAW DD SECTOR FLASHER
         // 1. Clean & Dismount USB partitions to prevent volume-lock collisions
@@ -2151,13 +2285,16 @@ pub async fn install_os(
         };
 
         let user = username.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "user".into());
-        let _pass = password.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "oswitch123".into());
+        let pass = password.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "oswitch123".into());
         let host = hostname.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "oswitch-node".into());
         let allocated_space = os_space.unwrap_or(75);
 
         let work_dir = get_oswitch_dir();
         let _ = tokio::fs::create_dir_all(&work_dir).await;
         let target_iso = work_dir.join(format!("{}.iso", id));
+
+        // Stage universal unattended answers in C:\OSwitch
+        let _ = crate::unattended::stage_unattended_media(&work_dir, &id, &user, &pass, &host);
 
         if iso_path.exists() && (!target_iso.exists() || target_iso != iso_path) {
             let _ = tokio::fs::copy(&iso_path, &target_iso).await;
@@ -2189,18 +2326,25 @@ insmod gpt\n\
 insmod ntfs\n\
 insmod loopback\n\
 \n\
-menuentry \"OSwitch - $name (Native Bare-Metal)\" {{\n\
+menuentry \"OSwitch - $name (Zero-Touch Auto-Login)\" {{\n\
     search --no-floppy --file --set=root /OSwitch/$isoName\n\
     loopback loop /OSwitch/$isoName\n\
-    linux (loop)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch img_dev=/dev/disk/by-label/OSW_NTFS img_loop=/OSwitch/$isoName earlymodules=loop cow_spacesize={allocated_space}G hostname={host}\n\
+    linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=/OSwitch/$isoName username={user} user-fullname=\"{user}\" hostname={host} noprompt noeject cow_spacesize={allocated_space}G autoinstall ds=nocloud;s=/OSwitch/nocloud/\n\
+    initrd (loop)/casper/initrd\n\
+}}\n\
+\n\
+menuentry \"OSwitch - $name (Arch Linux Native)\" {{\n\
+    search --no-floppy --file --set=root /OSwitch/$isoName\n\
+    loopback loop /OSwitch/$isoName\n\
+    linux (loop)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch img_loop=/OSwitch/$isoName earlymodules=loop cow_spacesize={allocated_space}G hostname={host} username={user}\n\
     initrd (loop)/arch/boot/x86_64/initramfs-linux.img\n\
 }}\n\
 \n\
-menuentry \"OSwitch - Universal Live Linux\" {{\n\
+menuentry \"OSwitch - $name (Fedora Workstation)\" {{\n\
     search --no-floppy --file --set=root /OSwitch/$isoName\n\
     loopback loop /OSwitch/$isoName\n\
-    linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=/OSwitch/$isoName noeject noprompt cow_spacesize={allocated_space}G\n\
-    initrd (loop)/casper/initrd\n\
+    linux (loop)/images/pxeboot/vmlinuz root=live:CDLABEL=Fedora iso-scan/filename=/OSwitch/$isoName rd.live.image quiet inst.ks=hd:LABEL=OSWITCH:/OSwitch/ks.cfg hostname={host}\n\
+    initrd (loop)/images/pxeboot/initrd.img\n\
 }}\n\
 \"@;\n\
                     Set-Content -Path 'S:\\EFI\\OSwitch\\grub.cfg' -Value $grubCfg -Force;\n\
@@ -2209,16 +2353,14 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
                         $m = Mount-DiskImage -ImagePath $targetIsoPath -PassThru -ErrorAction SilentlyContinue;\n\
                         $vol = ($m | Get-Volume -ErrorAction SilentlyContinue).DriveLetter;\n\
                         if ($vol) {{\n\
-                            $candidates = @(\n\
-                                \"$($vol):\\EFI\\BOOT\\BOOTX64.EFI\",\n\
-                                \"$($vol):\\EFI\\boot\\bootx64.efi\",\n\
-                                \"$($vol):\\EFI\\BOOT\\grubx64.efi\"\n\
-                            );\n\
-                            foreach ($c in $candidates) {{\n\
-                                if (Test-Path $c) {{\n\
-                                    Copy-Item -Path $c -Destination 'S:\\EFI\\OSwitch\\bootx64.efi' -Force;\n\
-                                    $extractedEfi = $true;\n\
-                                    break;\n\
+                            $cEfi = \"$($vol):\\EFI\\BOOT\";\n\
+                            if (Test-Path \"$cEfi\\BOOTX64.EFI\") {{ Copy-Item \"$cEfi\\BOOTX64.EFI\" 'S:\\EFI\\OSwitch\\bootx64.efi' -Force; $extractedEfi = $true; }}\n\
+                            if (Test-Path \"$cEfi\\grubx64.efi\") {{ Copy-Item \"$cEfi\\grubx64.efi\" 'S:\\EFI\\OSwitch\\grubx64.efi' -Force; }}\n\
+                            if (Test-Path \"$cEfi\\mmx64.efi\") {{ Copy-Item \"$cEfi\\mmx64.efi\" 'S:\\EFI\\OSwitch\\mmx64.efi' -Force; }}\n\
+                            if (-not $extractedEfi) {{\n\
+                                Get-ChildItem -Path \"$($vol):\\EFI\" -Filter \"*.efi\" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {{\n\
+                                    Copy-Item $_.FullName 'S:\\EFI\\OSwitch\\' -Force;\n\
+                                    if ($_.Name -like '*bootx64*' -or $_.Name -like '*grub*') {{ $extractedEfi = $true; }}\n\
                                 }}\n\
                             }}\n\
                         }}\n\
@@ -2289,7 +2431,7 @@ menuentry \"OSwitch - Universal Live Linux\" {{\n\
                         sed -i \"s/^[# ]*autologin-user=.*/autologin-user=$user/\" /etc/lightdm/lightdm.conf\n\
                         sed -i \"s/^[# ]*autologin-user-timeout=.*/autologin-user-timeout=0/\" /etc/lightdm/lightdm.conf\n\
                     fi\n",
-                    user, _pass, host
+                    user, pass, host
                 );
                 let _ = tokio::fs::write(overlay_dir.join("usr/bin/oswitch-autouser.sh"), &autouser_script).await;
                 let _ = Command::new("chmod").args(["+x", "/tmp/oswitch-overlay/usr/bin/oswitch-autouser.sh"]).output().await;
@@ -2438,24 +2580,33 @@ pub async fn boot_os(os: String) -> Result<String, String> {
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|| "qemu-system-x86_64.exe".to_string());
 
+                let cidata_iso = oswitch_dir.join("cidata.iso");
                 #[cfg(target_os = "windows")]
                 {
+                    let mut q_args = vec![
+                        "/c".to_string(), "start".to_string(), "".to_string(),
+                        micro_exe,
+                        "-m".to_string(), "3072".to_string(),
+                        "-smp".to_string(), "2".to_string(),
+                        "-accel".to_string(), "whpx,kernel-irqchip=off".to_string(),
+                        "-accel".to_string(), "tcg".to_string(),
+                        "-drive".to_string(), format!("file={},format=raw,if=virtio", disk_path),
+                        "-cdrom".to_string(), iso_path.to_string(),
+                    ];
+                    if cidata_iso.exists() {
+                        q_args.push("-drive".to_string());
+                        q_args.push(format!("file={},media=cdrom,readonly=on", cidata_iso.display()));
+                    }
+                    q_args.extend_from_slice(&[
+                        "-boot".to_string(), "menu=on,order=dc".to_string(),
+                        "-nic".to_string(), "user,model=virtio".to_string(),
+                        "-device".to_string(), "virtio-tablet-pci".to_string(),
+                        "-vga".to_string(), "std".to_string(),
+                        "-name".to_string(), format!("OSwitch Standalone Micro-Engine - {}", os_raw),
+                    ]);
+
                     let _ = std::process::Command::new("cmd")
-                        .args([
-                            "/c", "start", "",
-                            &micro_exe,
-                            "-m", "3072",
-                            "-smp", "2",
-                            "-accel", "whpx,kernel-irqchip=off",
-                            "-accel", "tcg",
-                            "-drive", &format!("file={},format=raw,if=virtio", disk_path),
-                            "-cdrom", iso_path,
-                            "-boot", "menu=on,order=dc",
-                            "-nic", "user,model=virtio",
-                            "-device", "virtio-tablet-pci",
-                            "-vga", "std",
-                            "-name", &format!("OSwitch Standalone Micro-Engine - {}", os_raw),
-                        ])
+                        .args(&q_args)
                         .spawn()
                         .map_err(|e| format!("Failed to launch OSwitch Standalone Micro-Engine: {}", e))?;
 
@@ -2463,18 +2614,26 @@ pub async fn boot_os(os: String) -> Result<String, String> {
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
+                    let mut q_args = vec![
+                        "-m".to_string(), "3072".to_string(),
+                        "-smp".to_string(), "2".to_string(),
+                        "-enable-kvm".to_string(),
+                        "-drive".to_string(), format!("file={},format=raw,if=virtio", disk_path),
+                        "-cdrom".to_string(), iso_path.to_string(),
+                    ];
+                    if cidata_iso.exists() {
+                        q_args.push("-drive".to_string());
+                        q_args.push(format!("file={},media=cdrom,readonly=on", cidata_iso.display()));
+                    }
+                    q_args.extend_from_slice(&[
+                        "-boot".to_string(), "menu=on,order=dc".to_string(),
+                        "-nic".to_string(), "user,model=virtio".to_string(),
+                        "-device".to_string(), "virtio-tablet-pci".to_string(),
+                        "-vga".to_string(), "std".to_string(),
+                    ]);
+
                     let _ = Command::new("qemu-system-x86_64")
-                        .args([
-                            "-m", "3072",
-                            "-smp", "2",
-                            "-enable-kvm",
-                            "-drive", &format!("file={},format=raw,if=virtio", disk_path),
-                            "-cdrom", iso_path,
-                            "-boot", "menu=on,order=dc",
-                            "-nic", "user,model=virtio",
-                            "-device", "virtio-tablet-pci",
-                            "-vga", "std",
-                        ])
+                        .args(&q_args)
                         .spawn().map_err(|e| e.to_string())?;
                     return Ok("Successfully launched OSwitch Micro-Engine!".into());
                 }
