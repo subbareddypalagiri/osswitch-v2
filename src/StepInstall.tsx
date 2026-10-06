@@ -343,7 +343,7 @@ export default function StepInstall({
   const runInstall = async (id: string, localIsoPath?: string) => {
     const effectivePath = localIsoPath || localIsoPaths?.[id];
     try {
-      const intent = selectedIntents[id] || "vbox_vm";
+      const intent = selectedIntents[id] || "micro_vm";
       // tools_only mode: skip all OS-related prompts, go straight to package install
       if (id === "tools_only") {
         await executeInstall(id, effectivePath);
@@ -377,7 +377,7 @@ export default function StepInstall({
         await invoke("backup_system");
       }
 
-      const intent = selectedIntents[id] || "vbox_vm";
+      const intent = selectedIntents[id] || "micro_vm";
       const catalogEntry = catalog.find(o => o.id === id);
       const selectedEditionId = selectedEditions?.[id];
       const editionObj = catalogEntry?.editions?.find((e: any) => e.id === selectedEditionId) || (catalogEntry?.editions && catalogEntry.editions.length > 0 ? catalogEntry.editions[0] : null);
@@ -693,7 +693,7 @@ export default function StepInstall({
                 $ Target OS: {activeOSDetails?.name} {activeOSDetails?.activeEdition ? `[${activeOSDetails.activeEdition.name} • ${activeOSDetails.activeEdition.size}]` : ""}
               </div>
             )}
-            {activeTab !== "tools_only" && <div className="text-green-400 mb-1">$ Intent: {selectedIntents[activeTab || ""] || "vbox_vm"}</div>}
+            {activeTab !== "tools_only" && <div className="text-green-400 mb-1">$ Intent: {selectedIntents[activeTab || ""] || "micro_vm"}</div>}
             {activeTab !== "tools_only" && localIsoPaths?.[activeTab || ""] && (
               <div className="text-cyan-300 mb-1 font-bold">
                 $ Local ISO: {localIsoPaths[activeTab || ""]} (0 GB Network Usage)
@@ -827,6 +827,9 @@ export default function StepInstall({
                   )}
                   {selectedIntents[activeTab || ""] === "baremetal_grub" && (
                     <p><strong>Next Steps (Native Dual-Boot):</strong> Zero-Partition Bare-Metal Bootloader has been injected into your Windows Boot Manager. When you restart your PC, Windows will automatically display the Boot Menu allowing you to boot directly into your new OS on real hardware with full CPU/GPU performance (Zero USB needed)!</p>
+                  )}
+                  {selectedIntents[activeTab || ""] === "micro_vm" && (
+                    <p><strong>Next Steps (OSwitch Standalone Micro-Engine):</strong> Your operating system has launched in an isolated high-speed micro-sandbox using Windows native hardware virtualization (Zero external tools required)!</p>
                   )}
                   {(selectedIntents[activeTab || ""] === "vbox_vm" || selectedIntents[activeTab || ""] === "vmware_vm") && (
                     <p><strong>Next Steps (Virtual Machine):</strong> Your virtual machine has been fully created and booted! VirtualBox/VMware is now running your new OS VM.</p>

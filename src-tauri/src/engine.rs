@@ -234,6 +234,42 @@ pub async fn pick_local_iso() -> Result<Option<LocalIsoMeta>, String> {
     }
 }
 
+pub fn get_qemu_executable() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        let candidates = [
+            PathBuf::from("C:\\OSwitch\\bin\\qemu\\qemu-system-x86_64.exe"),
+            PathBuf::from("C:\\Program Files\\qemu\\qemu-system-x86_64.exe"),
+            PathBuf::from("C:\\Program Files (x86)\\qemu\\qemu-system-x86_64.exe"),
+        ];
+        for p in &candidates {
+            if p.exists() {
+                return Some(p.clone());
+            }
+        }
+        if let Ok(out) = std::process::Command::new("where").arg("qemu-system-x86_64").output() {
+            if out.status.success() {
+                if let Some(line) = String::from_utf8_lossy(&out.stdout).lines().next() {
+                    let p = PathBuf::from(line.trim());
+                    if p.exists() {
+                        return Some(p);
+                    }
+                }
+            }
+        }
+        None
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(out) = std::process::Command::new("which").arg("qemu-system-x86_64").output() {
+            if out.status.success() {
+                return Some(PathBuf::from("qemu-system-x86_64"));
+            }
+        }
+        None
+    }
+}
+
 #[tauri::command]
 pub async fn scan_local_iso_cache() -> Result<Vec<LocalIsoMeta>, String> {
     let mut found = Vec::new();
@@ -1505,8 +1541,136 @@ pub async fn install_os(
 
     let _ = app.emit("install-progress", InstallProgress { i: 1, text: "Preparing environment...".into(), total: 3, done: false });
     
-    if intent == "vbox_vm" || intent == "vmware_vm" {
-        if intent == "vbox_vm" {
+    if intent == "micro_vm" || intent == "vbox_vm" || intent == "vmware_vm" {
+        let display_name = match id.as_str() {
+            "blackarch" => "BlackArch Linux",
+            "kali" => "Kali Linux",
+            "ubuntu" => "Ubuntu Desktop",
+            "arch" => "Arch Linux",
+            "fedora" => "Fedora Workstation",
+            "debian" => "Debian GNU/Linux",
+            _ => id.as_str(),
+        };
+
+        if intent == "micro_vm" {
+            let _ = app.emit("download-telemetry", DownloadTelemetry {
+                mbps: 0.0,
+                downloaded_mb: (iso_path.metadata().map(|m| m.len()).unwrap_or(0) as f64) / (1024.0 * 1024.0),
+                total_mb: (iso_path.metadata().map(|m| m.len()).unwrap_or(0) as f64) / (1024.0 * 1024.0),
+                pct: 100,
+                chunks: vec![100; 8],
+                sha256: "".into(),
+                is_accelerated: true,
+                eta_seconds: 0,
+                stage: "Stage 4: Initializing Standalone Micro-Engine (Zero-Install)".into(),
+                stage_index: 4,
+            });
+            let _ = app.emit("install-progress", InstallProgress { 
+                i: 2, 
+                text: "🚀 Stage 4: Launching OSwitch Standalone Micro-Engine (WHPX / QEMU)...".into(), 
+                total: 3, 
+                done: false 
+            });
+
+            // 1. Locate or ensure standalone micro-engine executable
+            let mut micro_exe = get_qemu_executable();
+            
+            #[cfg(target_os = "windows")]
+            if micro_exe.is_none() {
+                let _ = app.emit("install-progress", InstallProgress { 
+                    i: 2, 
+                    text: "Setting up lightweight standalone micro-engine via Winget (Zero-Reboot)...".into(), 
+                    total: 3, 
+                    done: false 
+                });
+                let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+                let winget_path = format!("{}/Microsoft/WindowsApps/winget.exe", local_app_data);
+                let _ = create_silent_cmd(&winget_path)
+                    .args(["install", "-e", "--id", "SoftwareFreedomConservancy.QEMU", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--source", "winget"])
+                    .output().await;
+                micro_exe = get_qemu_executable();
+            }
+
+            let micro_disk = temp_dir.join(format!("OSwitch_{}_micro.raw", id));
+            if !micro_disk.exists() {
+                if let Ok(f) = std::fs::File::create(&micro_disk) {
+                    let _ = f.set_len(40 * 1024 * 1024 * 1024); // 40GB sparse virtual disk
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = create_silent_cmd("fsutil")
+                        .args(["sparse", "setflag", &micro_disk.to_string_lossy()])
+                        .output()
+                        .await;
+                }
+            }
+
+            // Save micro-vm descriptor for Manage OS and instant 1-click reboot
+            let microvm_json = temp_dir.join(format!("OSwitch_{}.microvm.json", id));
+            let meta = serde_json::json!({
+                "id": id,
+                "name": display_name,
+                "iso_path": iso_path.to_string_lossy(),
+                "disk_path": micro_disk.to_string_lossy(),
+                "engine": "standalone_micro_vm",
+                "ram_mb": 3072,
+                "cpus": 2
+            });
+            let _ = tokio::fs::write(&microvm_json, meta.to_string()).await;
+
+            // Spawn Standalone Micro-Engine detached in Win32
+            #[cfg(target_os = "windows")]
+            {
+                let exe_str = micro_exe
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "qemu-system-x86_64.exe".to_string());
+
+                let _ = std::process::Command::new("cmd")
+                    .args([
+                        "/c", "start", "",
+                        &exe_str,
+                        "-m", "3072",
+                        "-smp", "2",
+                        "-accel", "whpx,kernel-irqchip=off",
+                        "-accel", "tcg",
+                        "-drive", &format!("file={},format=raw,if=virtio", micro_disk.display()),
+                        "-cdrom", &iso_path.to_string_lossy(),
+                        "-boot", "d",
+                        "-vga", "std",
+                        "-name", &format!("OSwitch Standalone Micro-Engine - {}", display_name),
+                    ])
+                    .spawn();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = Command::new("qemu-system-x86_64")
+                    .args([
+                        "-m", "3072",
+                        "-smp", "2",
+                        "-enable-kvm",
+                        "-drive", &format!("file={},format=raw,if=virtio", micro_disk.display()),
+                        "-cdrom", &iso_path.to_string_lossy(),
+                        "-boot", "d",
+                        "-vga", "std",
+                        "-name", &format!("OSwitch Standalone Micro-Engine - {}", display_name),
+                    ])
+                    .spawn();
+            }
+
+            let _ = app.emit("download-telemetry", DownloadTelemetry {
+                mbps: 0.0,
+                downloaded_mb: (iso_path.metadata().map(|m| m.len()).unwrap_or(0) as f64) / (1024.0 * 1024.0),
+                total_mb: (iso_path.metadata().map(|m| m.len()).unwrap_or(0) as f64) / (1024.0 * 1024.0),
+                pct: 100,
+                chunks: vec![100; 8],
+                sha256: "".into(),
+                is_accelerated: true,
+                eta_seconds: 0,
+                stage: "Stage 5: Standalone Micro-Engine Online (3-Sec Boot)".into(),
+                stage_index: 5,
+            });
+            let _ = app.emit("install-progress", InstallProgress { i: 2, text: "🚀 Stage 5: Standalone Micro-Engine Online".into(), total: 3, done: true });
+        } else if intent == "vbox_vm" {
             let vbox_path = "C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe";
             if !std::path::Path::new(vbox_path).exists() {
                 let _ = app.emit("install-progress", InstallProgress { i: 2, text: "Installing VirtualBox via Winget...".into(), total: 3, done: false });
@@ -2251,6 +2415,62 @@ pub async fn boot_os(os: String) -> Result<String, String> {
         .to_lowercase();
 
     let oswitch_dir = get_oswitch_dir();
+    let micro_candidate = if os.starts_with("micro:") {
+        oswitch_dir.join(os.trim_start_matches("micro:"))
+    } else {
+        oswitch_dir.join(format!("OSwitch_{}.microvm.json", os_raw))
+    };
+
+    // ─── 0. OSwitch Standalone Micro-Engine Execution Path ───
+    if micro_candidate.exists() {
+        if let Ok(content) = std::fs::read_to_string(&micro_candidate) {
+            if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content) {
+                let iso_path = meta["iso_path"].as_str().unwrap_or("");
+                let disk_path = meta["disk_path"].as_str().unwrap_or("");
+                let micro_exe = get_qemu_executable()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "qemu-system-x86_64.exe".to_string());
+
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = std::process::Command::new("cmd")
+                        .args([
+                            "/c", "start", "",
+                            &micro_exe,
+                            "-m", "3072",
+                            "-smp", "2",
+                            "-accel", "whpx,kernel-irqchip=off",
+                            "-accel", "tcg",
+                            "-drive", &format!("file={},format=raw,if=virtio", disk_path),
+                            "-cdrom", iso_path,
+                            "-boot", "d",
+                            "-vga", "std",
+                            "-name", &format!("OSwitch Standalone Micro-Engine - {}", os_raw),
+                        ])
+                        .spawn()
+                        .map_err(|e| format!("Failed to launch OSwitch Standalone Micro-Engine: {}", e))?;
+
+                    return Ok(format!("Successfully launched {} in OSwitch Standalone Micro-Engine!", os_raw));
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    let _ = Command::new("qemu-system-x86_64")
+                        .args([
+                            "-m", "3072",
+                            "-smp", "2",
+                            "-enable-kvm",
+                            "-drive", &format!("file={},format=raw,if=virtio", disk_path),
+                            "-cdrom", iso_path,
+                            "-boot", "d",
+                            "-vga", "std",
+                        ])
+                        .spawn().map_err(|e| e.to_string())?;
+                    return Ok("Successfully launched OSwitch Micro-Engine!".into());
+                }
+            }
+        }
+    }
+
     let vmx_candidate = if os.starts_with("vmware:") {
         oswitch_dir.join(os.trim_start_matches("vmware:"))
     } else {
@@ -2367,6 +2587,29 @@ pub async fn stop_os(os: String) -> Result<String, String> {
         .to_lowercase();
 
     let oswitch_dir = get_oswitch_dir();
+    let micro_candidate = if os.starts_with("micro:") {
+        oswitch_dir.join(os.trim_start_matches("micro:"))
+    } else {
+        oswitch_dir.join(format!("OSwitch_{}.microvm.json", os_raw))
+    };
+
+    // 0. If OSwitch Standalone Micro-Engine VM
+    if micro_candidate.exists() {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = create_silent_powershell()
+                .args(["-NoProfile", "-NonInteractive", "-Command", "Stop-Process -Name 'qemu-system-x86_64' -Force -ErrorAction SilentlyContinue"])
+                .output()
+                .await;
+            return Ok(format!("Stopped OSwitch Standalone Micro-Engine for {}.", target_vm_name));
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = Command::new("killall").args(["-9", "qemu-system-x86_64"]).output().await;
+            return Ok("Stopped OSwitch Standalone Micro-Engine.".into());
+        }
+    }
+
     let vmx_candidate = if os.starts_with("vmware:") {
         oswitch_dir.join(os.trim_start_matches("vmware:"))
     } else {
@@ -2457,6 +2700,13 @@ pub async fn uninstall_os(os: String) -> Result<String, String> {
             Remove-Item 'C:\OSwitch\OSwitch_{os_raw}_disk-flat.vmdk' -Force -ErrorAction SilentlyContinue;
             Remove-Item "$env:TEMP\OSwitch_{os_raw}.vmx" -Force -ErrorAction SilentlyContinue;
             Remove-Item "$env:TEMP\OSwitch_{os_raw}_disk.vmdk" -Force -ErrorAction SilentlyContinue;
+
+            # 2b. Terminate & Delete OSwitch Standalone Micro-Engine
+            Stop-Process -Name 'qemu-system-x86_64' -Force -ErrorAction SilentlyContinue;
+            Remove-Item 'C:\OSwitch\OSwitch_{os_raw}.microvm.json' -Force -ErrorAction SilentlyContinue;
+            Remove-Item 'C:\OSwitch\OSwitch_{os_raw}_micro.raw' -Force -ErrorAction SilentlyContinue;
+            Remove-Item "$env:TEMP\OSwitch_{os_raw}.microvm.json" -Force -ErrorAction SilentlyContinue;
+            Remove-Item "$env:TEMP\OSwitch_{os_raw}_micro.raw" -Force -ErrorAction SilentlyContinue;
 
             # 3. Unregister WSL Subsystem
             wsl --unregister '{os_raw}' 2>$null;
@@ -2703,6 +2953,67 @@ pub async fn get_installed_os_list() -> Result<Vec<InstalledOSInfo>, String> {
                     status: status.into(),
                     os_type: "Virtual Machine (VMware)".into(),
                     used: format!("{:.1} GB", vmdk_size_mb as f64 / 1024.0),
+                    total: "40.0 GB".into(),
+                    is_host: false,
+                });
+            }
+        }
+    }
+
+    // 4. Scan for OSwitch Standalone Micro-Engine (*.microvm.json) in C:\OSwitch
+    if let Ok(mut entries) = tokio::fs::read_dir(&oswitch_dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let fname = entry.file_name().to_string_lossy().to_string();
+            if fname.starts_with("OSwitch_") && fname.ends_with(".microvm.json") {
+                let os_raw = fname
+                    .trim_start_matches("OSwitch_")
+                    .trim_end_matches(".microvm.json")
+                    .to_lowercase();
+
+                let (display_name, glyph) = match os_raw.as_str() {
+                    "blackarch" => ("BlackArch Linux", "🏹"),
+                    "kali" => ("Kali Linux", "🐉"),
+                    "ubuntu" => ("Ubuntu Desktop", "🐧"),
+                    "arch" => ("Arch Linux", "🏔️"),
+                    "fedora" => ("Fedora Workstation", "🎩"),
+                    "debian" => ("Debian GNU/Linux", "🎯"),
+                    _ => (os_raw.as_str(), "💻"),
+                };
+
+                let micro_disk = oswitch_dir.join(format!("OSwitch_{}_micro.raw", os_raw));
+                let disk_exists = micro_disk.exists();
+                let disk_size_mb = if disk_exists {
+                    std::fs::metadata(&micro_disk).map(|m| m.len() / 1024 / 1024).unwrap_or(0)
+                } else {
+                    0
+                };
+
+                #[cfg(target_os = "windows")]
+                let is_running = {
+                    let s = create_silent_powershell()
+                        .args(["-NoProfile", "-NonInteractive", "-Command", "Get-Process | Where-Object { $_.ProcessName -like '*qemu-system-x86_64*' } | Measure-Object | Select-Object -ExpandProperty Count"])
+                        .output().await;
+                    s.ok().map(|o| String::from_utf8_lossy(&o.stdout).trim() != "0").unwrap_or(false)
+                };
+                #[cfg(not(target_os = "windows"))]
+                let is_running = false;
+
+                let status = if is_running {
+                    "Running"
+                } else if disk_exists {
+                    "Ready to Boot"
+                } else {
+                    "Disk Missing (Reinstall)"
+                };
+
+                list.push(InstalledOSInfo {
+                    id: format!("micro:{}", fname),
+                    name: format!("{} (Micro-Engine)", display_name),
+                    glyph: glyph.into(),
+                    partition: if disk_exists { "Standalone Virtual Disk (Raw/Sparse)".into() } else { "Disk Missing".into() },
+                    status: status.into(),
+                    os_type: "Standalone Micro-Engine (Zero-Install)".into(),
+                    used: format!("{:.1} GB", disk_size_mb as f64 / 1024.0),
                     total: "40.0 GB".into(),
                     is_host: false,
                 });

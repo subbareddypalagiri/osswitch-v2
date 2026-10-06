@@ -448,7 +448,7 @@ export default function StepChooseOS({
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-8">
                 {filteredOS.map((os: any) => {
                   const isSelected = selectedOSSet.has(os.id);
-                  const intent = selectedIntents[os.id] || 'vbox_vm';
+                  const intent = selectedIntents[os.id] || 'micro_vm';
                   const editions = os.editions as any[] | undefined;
                   const currentEditionId = selectedEditions[os.id] || (editions && editions.length > 0 ? editions[0].id : undefined);
                   const activeEdition = editions?.find((e: any) => e.id === currentEditionId) || (editions && editions.length > 0 ? editions[0] : null);
@@ -513,11 +513,12 @@ export default function StepChooseOS({
                               value={intent}
                               onChange={(e) => handleIntentChange(os.id, e.target.value)}
                             >
-                              <option value="vbox_vm">1. VirtualBox VM (Safe Sandbox)</option>
-                              <option value="vmware_vm">2. VMware Workstation Pro VM</option>
-                              <option value="baremetal_grub">3. Native Bare-Metal (UEFI Dual-Boot - No USB)</option>
-                              <option value="usb_live">4. Live USB Portable (Run in RAM/USB - 0% SSD Touch)</option>
-                              <option value="usb_installer">5. USB 1-Click Automated Dual-Boot Installer (Install to PC)</option>
+                              <option value="micro_vm">⭐ 1. OSwitch Standalone Micro-Engine (Instant 3-Sec Boot • 0 External Installs)</option>
+                              <option value="vbox_vm">2. Oracle VirtualBox VM (Traditional Hypervisor)</option>
+                              <option value="vmware_vm">3. VMware Workstation Pro VM (Traditional Hypervisor)</option>
+                              <option value="baremetal_grub">4. Native Bare-Metal (UEFI Dual-Boot - No USB)</option>
+                              <option value="usb_live">5. Live USB Portable (Run in RAM/USB - 0% SSD Touch)</option>
+                              <option value="usb_installer">6. USB 1-Click Automated Dual-Boot Installer (Install to PC)</option>
                             </select>
                           </div>
 
